@@ -2,13 +2,19 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Koodo Reader" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#fdf6e3" />
   <title>Koodo Reader - PDF & EPUB 阅读器</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- JSZip：用于解压并解析本地 EPUB 文件 -->
+  <!-- JSZip：解压并解析本地 EPUB -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <!-- PDF.js：用于解析并渲染本地 PDF 文件 -->
+  <!-- PDF.js：解析并渲染本地 PDF -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     /* 映射本机已安装的叶立群几何体测试版及常见中文字体 */
@@ -37,6 +43,7 @@
 
     * {
       box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
     }
 
     body {
@@ -157,35 +164,58 @@
       width: 0 !important;
       height: 0 !important;
     }
+
+    /* 手机端触控唤出四角悬浮按钮的状态 */
+    #reader-view.mobile-controls-active .corner-float-btn {
+      opacity: 1 !important;
+      pointer-events: auto !important;
+    }
+
+    /* 手机端侧边栏抽屉适配 */
+    @media (max-width: 768px) {
+      #library-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        z-index: 45;
+        background-color: #ffffff;
+        box-shadow: 4px 0 24px rgba(0, 0, 0, 0.14);
+        transition: transform 0.22s ease;
+      }
+      #library-sidebar.mobile-closed {
+        transform: translateX(-100%);
+      }
+    }
   </style>
 </head>
 <body class="h-screen w-screen overflow-hidden flex flex-col">
 
   <!-- 隐藏的文件上传控件：支持导入真实 PDF 和 EPUB -->
-  <input id="file-upload-input" type="file" accept=".pdf,.epub" multiple class="hidden" />
+  <input id="file-upload-input" type="file" accept=".pdf,.epub,application/pdf,application/epub+zip" multiple class="hidden" />
   <!-- 隐藏的本地字体上传控件：支持导入 .ttf / .otf / .woff / .woff2 字体文件 -->
   <input id="font-upload-input" type="file" accept=".ttf,.otf,.woff,.woff2" class="hidden" />
 
   <!-- ==================== 1. 主页书库视图（无顶部窗口栏，无预读按钮） ==================== -->
   <div id="library-view" class="flex-1 flex flex-col h-full w-full bg-white overflow-hidden">
     <!-- 主页顶部工具栏 -->
-    <header class="h-20 w-full flex items-center justify-between px-5 shrink-0">
-      <div class="flex items-center gap-6 flex-1">
+    <header class="h-20 w-full flex items-center justify-between px-4 sm:px-6 shrink-0">
+      <div class="flex items-center gap-3 sm:gap-6 flex-1 min-w-0">
         <!-- 左侧汉堡菜单按钮 -->
-        <button id="toggle-sidebar-btn" type="button" title="折叠/展开侧边栏" class="p-2 rounded-lg hover:bg-neutral-100 text-neutral-700 transition cursor-pointer">
+        <button id="toggle-sidebar-btn" type="button" title="折叠/展开侧边栏" class="p-2 rounded-lg hover:bg-neutral-100 text-neutral-700 transition cursor-pointer shrink-0">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h14M4 12h14M4 18h14" />
           </svg>
         </button>
 
         <!-- 搜索框与工具按钮区 -->
-        <div class="flex items-center gap-5 ml-10 sm:ml-28">
-          <div class="relative w-[240px] sm:w-[270px]">
+        <div class="flex items-center gap-3 sm:gap-5 ml-1 sm:ml-16 md:ml-24 flex-1 min-w-0">
+          <div class="relative w-full max-w-[260px]">
             <input
               id="library-search-input"
               type="text"
               placeholder="搜索我的书库"
-              class="w-full h-11 pl-5 pr-11 rounded-full bg-[#ebebeb] text-[15px] text-neutral-700 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-neutral-400 transition"
+              class="w-full h-11 pl-5 pr-10 rounded-full bg-[#ebebeb] text-[15px] text-neutral-700 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-neutral-400 transition"
             />
             <svg class="w-5 h-5 text-neutral-500 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <circle cx="11" cy="11" r="7"></circle>
@@ -194,14 +224,14 @@
           </div>
 
           <!-- 排序按钮 -->
-          <button id="sort-books-btn" type="button" title="排序图书" class="p-2.5 rounded-full hover:bg-neutral-100 text-neutral-700 transition cursor-pointer">
+          <button id="sort-books-btn" type="button" title="排序图书" class="hidden sm:inline-flex p-2.5 rounded-full hover:bg-neutral-100 text-neutral-700 transition cursor-pointer shrink-0">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M4 7h7M4 12h5M4 17h7M16 6v12m0 0l-3-3m3 3l3-3" />
             </svg>
           </button>
 
           <!-- 全局设置按钮 -->
-          <button id="app-settings-btn" type="button" title="阅读器偏好设置" class="p-2.5 rounded-full hover:bg-neutral-100 text-neutral-700 transition cursor-pointer">
+          <button id="app-settings-btn" type="button" title="阅读器偏好设置" class="hidden sm:inline-flex p-2.5 rounded-full hover:bg-neutral-100 text-neutral-700 transition cursor-pointer shrink-0">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <circle cx="12" cy="12" r="3"></circle>
@@ -211,34 +241,45 @@
       </div>
 
       <!-- 右上角「导入图书」胶囊按钮 -->
-      <div class="relative flex items-center">
+      <div class="relative flex items-center gap-2 shrink-0 ml-2">
         <div class="inline-flex items-center bg-[#484848] hover:bg-[#3a3a3a] text-white rounded-full h-11 shadow-sm transition overflow-hidden">
-          <button id="import-book-btn" type="button" class="px-6 h-full text-[15px] font-medium tracking-wide flex items-center cursor-pointer">
+          <button id="import-book-btn" type="button" class="px-5 sm:px-6 h-full text-[15px] font-medium tracking-wide flex items-center cursor-pointer whitespace-nowrap">
             导入图书
           </button>
           <div class="h-6 w-[1px] bg-neutral-500/60"></div>
-          <button id="import-dropdown-btn" type="button" title="更多导入选项" class="px-3.5 h-full flex items-center justify-center hover:bg-white/10 cursor-pointer">
+          <button id="import-dropdown-btn" type="button" title="更多选项" class="px-3.5 h-full flex items-center justify-center hover:bg-white/10 cursor-pointer">
             <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 20 20">
               <path d="M5.5 7.5l4.5 5 4.5-5H5.5z" />
             </svg>
           </button>
         </div>
 
-        <!-- 导入下拉菜单 -->
-        <div id="import-dropdown-menu" class="hidden absolute right-0 top-12 mt-2 w-56 bg-white rounded-xl shadow-xl border border-neutral-200 py-2 z-40 text-sm text-neutral-700">
+        <!-- 导入下拉菜单（含一键下载防乱码 UTF-8 HTML 文件） -->
+        <div id="import-dropdown-menu" class="hidden absolute right-0 top-12 mt-2 w-64 bg-white rounded-xl shadow-xl border border-neutral-200 py-2 z-50 text-sm text-neutral-700">
           <button id="menu-import-local" type="button" class="w-full text-left px-4 py-2.5 hover:bg-neutral-100 flex items-center gap-2.5 cursor-pointer">
             <span>📂</span>
             <span>从本地导入 PDF / EPUB</span>
+          </button>
+          <button id="menu-download-utf8" type="button" class="w-full text-left px-4 py-2.5 hover:bg-neutral-100 flex items-center gap-2.5 cursor-pointer text-emerald-700 font-medium">
+            <span>💾</span>
+            <span>下载防乱码 HTML (index.html)</span>
+          </button>
+          <button id="menu-clear-db" type="button" class="w-full text-left px-4 py-2.5 hover:bg-red-50 flex items-center gap-2.5 cursor-pointer text-red-600">
+            <span>🗑️</span>
+            <span>清空浏览器缓存图书</span>
           </button>
         </div>
       </div>
     </header>
 
     <!-- 主页下方主体：左侧导航栏 + 右侧书库内容区 -->
-    <div class="flex-1 flex overflow-hidden">
+    <div class="flex-1 flex overflow-hidden relative">
+      <!-- 手机端侧边栏半透明遮罩 -->
+      <div id="mobile-sidebar-backdrop" class="hidden fixed inset-0 bg-black/30 z-40 md:hidden"></div>
+
       <!-- 左侧导航栏 -->
-      <aside id="library-sidebar" class="w-[235px] shrink-0 flex flex-col justify-between pr-3 pb-4 select-none overflow-y-auto">
-        <div class="space-y-1">
+      <aside id="library-sidebar" class="mobile-closed md:transform-none w-[235px] shrink-0 flex flex-col justify-between pr-3 pb-4 select-none overflow-y-auto">
+        <div class="space-y-1 pt-2 md:pt-0">
           <!-- 主导航项 -->
           <nav id="main-nav-list" class="space-y-1">
             <button type="button" data-nav="all" class="nav-item active-nav w-full flex items-center gap-4 pl-6 pr-4 py-3 rounded-r-full bg-[#4a4a4a] text-white text-[15px] font-medium transition cursor-pointer">
@@ -314,11 +355,11 @@
       </aside>
 
       <!-- 右侧图书展示区 -->
-      <main id="library-main-area" class="flex-1 h-full overflow-y-auto px-14 pt-12 pb-16">
+      <main id="library-main-area" class="flex-1 h-full overflow-y-auto px-6 sm:px-14 pt-10 sm:pt-12 pb-16">
         <!-- 1) 空书库状态（严格还原图1，无任何预读按钮） -->
-        <div id="empty-library-state" class="mt-20 ml-4 max-w-md">
-          <h1 class="text-[38px] font-normal text-[#3c3c3c] tracking-wide leading-snug">图书库为空</h1>
-          <p class="mt-4 text-[24px] text-[#9e9e9e] leading-relaxed font-light">
+        <div id="empty-library-state" class="mt-16 sm:mt-20 ml-2 sm:ml-4 max-w-md">
+          <h1 class="text-[32px] sm:text-[38px] font-normal text-[#3c3c3c] tracking-wide leading-snug">图书库为空</h1>
+          <p class="mt-4 text-[20px] sm:text-[24px] text-[#9e9e9e] leading-relaxed font-light">
             请点击右上角的从本地导入按钮添加<br />图书
           </p>
         </div>
@@ -329,7 +370,7 @@
             <h2 id="current-category-title" class="text-xl font-medium text-neutral-800">全部图书</h2>
             <span id="book-count-badge" class="text-sm text-neutral-400">共 0 本</span>
           </div>
-          <div id="books-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-7"></div>
+          <div id="books-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5 sm:gap-7"></div>
         </div>
       </main>
     </div>
@@ -338,7 +379,7 @@
   <!-- ==================== 2. 阅读器视图（无顶部标题栏，左上返回主页与右上设置镜像对称） ==================== -->
   <div id="reader-view" class="hidden fixed inset-0 z-30 flex flex-col bg-[#e9e4d8]">
     <!-- 阅读器主画布区（100% 占满全屏，无顶栏、无底栏割裂） -->
-    <div class="relative flex-1 w-full h-full p-[6px] bg-[#dcd7cc] overflow-hidden flex items-center justify-center">
+    <div class="relative flex-1 w-full h-full p-0 sm:p-[6px] bg-[#dcd7cc] overflow-hidden flex items-center justify-center">
       <!-- 书页容器（受背景色、文字色、屏幕亮度等动态控制） -->
       <div
         id="book-stage"
@@ -346,7 +387,7 @@
         style="background-color: var(--reader-bg); color: var(--reader-text); filter: brightness(var(--reader-brightness));"
       >
         <!-- 可选书内页眉（受「不显示页眉」开关控制，默认隐藏） -->
-        <div id="reader-page-header" class="hidden h-8 px-14 pt-3 text-xs opacity-50 flex items-center justify-between select-none shrink-0">
+        <div id="reader-page-header" class="hidden h-8 px-6 sm:px-14 pt-3 text-xs opacity-50 flex items-center justify-between select-none shrink-0">
           <span id="header-book-title"></span>
           <span id="header-chapter-title"></span>
         </div>
@@ -354,15 +395,14 @@
         <!-- 左上角隐藏感应区 + 悬浮返回主页按钮（与右上角设置按钮完全镜像对称） -->
         <div
           id="top-left-hover-zone"
-          class="group absolute top-0 left-0 w-36 h-28 z-30 flex items-start justify-start p-2.5"
+          class="group absolute top-0 left-0 w-28 sm:w-36 h-24 sm:h-28 z-30 flex items-start justify-start p-2.5"
         >
           <button
             id="reader-home-trigger"
             type="button"
             title="返回书库主页"
-            class="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-200 w-11 h-11 rounded-full bg-black/[0.06] hover:bg-black/[0.14] flex items-center justify-center text-[#59524c] cursor-pointer"
+            class="corner-float-btn opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-200 w-11 h-11 rounded-full bg-black/[0.06] hover:bg-black/[0.14] flex items-center justify-center text-[#59524c] cursor-pointer"
           >
-            <!-- 左箭头/返回主页图标 -->
             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
@@ -372,15 +412,14 @@
         <!-- 右上角隐藏感应区 + 悬浮四宫格设置按钮（鼠标移动到右上角才浮现，还原图2） -->
         <div
           id="top-right-hover-zone"
-          class="group absolute top-0 right-0 w-36 h-28 z-30 flex items-start justify-end p-2.5"
+          class="group absolute top-0 right-0 w-28 sm:w-36 h-24 sm:h-28 z-30 flex items-start justify-end p-2.5"
         >
           <button
             id="reader-settings-trigger"
             type="button"
             title="阅读选项"
-            class="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-200 w-11 h-11 rounded-full bg-black/[0.06] hover:bg-black/[0.14] flex items-center justify-center text-[#59524c] cursor-pointer"
+            class="corner-float-btn opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-200 w-11 h-11 rounded-full bg-black/[0.06] hover:bg-black/[0.14] flex items-center justify-center text-[#59524c] cursor-pointer"
           >
-            <!-- 四宫格图标 -->
             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <rect x="4" y="4" width="6.5" height="6.5" rx="1"></rect>
               <rect x="13.5" y="4" width="6.5" height="6.5" rx="1"></rect>
@@ -393,13 +432,13 @@
         <!-- 左下角鼠标感应区 + 悬浮圆形上一页按钮 -->
         <div
           id="bottom-left-hover-zone"
-          class="group absolute bottom-0 left-0 w-44 h-36 z-30 flex items-end justify-start p-3 pointer-events-auto"
+          class="group absolute bottom-0 left-0 w-32 sm:w-44 h-28 sm:h-36 z-30 flex items-end justify-start p-3 pointer-events-auto"
         >
           <button
             id="prev-page-btn"
             type="button"
             title="上一页 (键盘 ← 或 ↑)"
-            class="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-200 w-12 h-12 rounded-full bg-[#4a4845]/70 hover:bg-[#3a3835]/85 text-white shadow-md flex items-center justify-center cursor-pointer"
+            class="corner-float-btn opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-200 w-12 h-12 rounded-full bg-[#4a4845]/70 hover:bg-[#3a3835]/85 text-white shadow-md flex items-center justify-center cursor-pointer"
           >
             <svg class="w-6 h-6 -ml-0.5" fill="none" stroke="currentColor" stroke-width="2.6" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
@@ -410,13 +449,13 @@
         <!-- 右下角鼠标感应区 + 悬浮圆形下一页按钮 -->
         <div
           id="bottom-right-hover-zone"
-          class="group absolute bottom-0 right-0 w-44 h-36 z-30 flex items-end justify-end p-3 pointer-events-auto"
+          class="group absolute bottom-0 right-0 w-32 sm:w-44 h-28 sm:h-36 z-30 flex items-end justify-end p-3 pointer-events-auto"
         >
           <button
             id="next-page-btn"
             type="button"
             title="下一页 (键盘 → 或 ↓)"
-            class="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-200 w-12 h-12 rounded-full bg-[#4a4845]/70 hover:bg-[#3a3835]/85 text-white shadow-md flex items-center justify-center cursor-pointer"
+            class="corner-float-btn opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-200 w-12 h-12 rounded-full bg-[#4a4845]/70 hover:bg-[#3a3835]/85 text-white shadow-md flex items-center justify-center cursor-pointer"
           >
             <svg class="w-6 h-6 ml-0.5" fill="none" stroke="currentColor" stroke-width="2.6" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
@@ -431,7 +470,7 @@
 
           <!-- 左页容器 -->
           <div id="page-left-wrapper" class="book-left-page relative flex-1 h-full flex flex-col justify-between overflow-hidden">
-            <div id="page-left" class="paginated-leaf flex-1 w-full overflow-hidden px-14 pt-12 pb-2 reader-selectable"></div>
+            <div id="page-left" class="paginated-leaf flex-1 w-full overflow-hidden px-6 sm:px-14 pt-8 sm:pt-12 pb-2 reader-selectable"></div>
             <div id="footer-left-page-num" class="reader-footer-num h-9 pb-2 flex items-center justify-center text-[15px] opacity-45 select-none shrink-0">
               第1页
             </div>
@@ -439,7 +478,7 @@
 
           <!-- 右页容器 -->
           <div id="page-right-wrapper" class="book-right-page relative flex-1 h-full flex flex-col justify-between overflow-hidden">
-            <div id="page-right" class="paginated-leaf flex-1 w-full overflow-hidden px-14 pt-12 pb-2 reader-selectable"></div>
+            <div id="page-right" class="paginated-leaf flex-1 w-full overflow-hidden px-6 sm:px-14 pt-8 sm:pt-12 pb-2 reader-selectable"></div>
             <div id="footer-right-page-num" class="reader-footer-num h-9 pb-2 flex items-center justify-center text-[15px] opacity-45 select-none shrink-0">
               第2页
             </div>
@@ -460,7 +499,7 @@
 
     <aside
       id="reader-settings-drawer"
-      class="fixed top-0 right-0 bottom-0 w-[335px] bg-[#fafafa] border-l border-neutral-200 shadow-2xl z-50 flex flex-col transform translate-x-full transition-transform duration-200 ease-out select-none"
+      class="fixed top-0 right-0 bottom-0 w-[335px] max-w-full bg-[#fafafa] border-l border-neutral-200 shadow-2xl z-50 flex flex-col transform translate-x-full transition-transform duration-200 ease-out select-none"
     >
       <!-- 顶部栏：解锁图标 + 阅读选项 + 右侧竖三点 -->
       <div class="h-14 px-4 flex items-center justify-between shrink-0">
@@ -502,14 +541,12 @@
               <svg class="w-16 h-16" viewBox="0 0 68 64" fill="none" stroke="currentColor" stroke-width="3">
                 <rect x="4" y="8" width="60" height="48" rx="1.5" />
                 <line x1="34" y1="8" x2="34" y2="56" />
-                <!-- 左页横线 -->
                 <line x1="14" y1="17" x2="28" y2="17" stroke-linecap="round" />
                 <line x1="10" y1="24" x2="28" y2="24" stroke-linecap="round" />
                 <line x1="10" y1="31" x2="28" y2="31" stroke-linecap="round" />
                 <line x1="10" y1="38" x2="28" y2="38" stroke-linecap="round" />
                 <line x1="10" y1="45" x2="28" y2="45" stroke-linecap="round" />
                 <line x1="10" y1="51" x2="28" y2="51" stroke-linecap="round" />
-                <!-- 右页横线 -->
                 <line x1="44" y1="17" x2="58" y2="17" stroke-linecap="round" />
                 <line x1="40" y1="24" x2="58" y2="24" stroke-linecap="round" />
                 <line x1="40" y1="31" x2="58" y2="31" stroke-linecap="round" />
@@ -546,10 +583,8 @@
             </button>
           </div>
 
-          <!-- 背景颜色圆圈网格 -->
           <div id="bg-color-swatches" class="grid grid-cols-5 gap-y-4 gap-x-3 items-center justify-items-center"></div>
 
-          <!-- 点击「⋮」后展开的自定义背景色添加面板 -->
           <div id="add-bg-color-popover" class="hidden mt-3 p-3 rounded-xl bg-white border border-neutral-200 shadow-md">
             <div class="text-xs text-neutral-500 mb-2">添加自定义背景颜色（支持 HEX 色值或取色器）</div>
             <div class="flex items-center gap-2">
@@ -580,10 +615,8 @@
             </button>
           </div>
 
-          <!-- 文字颜色圆圈网格 -->
           <div id="text-color-swatches" class="grid grid-cols-5 gap-y-4 gap-x-3 items-center justify-items-center"></div>
 
-          <!-- 点击「⋮」后展开的自定义文字色添加面板 -->
           <div id="add-text-color-popover" class="hidden mt-3 p-3 rounded-xl bg-white border border-neutral-200 shadow-md">
             <div class="text-xs text-neutral-500 mb-2">添加自定义文字颜色（支持 HEX 色值或取色器）</div>
             <div class="flex items-center gap-2">
@@ -823,13 +856,11 @@
 
   <!-- ==================== 核心交互与 PDF/EPUB 解析脚本 ==================== -->
   <script>
-    // 配置 PDF.js Worker
     if (window.pdfjsLib) {
       window.pdfjsLib.GlobalWorkerOptions.workerSrc =
         'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
 
-    // 安全事件绑定辅助函数：防止任何缺失节点中断初始化
     function bind(id, event, fn, options) {
       const el = document.getElementById(id);
       if (el) {
@@ -838,17 +869,17 @@
       return el;
     }
 
+    const isMobileViewport = () => window.innerWidth <= 768;
+
     // ==================== 全局状态定义 ====================
     const state = {
-      // 书架列表（严格对应图1：交易、世界、小说、技能）
       shelves: ['交易', '世界', '小说', '技能'],
-      currentNav: 'all', // all | favorite | notes | trash | shelf:xxx
+      currentNav: 'all',
       searchQuery: '',
       books: [],
       currentBook: null,
-      currentPageIndex: 0, // 双页模式下每次步进 2，单页模式下步进 1
+      currentPageIndex: 0,
 
-      // 字体映射表（严格对齐每一项选中的真实字体族名称）
       fontMap: {
         yeliqun: "'叶立群几何体测试版', '叶立群几何体', 'YeLiQunLocal', 'YouYuan', '幼圆', 'PingFang SC', 'Microsoft YaHei', sans-serif",
         yahei: "'Microsoft YaHei', '微软雅黑', 'Source Han Sans SC', 'Noto Sans CJK SC', 'PingFang SC', sans-serif",
@@ -858,18 +889,15 @@
         heiti: "'SimHei', '黑体', 'STHeiti', '华文黑体', 'PingFang SC', sans-serif"
       },
 
-      // 阅读选项状态（严格对应图3默认值与您指定的 #fdf6e3 / #2f251e）
       readerConfig: {
-        viewMode: 'dual', // 'single' | 'dual' | 'scroll'
+        viewMode: isMobileViewport() ? 'single' : 'dual',
         bgColor: '#fdf6e3',
         textColor: '#2f251e',
-        // 系统预设背景色 + 用户自定义背景色（右上角带 ×）
         presetBgColors: ['#ffffff', '#26282b', '#ebd8b7', '#bfe3cb'],
         customBgColors: ['#2e2218', '#fdf6e3'],
-        // 系统预设文字色 + 用户自定义文字色（右上角带 ×）
         presetTextColors: ['#000000', '#ffffff', '#523c24', '#2d4534'],
         customTextColors: ['#2f251e', '#fbf3db'],
-        fontSize: 23,
+        fontSize: isMobileViewport() ? 20 : 23,
         margin: 0,
         letterSpacing: 0,
         paraSpacing: 15,
@@ -880,6 +908,72 @@
         fontFamily: 'yeliqun'
       }
     };
+
+    // ==================== IndexedDB 本地书库持久化（手机端刷新不丢书） ====================
+    const DB_NAME = 'KoodoReaderMobileDB';
+    const DB_VERSION = 1;
+
+    function openBooksDB() {
+      return new Promise((resolve) => {
+        if (!window.indexedDB) {
+          resolve(null);
+          return;
+        }
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('books')) {
+            db.createObjectStore('books', { keyPath: 'id' });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => resolve(null);
+      });
+    }
+
+    async function saveBookToIndexedDB(book) {
+      try {
+        if (book.format !== 'EPUB') return;
+        const db = await openBooksDB();
+        if (!db) return;
+        const tx = db.transaction('books', 'readwrite');
+        tx.objectStore('books').put({
+          id: book.id,
+          title: book.title,
+          format: book.format,
+          shelf: book.shelf,
+          favorite: book.favorite,
+          isTrash: book.isTrash,
+          addedAt: book.addedAt,
+          lastPageIndex: book.lastPageIndex || 0,
+          rawBlocks: (book.rawBlocks || []).filter(b => b.type !== 'img')
+        });
+      } catch (e) {}
+    }
+
+    async function loadBooksFromIndexedDB() {
+      try {
+        const db = await openBooksDB();
+        if (!db) return [];
+        return new Promise((resolve) => {
+          const tx = db.transaction('books', 'readonly');
+          const req = tx.objectStore('books').getAll();
+          req.onsuccess = () => resolve(req.result || []);
+          req.onerror = () => resolve([]);
+        });
+      } catch (e) {
+        return [];
+      }
+    }
+
+    async function clearIndexedDBBooks() {
+      try {
+        const db = await openBooksDB();
+        if (!db) return;
+        const tx = db.transaction('books', 'readwrite');
+        tx.objectStore('books').clear();
+      } catch (e) {}
+    }
 
     // ==================== 编码与安全转义工具函数 ====================
     let toastTimer = null;
@@ -896,7 +990,6 @@
       }, 2400);
     }
 
-    // HTML 安全转义函数
     function escapeHtml(str) {
       if (str === null || str === undefined) return '';
       return String(str)
@@ -907,7 +1000,6 @@
         .replace(/'/g, '&#39;');
     }
 
-    // 智能字节解码器：处理 UTF-8 / UTF-16LE / UTF-16BE BOM，并对 GB18030 / GBK 编码的中文电子书自动回退解码
     function decodeTextBytes(bytes) {
       if (!bytes || bytes.length === 0) return '';
       const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
@@ -933,7 +1025,6 @@
       }
     }
 
-    // 判断颜色深浅，用于决定圆圈上的勾号(✓)用深色还是浅色
     function isLightColor(hex) {
       const clean = (hex || '#ffffff').replace('#', '');
       if (clean.length !== 6) return true;
@@ -945,6 +1036,20 @@
     }
 
     // ==================== 1. 主页书库与侧边栏渲染 ====================
+    function toggleMobileSidebar(forceOpen) {
+      const sb = document.getElementById('library-sidebar');
+      const bd = document.getElementById('mobile-sidebar-backdrop');
+      if (!sb) return;
+
+      if (isMobileViewport()) {
+        const willOpen = typeof forceOpen === 'boolean' ? forceOpen : sb.classList.contains('mobile-closed');
+        sb.classList.toggle('mobile-closed', !willOpen);
+        if (bd) bd.classList.toggle('hidden', !willOpen);
+      } else {
+        sb.classList.toggle('hidden');
+      }
+    }
+
     function renderShelves() {
       const container = document.getElementById('custom-shelf-list');
       if (!container) return;
@@ -966,7 +1071,10 @@
           </svg>
           <span class="truncate">${escapeHtml(shelfName)}</span>
         `;
-        btn.addEventListener('click', () => selectNav(navKey));
+        btn.addEventListener('click', () => {
+          selectNav(navKey);
+          if (isMobileViewport()) toggleMobileSidebar(false);
+        });
         container.appendChild(btn);
       });
     }
@@ -1058,6 +1166,7 @@
           favBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             book.favorite = !book.favorite;
+            saveBookToIndexedDB(book);
             renderLibrary();
           });
         }
@@ -1094,10 +1203,12 @@
               favorite: false,
               isTrash: false,
               addedAt: Date.now(),
+              lastPageIndex: 0,
               rawBlocks,
               pages: []
             };
-            state.books.push(newBook);
+            state.books.unshift(newBook);
+            await saveBookToIndexedDB(newBook);
             renderLibrary();
             openBookInReader(newBook);
             showToast(`已导入并打开《${bookTitle}》`);
@@ -1122,10 +1233,11 @@
               favorite: false,
               isTrash: false,
               addedAt: Date.now(),
+              lastPageIndex: 0,
               pdfDoc,
               numPages: pdfDoc.numPages
             };
-            state.books.push(newBook);
+            state.books.unshift(newBook);
             renderLibrary();
             openBookInReader(newBook);
             showToast(`已导入《${bookTitle}》（共 ${pdfDoc.numPages} 页）`);
@@ -1139,7 +1251,6 @@
       }
     }
 
-    // 路径规范化工具：处理 EPUB 内部相对路径与 URL 编码
     function resolveEpubPath(baseDir, relativeHref) {
       if (!relativeHref) return '';
       let clean = relativeHref.split('#')[0].split('?')[0];
@@ -1161,7 +1272,6 @@
       return stack.join('/');
     }
 
-    // 在 JSZip 实例中模糊匹配文件
     function findZipEntry(zip, targetPath) {
       if (!targetPath) return null;
       const direct = zip.file(targetPath);
@@ -1189,7 +1299,6 @@
       return null;
     }
 
-    // 预处理 XHTML 字符串：修复自闭合 <title/>、<style/>、<head/> 等标签在 text/html 模式下吞掉后续 <body> 的问题
     function sanitizeXhtmlForHtmlParser(rawHtml) {
       if (!rawHtml) return '';
       return rawHtml
@@ -1198,7 +1307,6 @@
         .replace(/<head[\s>][\s\S]*?<\/head>/gi, '');
     }
 
-    // 解析章节 HTML/XHTML 文档
     function parseChapterDocument(parser, rawHtml) {
       const cleaned = sanitizeXhtmlForHtmlParser(rawHtml);
       try {
@@ -1211,7 +1319,6 @@
       return parser.parseFromString(cleaned, 'text/html');
     }
 
-    // 从单个章节 DOM 中提取所有结构化段落、标题、目录链接与插图
     function extractChapterBlocksFromDoc(doc, entryName, chapterDir, imageBlobMap) {
       const body =
         doc.body ||
@@ -1242,7 +1349,6 @@
           return;
         }
 
-        // 图片节点 <img> 或 SVG <image>
         if (tag === 'img' || tag === 'image') {
           const rawSrc =
             node.getAttribute('src') ||
@@ -1261,7 +1367,6 @@
           return;
         }
 
-        // 标题节点 h1 - h6
         if (/^h[1-6]$/.test(tag)) {
           const txt = node.textContent.replace(/\s+/g, ' ').trim();
           if (txt) {
@@ -1283,7 +1388,6 @@
           return t === 'img' || t === 'image';
         });
 
-        // 叶子块级节点
         if (!hasChildBlocks && !hasChildImg) {
           const hasBr = Array.from(node.children).some(
             c => (c.localName || c.tagName || '').toLowerCase() === 'br'
@@ -1326,7 +1430,6 @@
 
       walk(body);
 
-      // 兜底保障：若常规递归未提取到任何块，但 body.textContent 确实有文字，则按换行切分提取
       if (items.length === 0 && !chapterHeading) {
         const clonedBody = body.cloneNode(true);
         clonedBody.querySelectorAll('br, p, div, li, tr, h1, h2, h3, h4, h5, h6').forEach(el => {
@@ -1375,7 +1478,6 @@
       return chapterBlocks;
     }
 
-    // 使用 JSZip 完整解析 EPUB
     async function parseEpubFile(file) {
       const zip = await window.JSZip.loadAsync(file);
       const parser = new DOMParser();
@@ -1525,7 +1627,7 @@
     // ==================== 3. 阅读器视图与真实 DOM 动态分页引擎 ====================
     function openBookInReader(book) {
       state.currentBook = book;
-      state.currentPageIndex = 0;
+      state.currentPageIndex = book.lastPageIndex || 0;
 
       const libView = document.getElementById('library-view');
       const readerView = document.getElementById('reader-view');
@@ -1537,7 +1639,11 @@
 
       applyReaderStyles();
       requestAnimationFrame(() => {
-        repaginateAndRender(false);
+        repaginateByDOM();
+        if (book.lastPageIndex && book.pages && book.lastPageIndex < book.pages.length) {
+          state.currentPageIndex = book.lastPageIndex;
+        }
+        renderReaderPages();
       });
     }
 
@@ -1572,8 +1678,10 @@
         btn.classList.toggle('text-[#b5b5b5]', !active);
       });
 
-      const basePadX = Math.max(18, 56 + Number(cfg.margin));
-      const basePadY = Math.max(16, 40 + Number(cfg.margin) * 0.45);
+      const baseHorizontal = isMobileViewport() ? 22 : 56;
+      const baseVertical = isMobileViewport() ? 24 : 40;
+      const basePadX = Math.max(14, baseHorizontal + Number(cfg.margin));
+      const basePadY = Math.max(14, baseVertical + Number(cfg.margin) * 0.45);
       const pageLeft = document.getElementById('page-left');
       const pageRight = document.getElementById('page-right');
       const pageLeftWrapper = document.getElementById('page-left-wrapper');
@@ -1687,7 +1795,6 @@
       return html;
     }
 
-    // 基于真实 DOM 高度的动态分页引擎
     function repaginateByDOM() {
       const book = state.currentBook;
       if (!book || book.format === 'PDF') return;
@@ -1709,7 +1816,7 @@
       const padLeft = parseFloat(cs.paddingLeft) || 0;
       const padRight = parseFloat(cs.paddingRight) || 0;
 
-      const availWidth = Math.max(200, Math.floor(pageLeft.clientWidth - padLeft - padRight));
+      const availWidth = Math.max(180, Math.floor(pageLeft.clientWidth - padLeft - padRight));
       const availHeight = Math.max(140, Math.floor(pageLeft.clientHeight - padTop - padBottom - 4));
       const maxWidthPercent = Math.min(100, Math.max(45, (cfg.pageWidth / 1.2) * 92));
 
@@ -1945,8 +2052,8 @@
 
       const page = await pdfDoc.getPage(pageNumber);
       const unscaledViewport = page.getViewport({ scale: 1 });
-      const availW = Math.max(200, container.clientWidth - 32);
-      const availH = Math.max(200, container.clientHeight - 24);
+      const availW = Math.max(180, container.clientWidth - 24);
+      const availH = Math.max(180, container.clientHeight - 20);
 
       const scale = isScrollMode
         ? 1.15 * Number(state.readerConfig.pageWidth)
@@ -1973,6 +2080,9 @@
 
       pageLeft.scrollTop = 0;
       pageRight.scrollTop = 0;
+
+      book.lastPageIndex = state.currentPageIndex;
+      saveBookToIndexedDB(book);
 
       if (book.format === 'PDF' && book.pdfDoc) {
         const total = book.numPages;
@@ -2057,7 +2167,6 @@
       const textContainer = document.getElementById('text-color-swatches');
       if (!bgContainer || !textContainer) return;
 
-      // 1) 背景色
       bgContainer.innerHTML = '';
       const addBgBtn = document.createElement('button');
       addBgBtn.type = 'button';
@@ -2133,7 +2242,6 @@
         bgContainer.appendChild(item);
       });
 
-      // 2) 文字色
       textContainer.innerHTML = '';
       const addTextBtn = document.createElement('button');
       addTextBtn.type = 'button';
@@ -2210,7 +2318,6 @@
       });
     }
 
-    // 双向绑定滑块与输入框
     function bindSliderAndInput(sliderId, inputId, labelId, configKey, onAfterChange) {
       const slider = document.getElementById(sliderId);
       const input = document.getElementById(inputId);
@@ -2238,23 +2345,26 @@
     }
 
     // ==================== 5. 事件绑定与初始化 ====================
-    window.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('DOMContentLoaded', async () => {
+      const savedBooks = await loadBooksFromIndexedDB();
+      if (savedBooks && savedBooks.length > 0) {
+        state.books = savedBooks.sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+      }
+
       renderShelves();
       renderLibrary();
       renderColorSwatches();
 
-      // 侧边栏折叠切换
-      bind('toggle-sidebar-btn', 'click', () => {
-        const sb = document.getElementById('library-sidebar');
-        if (sb) sb.classList.toggle('hidden');
-      });
+      bind('toggle-sidebar-btn', 'click', () => toggleMobileSidebar());
+      bind('mobile-sidebar-backdrop', 'click', () => toggleMobileSidebar(false));
 
-      // 主导航点击
       document.querySelectorAll('#main-nav-list .nav-item').forEach(btn => {
-        btn.addEventListener('click', () => selectNav(btn.dataset.nav));
+        btn.addEventListener('click', () => {
+          selectNav(btn.dataset.nav);
+          if (isMobileViewport()) toggleMobileSidebar(false);
+        });
       });
 
-      // 我的书架展开/收起
       bind('shelf-collapse-btn', 'click', () => {
         const container = document.getElementById('shelf-items-container');
         const chevron = document.getElementById('shelf-chevron');
@@ -2262,25 +2372,21 @@
         if (chevron) chevron.classList.toggle('-rotate-90');
       });
 
-      // 搜索框实时过滤
       bind('library-search-input', 'input', (e) => {
         state.searchQuery = e.target.value.trim();
         renderLibrary();
       });
 
-      // 排序按钮
       bind('sort-books-btn', 'click', () => {
         state.books.reverse();
         renderLibrary();
         showToast('已切换图书排序');
       });
 
-      // 主页顶部齿轮设置按钮
       bind('app-settings-btn', 'click', () => {
-        showToast('导入并打开图书后，将鼠标移至右上角可打开阅读选项');
+        showToast('导入并打开图书后，将鼠标移至右上角（手机点击屏幕中央）可打开阅读选项');
       });
 
-      // 新建书架弹窗
       const modal = document.getElementById('custom-modal');
       const modalInput = document.getElementById('modal-input');
       bind('create-shelf-btn', 'click', () => {
@@ -2303,7 +2409,6 @@
         modal.classList.add('hidden');
       });
 
-      // 管理书架与阅读统计轻提示
       bind('manage-shelf-btn', 'click', () => {
         showToast('点击左侧书架可筛选对应分类图书');
       });
@@ -2311,7 +2416,6 @@
         showToast(`当前书库共 ${state.books.length} 本图书`);
       });
 
-      // 右上角「导入图书」按钮与下拉菜单
       const fileInput = document.getElementById('file-upload-input');
       const dropdownMenu = document.getElementById('import-dropdown-menu');
 
@@ -2326,6 +2430,27 @@
         if (dropdownMenu) dropdownMenu.classList.add('hidden');
         if (fileInput) fileInput.click();
       });
+
+      // 一键导出带 UTF-8 BOM 签名头的 index.html 文件，彻底防止 Windows 记事本或浏览器乱码
+      bind('menu-download-utf8', 'click', () => {
+        if (dropdownMenu) dropdownMenu.classList.add('hidden');
+        const fullSource = '\uFEFF<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+        const blob = new Blob([fullSource], { type: 'text/html;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'index.html';
+        link.click();
+        showToast('已下载防乱码 UTF-8 标准文件 index.html');
+      });
+
+      bind('menu-clear-db', 'click', async () => {
+        if (dropdownMenu) dropdownMenu.classList.add('hidden');
+        state.books = [];
+        await clearIndexedDBBooks();
+        renderLibrary();
+        showToast('已清空浏览器缓存图书');
+      });
+
       document.addEventListener('click', () => {
         if (dropdownMenu) dropdownMenu.classList.add('hidden');
       });
@@ -2335,10 +2460,7 @@
         e.target.value = '';
       });
 
-      // 支持全窗口拖拽导入 PDF / EPUB 文件
-      window.addEventListener('dragover', (e) => {
-        e.preventDefault();
-      });
+      window.addEventListener('dragover', (e) => e.preventDefault());
       window.addEventListener('drop', (e) => {
         e.preventDefault();
         if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
@@ -2346,7 +2468,6 @@
         }
       });
 
-      // 阅读器右上角悬浮按钮 -> 打开图3「阅读选项」侧边抽屉
       const drawer = document.getElementById('reader-settings-drawer');
       const backdrop = document.getElementById('settings-backdrop');
       const prevFloatBtn = document.getElementById('prev-page-btn');
@@ -2365,14 +2486,17 @@
         if (nextFloatBtn) nextFloatBtn.classList.remove('!opacity-100');
       }
 
-      // 阅读器左上角悬浮感应按钮 -> 返回书库主页（与右上角设置按钮镜像对称）
       bind('reader-home-trigger', 'click', (e) => {
         e.stopPropagation();
         closeSettingsDrawer();
         const readerView = document.getElementById('reader-view');
         const libView = document.getElementById('library-view');
-        if (readerView) readerView.classList.add('hidden');
+        if (readerView) {
+          readerView.classList.add('hidden');
+          readerView.classList.remove('mobile-controls-active');
+        }
         if (libView) libView.classList.remove('hidden');
+        renderLibrary();
       });
 
       bind('reader-settings-trigger', 'click', (e) => {
@@ -2382,7 +2506,41 @@
       bind('settings-backdrop', 'click', closeSettingsDrawer);
       bind('close-settings-drawer-btn', 'click', closeSettingsDrawer);
 
-      // 视图模式切换（单页 / 双页 / 卷轴滚动）
+      // 手机端触控支持：左右滑动翻页 + 点击左25%前翻、右25%后翻、中间50%浮现四角按钮
+      let touchStartX = 0;
+      let touchStartY = 0;
+      bind('reader-content-viewport', 'touchstart', (e) => {
+        if (!e.touches || e.touches.length === 0) return;
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      }, { passive: true });
+
+      bind('reader-content-viewport', 'touchend', (e) => {
+        if (!e.changedTouches || e.changedTouches.length === 0) return;
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = e.changedTouches[0].clientY - touchStartY;
+        if (Math.abs(dx) > 42 && Math.abs(dx) > Math.abs(dy) * 1.3) {
+          turnPage(dx < 0 ? 1 : -1);
+        }
+      }, { passive: true });
+
+      bind('reader-content-viewport', 'click', (e) => {
+        if (e.target.closest('a') || e.target.closest('button')) return;
+        const sel = window.getSelection && window.getSelection().toString();
+        if (sel && sel.length > 0) return;
+
+        const w = window.innerWidth || document.documentElement.clientWidth;
+        const x = e.clientX;
+        if (x < w * 0.24) {
+          turnPage(-1);
+        } else if (x > w * 0.76) {
+          turnPage(1);
+        } else {
+          const rv = document.getElementById('reader-view');
+          if (rv) rv.classList.toggle('mobile-controls-active');
+        }
+      });
+
       document.querySelectorAll('.view-mode-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           state.readerConfig.viewMode = btn.dataset.mode;
@@ -2391,7 +2549,6 @@
         });
       });
 
-      // 清除自定义背景色 / 文字色
       bind('clear-bg-custom-btn', 'click', () => {
         state.readerConfig.customBgColors = ['#fdf6e3'];
         state.readerConfig.bgColor = '#fdf6e3';
@@ -2408,8 +2565,6 @@
         showToast('已重置自定义文字颜色（保留 #2f251e）');
       });
 
-      // 自定义背景色取色器与输入框联动添加
-      const bgPicker = document.getElementById('bg-color-picker');
       const bgHexInput = document.getElementById('bg-color-hex-input');
       bind('bg-color-picker', 'input', (e) => {
         if (bgHexInput) bgHexInput.value = e.target.value;
@@ -2432,8 +2587,6 @@
         if (pop) pop.classList.add('hidden');
       });
 
-      // 自定义文字色取色器与输入框联动添加
-      const textPicker = document.getElementById('text-color-picker');
       const textHexInput = document.getElementById('text-color-hex-input');
       bind('text-color-picker', 'input', (e) => {
         if (textHexInput) textHexInput.value = e.target.value;
@@ -2456,7 +2609,6 @@
         if (pop) pop.classList.add('hidden');
       });
 
-      // 绑定全部 6 组滑块与数字输入框（实时重新测量 DOM 分页）
       let repaginateTimer = null;
       const scheduleRepaginate = () => {
         clearTimeout(repaginateTimer);
@@ -2472,7 +2624,6 @@
       bindSliderAndInput('slider-page-width', 'input-page-width', 'label-page-width', 'pageWidth', scheduleRepaginate);
       bindSliderAndInput('slider-brightness', 'input-brightness', 'label-brightness', 'brightness');
 
-      // 绑定「不显示页脚」与「不显示页眉」开关
       bind('toggle-hide-footer', 'click', () => {
         const btn = document.getElementById('toggle-hide-footer');
         if (!btn) return;
@@ -2511,7 +2662,6 @@
         scheduleRepaginate();
       });
 
-      // 默认字体下拉框切换：立即更新 CSS 字体栈并重新测量 DOM 分页
       const fontSelect = document.getElementById('select-font-family');
       bind('select-font-family', 'change', (e) => {
         state.readerConfig.fontFamily = e.target.value;
@@ -2521,7 +2671,6 @@
         });
       });
 
-      // 支持载入本地 .ttf/.otf/.woff2 字体文件并自动加入「默认字体」下拉框选中
       const fontUploadInput = document.getElementById('font-upload-input');
       bind('import-local-font-btn', 'click', () => {
         if (fontUploadInput) fontUploadInput.click();
@@ -2559,7 +2708,6 @@
         e.target.value = '';
       });
 
-      // 左下角/右下角悬浮翻页按钮与键盘「左/上」前翻、「右/下」下翻
       bind('prev-page-btn', 'click', (e) => {
         e.stopPropagation();
         turnPage(-1);
@@ -2588,7 +2736,6 @@
         }
       });
 
-      // 双页/单页模式下支持鼠标滚轮直接翻页（无滚动条）
       let wheelCooldown = false;
       bind('reader-content-viewport', 'wheel', (e) => {
         if (state.readerConfig.viewMode === 'scroll') return;
@@ -2602,7 +2749,6 @@
         }, 220);
       }, { passive: false });
 
-      // 窗口尺寸变化时自动重新测量 DOM 高度并重分页
       let resizeTimer = null;
       window.addEventListener('resize', () => {
         const readerEl = document.getElementById('reader-view');
