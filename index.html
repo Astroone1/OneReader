@@ -17,9 +17,8 @@
       --reader-margin: 0px;
       --reader-letter-spacing: 0px;
       --reader-para-spacing: 15px;
-      --reader-page-width: 1.2;
       --reader-brightness: 1;
-      --reader-font-family: '叶立群几何体测试版', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      --reader-font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; user-select: none; overflow: hidden; background: #fff; color: #2c2c2c; }
@@ -30,6 +29,12 @@
     .paginated-leaf { overflow: hidden !important; }
     .paginated-leaf::-webkit-scrollbar { display: none !important; }
     #reader-view.mobile-controls-active .corner-float-btn { opacity: 1 !important; pointer-events: auto !important; }
+    /* 触屏设备没有可靠的 hover：顶部中间感应区不拦截任何点击/滑动，避免盖住“点屏幕中央唤出控制条”的手势 */
+    @media (hover: none) {
+      #fs-sense-zone { pointer-events: none !important; }
+      #fs-sense-zone #reader-fullscreen-toggle { pointer-events: none; }
+      #reader-view.mobile-controls-active #fs-sense-zone #reader-fullscreen-toggle { pointer-events: auto; }
+    }
     @keyframes cloudPulse { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
     .cloud-btn-hover:hover svg .cloud-arrow { animation: cloudPulse 1.2s ease-in-out infinite; }
     @media (max-width: 768px) {
@@ -40,13 +45,12 @@
 </head>
 <body class="h-screen w-screen overflow-hidden flex flex-col">
 
-  <!-- 隐藏本地文件与字体选择器 -->
+  <!-- 隐藏文件/字体选择器 -->
   <input id="file-upload-input" type="file" accept=".pdf,.epub,application/pdf,application/epub+zip" multiple class="hidden" />
-  <input id="font-upload-input" type="file" accept=".ttf,.otf,.woff,.woff2" class="hidden" />
+  <input id="font-upload-input" type="file" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" class="hidden" />
 
-  <!-- ==================== 1. 书库主页视图 ==================== -->
+  <!-- ==================== 1. 书库主页 ==================== -->
   <div id="library-view" class="flex-1 flex flex-col h-full w-full bg-white overflow-hidden">
-    <!-- 顶部栏：汉堡菜单 + 搜索框（无多余按钮） + 右上角优化云标志 -->
     <header class="h-20 w-full flex items-center justify-between px-4 sm:px-8 shrink-0">
       <div class="flex items-center gap-3 sm:gap-6 flex-1 min-w-0">
         <button id="toggle-sidebar-btn" type="button" title="导航菜单" class="p-2.5 rounded-xl hover:bg-neutral-100 text-neutral-700 transition cursor-pointer shrink-0">
@@ -60,29 +64,25 @@
         </div>
       </div>
 
-      <!-- 右上角：定制云端书库与导入图标按钮 -->
+      <!-- 右上角精美云端图标与状态点 -->
       <div class="relative flex items-center gap-2 shrink-0">
-        <button id="open-cloud-modal-btn" type="button" title="云端私有书库与图书导入" class="cloud-btn-hover group relative p-2.5 rounded-2xl hover:bg-neutral-100 active:scale-95 transition flex items-center justify-center cursor-pointer">
+        <button id="open-cloud-modal-btn" type="button" title="云端私有书库与同步管理" class="cloud-btn-hover group relative p-2.5 rounded-2xl hover:bg-neutral-100 active:scale-95 transition flex items-center justify-center cursor-pointer">
           <svg class="w-10 h-10 text-[#3b3b3b] group-hover:text-black transition" viewBox="0 0 40 32" fill="none">
-            <!-- 外层柔和云朵轮廓 -->
             <path d="M11.5 26.5H29.5C33.6421 26.5 37 23.1421 37 19C37 15.203 34.1783 12.065 30.514 11.568C29.389 6.657 25.002 3 19.75 3C13.675 3 8.75 7.925 8.75 14C8.75 14.389 8.77 14.773 8.81 15.151C5.534 15.792 3 18.678 3 22.15C3 24.552 4.948 26.5 7.35 26.5H11.5Z" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="rgba(59,59,59,0.03)"/>
-            <!-- 云朵内部双向同步流线箭头 -->
             <g class="cloud-arrow" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M16.5 19.5V12.5M16.5 12.5L13.8 15.2M16.5 12.5L19.2 15.2"/>
               <path d="M23.5 13.5V20.5M23.5 20.5L20.8 17.8M23.5 20.5L26.2 17.8"/>
             </g>
           </svg>
-          <!-- 云连接状态指示点：未连接灰、已连接绿 -->
           <span id="cloud-status-dot" class="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-neutral-400 ring-2 ring-white transition-colors"></span>
         </button>
       </div>
     </header>
 
-    <!-- 主体：左侧精简导航栏 + 右侧图书网格 -->
     <div class="flex-1 flex overflow-hidden relative">
       <div id="mobile-sidebar-backdrop" class="hidden fixed inset-0 bg-black/30 z-40 md:hidden"></div>
 
-      <!-- 左侧导航栏（仅保留全部图书与我的书架） -->
+      <!-- 左侧精简导航栏 -->
       <aside id="library-sidebar" class="mobile-closed md:transform-none w-[230px] shrink-0 flex flex-col justify-between pr-3 pb-4 select-none overflow-y-auto">
         <div class="space-y-1 pt-2 md:pt-0">
           <nav id="main-nav-list" class="space-y-1">
@@ -92,7 +92,6 @@
             </button>
           </nav>
 
-          <!-- 我的书架分组 -->
           <div class="pt-4">
             <button id="shelf-collapse-btn" type="button" class="w-full flex items-center justify-between pl-6 pr-5 py-2.5 text-[15px] font-semibold text-neutral-800 hover:bg-neutral-50 rounded-r-full cursor-pointer">
               <span>我的书架</span>
@@ -115,7 +114,7 @@
         </div>
       </aside>
 
-      <!-- 右侧图书内容区 -->
+      <!-- 书库列表展示 -->
       <main class="flex-1 h-full overflow-y-auto px-6 sm:px-12 pt-6 sm:pt-8 pb-24">
         <div id="empty-library-state" class="mt-16 sm:mt-20 ml-2 sm:ml-4 max-w-md">
           <h1 class="text-[32px] sm:text-[38px] font-normal text-[#3c3c3c] tracking-wide">图书库为空</h1>
@@ -128,7 +127,7 @@
         </div>
       </main>
 
-      <!-- 多选模式底部批量操作栏 -->
+      <!-- 批量多选栏 -->
       <div id="multiselect-bar" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-[#3b3b3b] text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-4 text-sm">
         <span id="multiselect-count" class="text-neutral-200 font-medium">已选 0 本</span>
         <div class="h-4 w-[1px] bg-neutral-600"></div>
@@ -141,65 +140,72 @@
     </div>
   </div>
 
-  <!-- ==================== 2. 右上角云标志弹窗：GitHub 私有云配置与本地导入（无任何预填值） ==================== -->
+  <!-- ==================== 2. 云端弹窗（全空配置 + 本地缓存管理清理） ==================== -->
   <div id="cloud-hub-modal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl max-w-[460px] w-full p-6 shadow-2xl border border-neutral-100 flex flex-col max-h-[90vh] overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-[470px] w-full p-6 shadow-2xl border border-neutral-100 flex flex-col max-h-[90vh] overflow-y-auto">
       <div class="relative flex items-center justify-center pb-4 border-b border-neutral-100">
-        <div class="flex items-center gap-2">
-          <span class="text-[19px] font-medium text-[#333]">云端私有书库与本地导入</span>
-        </div>
-        <button id="close-cloud-modal-btn" type="button" class="absolute right-0 p-1.5 text-neutral-500 hover:text-black rounded-full hover:bg-neutral-100 transition cursor-pointer">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
-        </button>
+        <h3 class="text-[19px] font-medium text-[#333]">云端私有仓与存储管理</h3>
+        <button id="close-cloud-modal-btn" type="button" class="absolute right-0 p-1.5 text-neutral-500 hover:text-black rounded-full hover:bg-neutral-100 transition cursor-pointer">✕</button>
       </div>
 
-      <!-- 快捷操作区：本地导入 + 下载 HTML -->
-      <div class="py-4 border-b border-neutral-100 space-y-2.5">
-        <div class="text-xs font-medium text-neutral-400 uppercase tracking-wider">本地操作</div>
-        <div class="grid grid-cols-2 gap-2.5">
-          <button id="hub-import-local-btn" type="button" class="flex items-center justify-center gap-2 py-2.5 px-3 rounded-2xl bg-[#484848] hover:bg-black text-white text-sm font-medium transition cursor-pointer">
-            <span>📂 导入本地图书</span>
-          </button>
-          <button id="hub-download-html-btn" type="button" class="flex items-center justify-center gap-2 py-2.5 px-3 rounded-2xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-sm font-medium transition cursor-pointer">
-            <span>💾 下载 index.html</span>
+      <!-- 本地缓存与容量管理 -->
+      <div class="py-4 border-b border-neutral-100 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-neutral-400 uppercase tracking-wider">手机/本地缓存空间</span>
+          <span id="local-storage-size" class="text-xs font-semibold text-neutral-700">计算中...</span>
+        </div>
+        <div class="flex items-center justify-between gap-3">
+          <button id="purge-all-cache-btn" type="button" class="flex-1 py-2 px-3 rounded-xl bg-neutral-100 hover:bg-red-50 text-neutral-700 hover:text-red-600 text-xs font-medium transition cursor-pointer border border-neutral-200">
+            🧹 清空本地图书文件 (防爆炸)
           </button>
         </div>
-        <label class="flex items-center justify-between pt-1 px-1 text-sm text-neutral-600 cursor-pointer">
-          <span>本地导入新书时自动上传至 GitHub 私有仓</span>
-          <input id="auto-upload-checkbox" type="checkbox" class="w-4 h-4 accent-[#484848] rounded cursor-pointer" />
-        </label>
+        <div class="grid grid-cols-2 gap-2">
+          <button id="hub-import-local-btn" type="button" class="py-2 px-4 rounded-xl bg-[#484848] hover:bg-black text-white text-xs font-medium transition cursor-pointer">
+            📂 导入
+          </button>
+          <button id="hub-import-cloud-btn" type="button" title="连接仓库后可用：导入并同时上传到仓库" class="py-2 px-4 rounded-xl bg-[#484848] hover:bg-black text-white text-xs font-medium transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+            ☁️ 云导入
+          </button>
+        </div>
+        <p class="text-[11px] text-neutral-400 leading-tight">注：清空缓存仅删除手机内占空间的电子书大文件，保留云端记录和阅读进度，需阅读时可重新从私库拉取。</p>
       </div>
 
-      <!-- GitHub 私有仓库配置表单（严格留空，不预填用户名与仓库名） -->
+      <!-- GitHub 配置（完全留空） -->
       <div class="pt-4 space-y-3.5 text-sm">
         <div class="flex items-center justify-between">
-          <span class="text-xs font-medium text-neutral-400 uppercase tracking-wider">GitHub 私有仓连接配置</span>
+          <span class="text-xs font-medium text-neutral-400 uppercase tracking-wider">GitHub 私有仓直连</span>
           <span id="cloud-conn-badge" class="text-xs px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-500">未连接</span>
         </div>
 
         <div>
           <label class="block text-neutral-700 mb-1">GitHub 用户名 (Owner)</label>
-          <input id="gh-owner-input" type="text" value="" placeholder="请手动输入您的 GitHub 用户名" autocomplete="off" class="w-full h-10 px-3.5 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-neutral-700" />
+          <input id="gh-owner-input" type="text" value="" placeholder="输入 GitHub 用户名 (如 Astroone1)" autocomplete="off" class="w-full h-10 px-3.5 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-neutral-700" />
         </div>
 
         <div class="grid grid-cols-3 gap-2.5">
           <div class="col-span-2">
             <label class="block text-neutral-700 mb-1">私有仓库名 (Repo)</label>
-            <input id="gh-repo-input" type="text" value="" placeholder="请手动输入私有仓库名称" autocomplete="off" class="w-full h-10 px-3.5 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-neutral-700" />
+            <input id="gh-repo-input" type="text" value="" placeholder="输入仓库名 (如 OneReader-Book)" autocomplete="off" class="w-full h-10 px-3.5 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-neutral-700" />
           </div>
           <div>
             <label class="block text-neutral-700 mb-1">分支 (Branch)</label>
-            <input id="gh-branch-input" type="text" value="" placeholder="默认 main" autocomplete="off" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-neutral-700" />
+            <input id="gh-branch-input" type="text" value="" placeholder="main" autocomplete="off" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-neutral-700" />
           </div>
         </div>
 
         <div>
           <label class="block text-neutral-700 mb-1">细粒度访问令牌 (Fine-grained Token)</label>
           <div class="relative">
-            <input id="gh-token-input" type="password" value="" placeholder="粘贴 github_pat_... 或 ghp_... 密钥" autocomplete="off" class="w-full h-10 pl-3.5 pr-14 rounded-xl border border-neutral-300 text-sm font-mono focus:outline-none focus:border-neutral-700" />
+            <input id="gh-token-input" type="password" value="" placeholder="粘贴 github_pat_... 密钥" autocomplete="off" class="w-full h-10 pl-3.5 pr-14 rounded-xl border border-neutral-300 text-sm font-mono focus:outline-none focus:border-neutral-700" />
             <button id="toggle-token-vis-btn" type="button" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-neutral-500 hover:text-black px-1.5 py-0.5 rounded cursor-pointer">显示</button>
           </div>
-          <p class="mt-1 text-[12px] text-neutral-400 leading-normal">密钥仅保存在您当前设备的浏览器本地，不会上传至任何第三方。</p>
+        </div>
+
+        <div id="sync-progress-box" class="hidden text-xs py-2 px-3 rounded-xl bg-blue-50 text-blue-800 space-y-1">
+          <div id="sync-progress-text">正在连接云端...</div>
+          <div class="w-full bg-blue-200 h-1.5 rounded-full overflow-hidden">
+            <div id="sync-progress-bar" class="bg-blue-600 h-full w-0 transition-all duration-150"></div>
+          </div>
         </div>
 
         <div class="pt-2 flex flex-col gap-2">
@@ -207,8 +213,8 @@
             保存并拉取私有仓书库
           </button>
           <div class="grid grid-cols-2 gap-2">
-            <button id="gh-push-meta-btn" type="button" class="py-2 rounded-xl border border-neutral-300 hover:bg-neutral-100 text-neutral-700 text-xs font-medium transition cursor-pointer">
-              ☁️ 同步阅读进度到云端
+            <button id="hub-download-html-btn" type="button" class="py-2 rounded-xl border border-neutral-300 hover:bg-neutral-100 text-neutral-700 text-xs font-medium transition cursor-pointer">
+              💾 导出最新 index.html
             </button>
             <button id="gh-clear-config-btn" type="button" class="py-2 rounded-xl border border-red-200 hover:bg-red-50 text-red-600 text-xs font-medium transition cursor-pointer">
               断开并清除本地密钥
@@ -219,9 +225,9 @@
     </div>
   </div>
 
-  <!-- ==================== 3. 单本书右下角 ••• 紧凑圆角弹窗（图4） ==================== -->
+  <!-- ==================== 3. 单本书 ••• 菜单（带释放缓存） ==================== -->
   <div id="book-action-backdrop" class="hidden fixed inset-0 z-50"></div>
-  <div id="book-action-popover" class="hidden fixed z-50 w-44 bg-white rounded-2xl shadow-[0_10px_32px_rgba(0,0,0,0.16)] border border-neutral-100 py-1.5 px-1.5 text-[15px] text-[#3a3a3a] select-none">
+  <div id="book-action-popover" class="hidden fixed z-50 w-48 bg-white rounded-2xl shadow-[0_10px_32px_rgba(0,0,0,0.16)] border border-neutral-100 py-1.5 px-1.5 text-[15px] text-[#3a3a3a] select-none">
     <button id="book-act-shelf" type="button" class="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-neutral-100 transition cursor-pointer text-left">
       <svg class="w-4 h-4 text-neutral-700 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="5" rx="1.5"/><rect x="4" y="13" width="16" height="5" rx="1.5"/></svg>
       <span>添加到书架</span>
@@ -234,24 +240,26 @@
       <svg class="w-4 h-4 text-neutral-700 shrink-0" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 18V6m0 0L4 9m3-3l3 3M13 7h7M13 12h7M13 17h7"/></svg>
       <span id="book-act-pin-label">置顶</span>
     </button>
-    <button id="book-act-upload-cloud" type="button" class="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-neutral-100 transition cursor-pointer text-left">
-      <svg class="w-4 h-4 text-neutral-700 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-      <span>上传到私有云</span>
+    <button id="book-act-purge-one" type="button" class="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-neutral-100 transition cursor-pointer text-left">
+      <svg class="w-4 h-4 text-neutral-700 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+      <span>释放本地空间</span>
     </button>
     <button id="book-act-delete" type="button" class="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-red-50 text-[#3a3a3a] hover:text-red-600 transition cursor-pointer text-left">
       <svg class="w-4 h-4 text-neutral-700 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
       <span>删除</span>
     </button>
+    <button id="book-act-cloud-delete" type="button" title="连接仓库后可用：同时删除仓库里的这本" class="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-red-50 text-[#3a3a3a] hover:text-red-600 transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed">
+      <svg class="w-4 h-4 text-neutral-700 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7h18M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M10 7V5a1 1 0 011-1h2a1 1 0 011 1v2"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.5 11.5c2.5 2 2.5 4 0 6"/></svg>
+      <span>云删除</span>
+    </button>
   </div>
 
-  <!-- ==================== 4. 管理书架 圆角弹窗（图1） ==================== -->
+  <!-- ==================== 4. 管理书架圆角弹窗 ==================== -->
   <div id="manage-shelves-modal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl max-w-[420px] w-full pt-5 pb-5 px-6 shadow-2xl border border-neutral-100 flex flex-col max-h-[82vh]">
       <div class="relative flex items-center justify-center pb-4">
         <h3 class="text-[20px] font-normal text-[#3b3b3b] tracking-wide">管理书架</h3>
-        <button id="close-manage-shelves-btn" type="button" class="absolute right-0 p-1.5 text-neutral-500 hover:text-black rounded-full hover:bg-neutral-100 transition cursor-pointer">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
-        </button>
+        <button id="close-manage-shelves-btn" type="button" class="absolute right-0 p-1.5 text-neutral-500 hover:text-black rounded-full hover:bg-neutral-100 transition cursor-pointer">✕</button>
       </div>
       <div id="manage-shelves-list" class="flex-1 overflow-y-auto py-2 space-y-2 min-h-[180px]"></div>
       <div class="pt-5 flex justify-end">
@@ -265,34 +273,40 @@
     <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-neutral-100">
       <div class="relative flex items-center justify-center pb-3">
         <h4 class="text-[18px] font-normal text-[#3b3b3b]">添加到书架</h4>
-        <button id="close-assign-shelf-btn" type="button" class="absolute right-0 p-1 text-neutral-500 hover:text-black rounded-full hover:bg-neutral-100 transition cursor-pointer">✕</button>
+        <button id="close-assign-shelf-btn" type="button" class="absolute right-0 p-1 text-neutral-500 hover:text-black rounded-full cursor-pointer">✕</button>
       </div>
       <div id="assign-shelf-options" class="mt-2 space-y-1.5 max-h-60 overflow-y-auto"></div>
     </div>
   </div>
 
-  <!-- 通用输入弹窗（新建/重命名书架） -->
+  <!-- 通用输入弹窗 -->
   <div id="custom-modal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-neutral-100">
       <h4 id="modal-title" class="text-lg font-medium text-neutral-800">新建书架</h4>
       <p id="modal-desc" class="text-sm text-neutral-500 mt-1">请输入书架名称：</p>
       <input id="modal-input" type="text" class="mt-3 w-full h-10 px-3.5 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-neutral-700" />
       <div class="mt-5 flex justify-end gap-2.5">
-        <button id="modal-cancel-btn" type="button" class="px-4 py-2 rounded-xl text-sm text-neutral-600 hover:bg-neutral-100 transition cursor-pointer">取消</button>
-        <button id="modal-confirm-btn" type="button" class="px-4 py-2 rounded-xl text-sm bg-[#484848] text-white hover:bg-black transition cursor-pointer">确定</button>
+        <button id="modal-cancel-btn" type="button" class="px-4 py-2 rounded-xl text-sm text-neutral-600 hover:bg-neutral-100 cursor-pointer">取消</button>
+        <button id="modal-confirm-btn" type="button" class="px-4 py-2 rounded-xl text-sm bg-[#484848] text-white hover:bg-black cursor-pointer">确定</button>
       </div>
     </div>
   </div>
 
-  <!-- ==================== 5. 阅读器视图与纯自定义颜色抽屉（图2） ==================== -->
+  <!-- ==================== 5. 阅读器视图（顶部正中全屏按钮，靠近才浮现） ==================== -->
   <div id="reader-view" class="hidden fixed inset-0 z-30 flex flex-col bg-[#e9e4d8]">
     <div class="relative flex-1 w-full h-full p-0 sm:p-[6px] bg-[#dcd7cc] overflow-hidden flex items-center justify-center">
       <div id="book-stage" class="relative w-full h-full border border-[#bfbab0] overflow-hidden flex flex-col transition-colors duration-150" style="background-color: var(--reader-bg); color: var(--reader-text); filter: brightness(var(--reader-brightness));">
-        <div id="reader-page-header" class="hidden h-8 px-6 sm:px-14 pt-3 text-xs opacity-50 flex items-center justify-between select-none shrink-0">
-          <span id="header-book-title"></span>
+        
+        <!-- 顶部正中沉浸全屏切换：与四角按钮同款「靠近才浮现」感应区，平时完全透明不遮挡正文 -->
+        <div id="fs-sense-zone" class="group absolute top-0 left-1/2 -translate-x-1/2 w-36 h-16 z-30 flex items-start justify-center p-2.5">
+          <button id="reader-fullscreen-toggle" type="button" title="切换沉浸全屏" class="corner-float-btn opacity-0 group-hover:opacity-100 transition-all duration-150 px-3 py-1 rounded-full bg-black/[0.06] hover:bg-black/[0.14] active:scale-95 text-[#4a4239] hover:text-black flex items-center gap-1.5 text-xs backdrop-blur-sm cursor-pointer shadow-sm">
+            <svg id="fs-icon-expand" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+            <svg id="fs-icon-shrink" class="w-3.5 h-3.5 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4l5 5m0 0H5m4 0V5m11-1l-5 5m0 0h4m-4 0V5M4 20l5-5m0 0H5m4 0v4m11 1l-5-5m0 0h4m-4 0v4"/></svg>
+            <span class="font-sans font-medium text-[11px]">全屏</span>
+          </button>
         </div>
 
-        <!-- 四角隐藏悬浮感应按钮 -->
+        <!-- 悬浮四角感应按钮 -->
         <div class="group absolute top-0 left-0 w-28 h-24 z-30 flex items-start justify-start p-2.5">
           <button id="reader-home-trigger" type="button" title="返回书库" class="corner-float-btn opacity-0 group-hover:opacity-100 transition w-11 h-11 rounded-full bg-black/[0.06] hover:bg-black/[0.14] flex items-center justify-center text-[#59524c] cursor-pointer">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
@@ -304,29 +318,27 @@
           </button>
         </div>
         <div class="group absolute bottom-0 left-0 w-32 h-28 z-30 flex items-end justify-start p-3">
-          <button id="prev-page-btn" type="button" class="corner-float-btn opacity-0 group-hover:opacity-100 transition w-12 h-12 rounded-full bg-[#4a4845]/70 hover:bg-[#3a3835]/85 text-white shadow-md flex items-center justify-center cursor-pointer">‹</button>
+          <button id="prev-page-btn" type="button" title="上一页" class="corner-float-btn opacity-0 group-hover:opacity-100 transition w-12 h-12 rounded-full bg-[#4a4845]/70 hover:bg-[#3a3835]/85 text-white shadow-md flex items-center justify-center cursor-pointer">‹</button>
         </div>
         <div class="group absolute bottom-0 right-0 w-32 h-28 z-30 flex items-end justify-end p-3">
-          <button id="next-page-btn" type="button" class="corner-float-btn opacity-0 group-hover:opacity-100 transition w-12 h-12 rounded-full bg-[#4a4845]/70 hover:bg-[#3a3835]/85 text-white shadow-md flex items-center justify-center cursor-pointer">›</button>
+          <button id="next-page-btn" type="button" title="下一页" class="corner-float-btn opacity-0 group-hover:opacity-100 transition w-12 h-12 rounded-full bg-[#4a4845]/70 hover:bg-[#3a3835]/85 text-white shadow-md flex items-center justify-center cursor-pointer">›</button>
         </div>
 
-        <!-- 内容区 -->
+        <!-- 页面阅读内容容器：正文占满整页，不保留页码栏（EPUB 反转页码无意义，直接去掉） -->
         <div id="reader-content-viewport" class="relative flex-1 w-full h-full overflow-hidden flex items-stretch justify-center">
           <div id="dual-page-spine" class="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 w-[2px] bg-[#b8b3a8] z-10"></div>
-          <div id="page-left-wrapper" class="relative flex-1 h-full flex flex-col justify-between overflow-hidden">
-            <div id="page-left" class="paginated-leaf flex-1 w-full overflow-hidden px-6 sm:px-14 pt-8 pb-2 select-text"></div>
-            <div id="footer-left-page-num" class="reader-footer-num h-9 pb-2 flex items-center justify-center text-[14px] opacity-45 shrink-0">第1页</div>
+          <div id="page-left-wrapper" class="relative flex-1 h-full overflow-hidden">
+            <div id="page-left" class="paginated-leaf absolute inset-0 w-full overflow-hidden select-text"></div>
           </div>
-          <div id="page-right-wrapper" class="relative flex-1 h-full flex flex-col justify-between overflow-hidden">
-            <div id="page-right" class="paginated-leaf flex-1 w-full overflow-hidden px-6 sm:px-14 pt-8 pb-2 select-text"></div>
-            <div id="footer-right-page-num" class="reader-footer-num h-9 pb-2 flex items-center justify-center text-[14px] opacity-45 shrink-0">第2页</div>
+          <div id="page-right-wrapper" class="relative flex-1 h-full overflow-hidden">
+            <div id="page-right" class="paginated-leaf absolute inset-0 w-full overflow-hidden select-text"></div>
           </div>
           <div id="page-measure-box" aria-hidden="true" class="pointer-events-none fixed -top-[9999px] -left-[9999px] invisible overflow-hidden"></div>
         </div>
       </div>
     </div>
 
-    <!-- 阅读设置抽屉（图2纯自定义颜色，取消选中还原原书配色） -->
+    <!-- 侧拉设置面板（性能极致优化：颜色0ms直接响应，滑块智能防抖） -->
     <div id="settings-backdrop" class="hidden fixed inset-0 z-40 bg-black/10"></div>
     <aside id="reader-settings-drawer" class="fixed top-0 right-0 bottom-0 w-[330px] max-w-full bg-[#fafafa] border-l border-neutral-200 shadow-2xl z-50 flex flex-col transform translate-x-full transition-transform duration-200 ease-out">
       <div class="h-14 px-5 flex items-center justify-between border-b border-neutral-100 shrink-0">
@@ -334,7 +346,6 @@
         <button id="close-settings-drawer-btn" type="button" class="p-1.5 text-neutral-500 hover:text-black cursor-pointer">✕</button>
       </div>
       <div class="flex-1 overflow-y-auto px-5 py-5 space-y-6 text-[#3a3a3a]">
-        <!-- 视图模式 -->
         <div>
           <div class="text-[16px] mb-2.5">视图模式</div>
           <div class="grid grid-cols-3 gap-2">
@@ -344,7 +355,7 @@
           </div>
         </div>
 
-        <!-- 背景颜色（图2：无固定颜色，仅保留可删自定义色，都不选中还原原书背景） -->
+        <!-- 背景颜色（无固定色，0毫秒极速响应） -->
         <div>
           <div class="flex items-center gap-3 mb-3">
             <span class="text-[17px]">背景颜色</span>
@@ -357,7 +368,7 @@
           <div id="bg-color-swatches" class="grid grid-cols-5 gap-y-4 gap-x-3 items-center justify-items-center"></div>
         </div>
 
-        <!-- 文字颜色（图2：无固定颜色，仅保留可删自定义色，都不选中还原原书文字色） -->
+        <!-- 文字颜色（无固定色，0毫秒极速响应） -->
         <div>
           <div class="flex items-center gap-3 mb-3">
             <span class="text-[17px]">文字颜色</span>
@@ -380,17 +391,17 @@
             <button id="import-local-font-btn" type="button" class="text-xs text-neutral-500 hover:text-black underline cursor-pointer">+ 本地字体</button>
           </div>
           <select id="select-font-family" class="w-full h-10 px-3 rounded-xl border border-neutral-300 bg-white text-[15px] focus:outline-none">
-            <option value="yeliqun">叶立群几何体测试版</option>
-            <option value="yahei">微软雅黑 / 思源黑体</option>
+            <option value="system">系统默认 / 黑体</option>
             <option value="songti">宋体 / 思源宋体</option>
             <option value="kaiti">楷体 / 华文楷体</option>
+            <option value="yeliqun">叶立群几何体测试版</option>
           </select>
+          <div id="local-font-list" class="flex flex-wrap gap-1.5 pt-0.5"></div>
         </div>
       </div>
     </aside>
   </div>
 
-  <!-- 轻提示 Toast -->
   <div id="toast-message" class="pointer-events-none fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-full bg-[#333]/95 text-white text-sm shadow-lg opacity-0 transition-opacity duration-200"></div>
 
   <script>
@@ -412,14 +423,14 @@
       multiSelectMode: false,
       selectedBookIds: new Set(),
       modalConfirmCallback: null,
-      // GitHub 配置默认全空，不预填任何账号或仓库名
-      github: { owner: '', repo: '', branch: '', token: '', autoUpload: false, metaSha: '' },
+      github: { owner: '', repo: '', branch: '', token: '', metaSha: '' },
       fontMap: {
-        yeliqun: "'叶立群几何体测试版', 'YouYuan', 'PingFang SC', 'Microsoft YaHei', sans-serif",
-        yahei: "'Microsoft YaHei', 'PingFang SC', sans-serif",
+        system: "-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif",
         songti: "'SimSun', 'Songti SC', serif",
-        kaiti: "'KaiTi', 'STKaiti', serif"
+        kaiti: "'KaiTi', 'STKaiti', serif",
+        yeliqun: "'叶立群几何体测试版', '叶立群几何体', 'YeLiQun Jiheti', 'PingFang SC', 'Microsoft YaHei', sans-serif"
       },
+      localFonts: [],
       readerConfig: {
         viewMode: isMobile() ? 'single' : 'dual',
         bgColor: '#fdf6e3',
@@ -430,23 +441,27 @@
         margin: 0,
         letterSpacing: 0,
         paraSpacing: 15,
-        pageWidth: 1.2,
         brightness: 1,
-        fontFamily: 'yeliqun'
+        fontFamily: 'system'
       }
     };
 
-    const PREFS_KEY = 'onereader_prefs_v3';
-    const GH_KEY = 'onereader_gh_config_v3';
-    const DB_NAME = 'OneReaderDB_v3';
+    const PREFS_KEY = 'onereader_prefs_v4';
+    const GH_KEY = 'onereader_gh_v4';
+    const DB_NAME = 'OneReaderDB_v4';
+    const FONT_DB_NAME = 'OneReaderFonts_v1';
+    // 解析逻辑版本号：解析规则有破坏性变更时 +1，旧书打开时会自动重新解析
+    const PARSE_VERSION = 3;
 
     let toastTimer = null;
+    // 云导入：点按钮时置为 true，文件选择完成后据此决定是否上传到私有仓
+    let pendingUploadToCloud = false;
     function showToast(msg) {
       const el = $('toast-message');
       el.textContent = msg;
       el.classList.replace('opacity-0', 'opacity-100');
       clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => el.classList.replace('opacity-100', 'opacity-0'), 2600);
+      toastTimer = setTimeout(() => el.classList.replace('opacity-100', 'opacity-0'), 2500);
     }
 
     function savePrefs() {
@@ -466,7 +481,7 @@
       } catch (e) {}
     }
 
-    // ==================== IndexedDB 离线缓存 ====================
+    // ==================== IndexedDB 本地长期存储 ====================
     function openDB() {
       return new Promise(res => {
         if (!window.indexedDB) return res(null);
@@ -486,11 +501,15 @@
       if (!db) return;
       const copy = { ...b, pdfDoc: undefined, pages: undefined };
       db.transaction('books', 'readwrite').objectStore('books').put(copy);
+      updateStorageUsageDisplay();
     }
 
     async function deleteBookDB(id) {
       const db = await openDB();
-      if (db) db.transaction('books', 'readwrite').objectStore('books').delete(id);
+      if (db) {
+        db.transaction('books', 'readwrite').objectStore('books').delete(id);
+        updateStorageUsageDisplay();
+      }
     }
 
     async function loadAllBooksDB() {
@@ -503,13 +522,195 @@
       });
     }
 
-    // ==================== GitHub 私有仓 REST API 核心 ====================
+    // ==================== 本地字体：导入 / 持久化 / 注入 @font-face ====================
+    function openFontDB() {
+      return new Promise(res => {
+        if (!window.indexedDB) return res(null);
+        const r = indexedDB.open(FONT_DB_NAME, 1);
+        r.onupgradeneeded = e => {
+          if (!e.target.result.objectStoreNames.contains('fonts')) {
+            e.target.result.createObjectStore('fonts', { keyPath: 'id' });
+          }
+        };
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => res(null);
+      });
+    }
+
+    async function loadAllLocalFonts() {
+      const db = await openFontDB();
+      if (!db) return [];
+      return new Promise(res => {
+        const req = db.transaction('fonts', 'readonly').objectStore('fonts').getAll();
+        req.onsuccess = () => res(req.result || []);
+        req.onerror = () => res([]);
+      });
+    }
+
+    async function saveLocalFontDB(rec) {
+      const db = await openFontDB();
+      if (!db) return;
+      db.transaction('fonts', 'readwrite').objectStore('fonts').put(rec);
+    }
+
+    async function deleteLocalFontDB(id) {
+      const db = await openFontDB();
+      if (!db) return;
+      db.transaction('fonts', 'readwrite').objectStore('fonts').delete(id);
+    }
+
+    // 把已导入的字体注册进 document.fonts，供排版与测量使用
+    function registerLocalFontFace(rec) {
+      if (!rec || !rec.buffer || !rec.family) return;
+      try {
+        const face = new FontFace(rec.family, rec.buffer.slice(0));
+        face.load().then(f => document.fonts.add(f)).catch(() => {});
+      } catch (e) {}
+    }
+
+    // 系统里已装的「叶立群几何体测试版」若存在则直接可用；此处无需注册，字体栈自动回落
+    function renderFontOptions() {
+      const sel = $('select-font-family');
+      if (!sel) return;
+      sel.querySelectorAll('option[data-local="1"]').forEach(o => o.remove());
+      state.localFonts.forEach(rec => {
+        const opt = document.createElement('option');
+        opt.value = rec.id;
+        opt.dataset.local = '1';
+        opt.textContent = `本地：${rec.name}`;
+        sel.appendChild(opt);
+      });
+      sel.value = state.readerConfig.fontFamily || 'system';
+      if (!sel.value) sel.value = 'system';
+
+      const box = $('local-font-list');
+      if (!box) return;
+      box.innerHTML = '';
+      state.localFonts.forEach(rec => {
+        const chip = document.createElement('span');
+        chip.className = 'inline-flex items-center gap-1 max-w-full px-2 py-0.5 rounded-full bg-neutral-100 text-[11px] text-neutral-600';
+        chip.innerHTML = `<span class="truncate max-w-[150px]"></span><button type="button" class="text-neutral-400 hover:text-red-500 leading-none px-0.5 cursor-pointer">✕</button>`;
+        chip.firstElementChild.textContent = rec.name;
+        chip.querySelector('button').onclick = async () => {
+          await deleteLocalFontDB(rec.id);
+          state.localFonts = state.localFonts.filter(f => f.id !== rec.id);
+          if (state.readerConfig.fontFamily === rec.id) {
+            state.readerConfig.fontFamily = 'system';
+            savePrefs();
+            applyLayoutStyles();
+            repaginateDebounced();
+          }
+          renderFontOptions();
+          showToast(`已移除本地字体「${rec.name}」`);
+        };
+        box.appendChild(chip);
+      });
+    }
+
+    // 读取字体元信息：优先用 File System Access API 的 queryLocalFonts 风格解析，失败则用文件名
+    function guessFontFamilyFromName(name) {
+      return String(name || '').replace(/\.(ttf|otf|woff2?|ttc)$/i, '').replace(/[_-]+/g, ' ').trim() || '本地字体';
+    }
+
+    async function handleLocalFontImport(file) {
+      if (!file) return;
+      if (!/\.(ttf|otf|woff2?|ttc)$/i.test(file.name)) return showToast('请选择 .ttf / .otf / .woff / .woff2 字体文件');
+      const buf = await file.arrayBuffer();
+      const family = guessFontFamilyFromName(file.name) + '_' + Date.now().toString(36);
+      const displayName = guessFontFamilyFromName(file.name);
+
+      try {
+        const face = new FontFace(family, buf.slice(0));
+        await face.load();
+        document.fonts.add(face);
+      } catch (e) {
+        return showToast('这个字体文件无法解析，换一个 .ttf/.otf 试试');
+      }
+
+      const id = 'local:' + family;
+      const rec = { id, name: displayName, family, mime: file.type || '', buffer: buf, addedAt: Date.now() };
+      state.fontMap[id] = `'${family}', 'PingFang SC', 'Microsoft YaHei', sans-serif`;
+      state.localFonts.push(rec);
+      await saveLocalFontDB(rec);
+
+      state.readerConfig.fontFamily = id;
+      savePrefs();
+      renderFontOptions();
+      applyLayoutStyles();
+      repaginateDebounced();
+      showToast(`已导入并启用「${displayName}」`);
+    }
+
+    // 统计本地 IndexedDB 存储体积 (MB)
+    function updateStorageUsageDisplay() {
+      let totalBytes = 0;
+      let cachedCount = 0;
+      state.books.forEach(b => {
+        if (b.fileBytes) {
+          totalBytes += (b.fileBytes.byteLength || 0);
+          cachedCount++;
+        }
+      });
+      const mb = (totalBytes / (1024 * 1024)).toFixed(1);
+      $('local-storage-size').textContent = `已用 ${mb} MB (${cachedCount} 本已离线)`;
+    }
+
+    // 清理本地书籍缓存（防存储爆炸：释放二进制占用，保留云端条目和进度）
+    async function purgeAllLocalCache() {
+      let freed = 0;
+      for (const b of state.books) {
+        if (b.fileBytes && (b.cloudPath || b.cloudSha)) {
+          b.fileBytes = null;
+          b.rawBlocks = null;
+          b.pdfDoc = null;
+          b.isCloudOnly = true;
+          await saveBookDB(b);
+          freed++;
+        }
+      }
+      renderLibrary();
+      updateStorageUsageDisplay();
+      showToast(`已释放 ${freed} 本书的手机空间，云端记录已保留`);
+    }
+
+    // ==================== 全屏沉浸切换 ====================
+    function toggleReaderFullscreen() {
+      const doc = document;
+      const isFs = doc.fullscreenElement || doc.webkitFullscreenElement;
+      if (!isFs) {
+        const el = doc.documentElement;
+        (el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen)?.call(el);
+      } else {
+        (doc.exitFullscreen || doc.webkitExitFullscreen || doc.msExitFullscreen)?.call(doc);
+      }
+    }
+
+    function updateFullscreenIcons() {
+      const isFs = Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+      $('fs-icon-expand').classList.toggle('hidden', isFs);
+      $('fs-icon-shrink').classList.toggle('hidden', !isFs);
+    }
+    document.addEventListener('fullscreenchange', updateFullscreenIcons);
+    document.addEventListener('webkitfullscreenchange', updateFullscreenIcons);
+
+    // ==================== GitHub REST API 私有仓直连 ====================
     function updateCloudIndicator() {
       const connected = Boolean(state.github.owner && state.github.repo && state.github.token);
       $('cloud-status-dot').className = `absolute top-2 right-2 w-2.5 h-2.5 rounded-full ring-2 ring-white transition-colors ${connected ? 'bg-emerald-500' : 'bg-neutral-400'}`;
       const badge = $('cloud-conn-badge');
-      badge.textContent = connected ? `已连接 ${state.github.owner}/${state.github.repo}` : '未连接';
+      badge.textContent = connected ? `已连 ${state.github.owner}/${state.github.repo}` : '未连接';
       badge.className = `text-xs px-2.5 py-0.5 rounded-full ${connected ? 'bg-emerald-50 text-emerald-700 font-medium' : 'bg-neutral-100 text-neutral-500'}`;
+      // 云导入 / 云删除：仅连接私有仓后可用（置灰并给出说明）
+      const cloudButtons = {
+        'hub-import-cloud-btn': '连接仓库后可用：导入并同时上传到仓库',
+        'book-act-cloud-delete': '连接仓库后可用：同时删除仓库里的这本'
+      };
+      Object.entries(cloudButtons).forEach(([id, tip]) => {
+        const el = $(id);
+        if (!el) return;
+        el.disabled = !connected;
+        el.title = connected ? tip.replace(/^连接仓库后可用：/, '') : tip;
+      });
     }
 
     function ghHeaders(extra = {}) {
@@ -520,216 +721,157 @@
       };
     }
 
-    function uint8ToBase64(u8) {
+    // 是否已连接私有仓（云导入 / 云删除仅在连接后可用）
+    function isCloudConnected() {
+      return Boolean(state.github.owner && state.github.repo && state.github.token);
+    }
+
+    function repoApiBase() {
+      const { owner, repo } = state.github;
+      return `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+    }
+
+    // 数组缓冲 -> base64（GitHub contents API 要求 base64 内容）
+    function arrayBufferToBase64(buf) {
+      const bytes = new Uint8Array(buf);
       let binary = '';
       const chunk = 0x8000;
-      for (let i = 0; i < u8.length; i += chunk) {
-        binary += String.fromCharCode.apply(null, u8.subarray(i, i + chunk));
+      for (let i = 0; i < bytes.length; i += chunk) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
       }
       return btoa(binary);
     }
 
-    // 拉取私有仓文件列表与 onereader_meta.json
+    // 查询云端某文件当前的 sha（更新或删除都需要）。不存在返回 null。
+    async function getCloudFileSha(path) {
+      const branch = state.github.branch || 'main';
+      const url = `${repoApiBase()}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`;
+      const res = await fetch(url, { headers: ghHeaders() });
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      return data && data.sha ? data.sha : null;
+    }
+
+    // 上传（或覆盖）一本书到私有仓根目录
+    async function uploadBookToCloud(book) {
+      if (!isCloudConnected()) throw new Error('未连接私有仓');
+      if (!book.fileBytes) throw new Error('本地没有原始文件，无法上传');
+      const branch = state.github.branch || 'main';
+      const path = book.fileName || `${book.title}.${book.format === 'PDF' ? 'pdf' : 'epub'}`;
+      const sha = await getCloudFileSha(path);
+      const body = {
+        message: `upload: ${path}`,
+        content: arrayBufferToBase64(book.fileBytes),
+        branch
+      };
+      if (sha) body.sha = sha;
+      const res = await fetch(`${repoApiBase()}/contents/${encodeURIComponent(path)}`, {
+        method: 'PUT',
+        headers: ghHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) {
+        const t = await res.text().catch(() => '');
+        throw new Error(`HTTP ${res.status} ${t.slice(0, 120)}`);
+      }
+      const data = await res.json();
+      book.cloudPath = path;
+      book.cloudSha = data && data.content ? data.content.sha : (sha || '');
+      return path;
+    }
+
+    // 从私有仓删除一本书
+    async function deleteBookFromCloud(book) {
+      if (!isCloudConnected()) throw new Error('未连接私有仓');
+      const branch = state.github.branch || 'main';
+      const path = book.cloudPath || book.fileName;
+      if (!path) throw new Error('该书没有云端路径');
+      const sha = await getCloudFileSha(path);
+      if (!sha) return { skipped: true };  // 云端本来就没有
+      const res = await fetch(`${repoApiBase()}/contents/${encodeURIComponent(path)}`, {
+        method: 'DELETE',
+        headers: ghHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ message: `delete: ${path}`, sha, branch })
+      });
+      if (!res.ok) {
+        const t = await res.text().catch(() => '');
+        throw new Error(`HTTP ${res.status} ${t.slice(0, 120)}`);
+      }
+      book.cloudPath = '';
+      book.cloudSha = '';
+      return { deleted: true };
+    }
+
+    // 拉取私有仓书库列表
     async function pullFromGitHubPrivateRepo() {
       const owner = $('gh-owner-input').value.trim();
       const repo = $('gh-repo-input').value.trim();
       const branch = $('gh-branch-input').value.trim() || 'main';
       const token = $('gh-token-input').value.trim();
-      if (!owner || !repo || !token) {
-        return showToast('请先完整填写 GitHub 用户名、私有仓库名与 Token');
-      }
+      if (!owner || !repo || !token) return showToast('请完整输入 GitHub 用户名、仓库名与 Token');
+
       state.github = { ...state.github, owner, repo, branch, token };
       savePrefs();
-      updateCloudIndicator();
 
-      showToast('正在连接 GitHub 私有仓库...');
+      const progBox = $('sync-progress-box');
+      const progTxt = $('sync-progress-text');
+      const progBar = $('sync-progress-bar');
+      progBox.classList.remove('hidden');
+      progTxt.textContent = '正在连接私有仓库...';
+      progBar.style.width = '20%';
+
       try {
         const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents?ref=${encodeURIComponent(branch)}`;
         const resp = await fetch(url, { headers: ghHeaders() });
-        if (resp.status === 404) {
-          showToast('仓库为空或不存在，已准备就绪');
-          $('cloud-hub-modal').classList.add('hidden');
-          return;
-        }
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const files = await resp.json();
-        if (!Array.isArray(files)) return;
+        if (!Array.isArray(files)) throw new Error('返回结构异常');
 
-        // 1. 检查是否存在进度配置文件 onereader_meta.json
-        const metaFile = files.find(f => f.name === 'onereader_meta.json');
-        let cloudMeta = {};
-        if (metaFile) {
-          state.github.metaSha = metaFile.sha;
-          const mResp = await fetch(metaFile.url, { headers: ghHeaders({ 'Accept': 'application/vnd.github.raw' }) });
-          if (mResp.ok) {
-            cloudMeta = await mResp.json();
-            if (Array.isArray(cloudMeta.shelves) && cloudMeta.shelves.length) state.shelves = cloudMeta.shelves;
-            if (cloudMeta.readerConfig) Object.assign(state.readerConfig, cloudMeta.readerConfig);
-          }
-        }
+        progBar.style.width = '50%';
+        progTxt.textContent = '检测图书列表...';
 
-        // 2. 合并云端 .epub / .pdf 图书条目
         const bookFiles = files.filter(f => f.type === 'file' && /\.(epub|pdf)$/i.test(f.name));
-        for (const f of bookFiles) {
-          const format = f.name.toLowerCase().endsWith('.pdf') ? 'PDF' : 'EPUB';
+        for (let i = 0; i < bookFiles.length; i++) {
+          const f = bookFiles[i];
+          const pct = Math.round(50 + ((i + 1) / bookFiles.length) * 45);
+          progBar.style.width = `${pct}%`;
+          progTxt.textContent = `发现云端书目 (${i + 1}/${bookFiles.length}): ${f.name}`;
+
           const title = f.name.replace(/\.(epub|pdf)$/i, '');
-          const metaItem = (cloudMeta.books && cloudMeta.books[f.name]) || {};
-          let existing = state.books.find(b => b.fileName === f.name || b.title === title);
-          if (!existing) {
-            const cloudBook = {
+          const format = f.name.toLowerCase().endsWith('.pdf') ? 'PDF' : 'EPUB';
+          let exist = state.books.find(b => b.fileName === f.name || b.title === title);
+          if (!exist) {
+            const newCloudBook = {
               id: 'cloud-' + f.sha.slice(0, 10),
-              title,
-              fileName: f.name,
-              format,
-              shelf: metaItem.shelf || '',
-              pinned: Boolean(metaItem.pinned),
-              addedAt: metaItem.addedAt || Date.now(),
-              coverUrl: metaItem.coverUrl || '',
-              hasBeenRead: Boolean(metaItem.hasBeenRead),
-              progressPercent: metaItem.progressPercent || 0,
-              lastPageIndex: metaItem.lastPageIndex || 0,
-              cloudPath: f.path,
-              cloudSha: f.sha,
-              isCloudOnly: true
+              title, fileName: f.name, format, shelf: '',
+              pinned: false, addedAt: Date.now(), coverUrl: '',
+              hasBeenRead: false, progressPercent: 0, lastPageIndex: 0,
+              cloudPath: f.path, cloudSha: f.sha, isCloudOnly: true
             };
-            state.books.push(cloudBook);
-            await saveBookDB(cloudBook);
+            state.books.push(newCloudBook);
+            await saveBookDB(newCloudBook);
           } else {
-            existing.cloudPath = f.path;
-            existing.cloudSha = f.sha;
-            if (metaItem.progressPercent > (existing.progressPercent || 0)) {
-              existing.progressPercent = metaItem.progressPercent;
-              existing.lastPageIndex = metaItem.lastPageIndex || 0;
-              existing.hasBeenRead = true;
-            }
-            await saveBookDB(existing);
+            exist.cloudPath = f.path;
+            exist.cloudSha = f.sha;
+            await saveBookDB(exist);
           }
         }
 
-        savePrefs();
+        updateCloudIndicator();
         renderShelves();
         renderLibrary();
-        renderColorSwatches();
+        progBox.classList.add('hidden');
         $('cloud-hub-modal').classList.add('hidden');
-        showToast(`同步成功：发现 ${bookFiles.length} 本云端图书`);
+        showToast(`同步完成：已索引 ${bookFiles.length} 本云端图书`);
       } catch (err) {
         console.error(err);
-        showToast('连接失败，请检查用户名、仓库名、分支或 Token 权限');
+        progBox.classList.add('hidden');
+        showToast('连接失败：请核对用户名、仓库名或 Token');
       }
     }
 
-    // 同步书架、阅读进度与颜色配置到私有仓 onereader_meta.json
-    async function pushMetaToGitHub(silent = false) {
-      const { owner, repo, branch, token } = state.github;
-      if (!owner || !repo || !token) {
-        if (!silent) showToast('请先配置并连接 GitHub 私有仓');
-        return;
-      }
-      try {
-        const booksMeta = {};
-        state.books.forEach(b => {
-          const key = b.fileName || `${b.title}.${(b.format || 'epub').toLowerCase()}`;
-          booksMeta[key] = {
-            shelf: b.shelf || '',
-            pinned: Boolean(b.pinned),
-            hasBeenRead: Boolean(b.hasBeenRead),
-            progressPercent: b.progressPercent || 0,
-            lastPageIndex: b.lastPageIndex || 0,
-            addedAt: b.addedAt || Date.now()
-          };
-        });
-        const payloadObj = {
-          updatedAt: new Date().toISOString(),
-          shelves: state.shelves,
-          readerConfig: state.readerConfig,
-          books: booksMeta
-        };
-        const bytes = new TextEncoder().encode(JSON.stringify(payloadObj, null, 2));
-        const apiUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/onereader_meta.json`;
-
-        let sha = state.github.metaSha;
-        if (!sha) {
-          const check = await fetch(`${apiUrl}?ref=${encodeURIComponent(branch || 'main')}`, { headers: ghHeaders() });
-          if (check.ok) {
-            const data = await check.json();
-            sha = data.sha;
-          }
-        }
-
-        const body = {
-          message: 'Sync OneReader progress & shelves',
-          content: uint8ToBase64(bytes),
-          branch: branch || 'main'
-        };
-        if (sha) body.sha = sha;
-
-        const res = await fetch(apiUrl, {
-          method: 'PUT',
-          headers: ghHeaders({ 'Content-Type': 'application/json' }),
-          body: JSON.stringify(body)
-        });
-        if (res.ok) {
-          const data = await res.json();
-          state.github.metaSha = data.content && data.content.sha ? data.content.sha : sha;
-          savePrefs();
-          if (!silent) showToast('已将书架与阅读进度同步至私有仓');
-        }
-      } catch (e) {
-        if (!silent) showToast('同步进度到私有仓失败');
-      }
-    }
-
-    // 上传单本图书二进制文件到 GitHub 私有仓库
-    async function uploadBookToGitHub(book) {
-      const { owner, repo, branch, token } = state.github;
-      if (!owner || !repo || !token) {
-        $('cloud-hub-modal').classList.remove('hidden');
-        return showToast('请先填写 GitHub 私有仓配置');
-      }
-      if (!book.fileBytes) {
-        return showToast('该图书已在云端或无本地原始文件流');
-      }
-      const fileName = book.fileName || `${book.title}.${book.format.toLowerCase()}`;
-      showToast(`正在上传《${book.title}》到私有云...`);
-      try {
-        const apiUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeURIComponent(fileName)}`;
-        let sha = book.cloudSha;
-        if (!sha) {
-          const check = await fetch(`${apiUrl}?ref=${encodeURIComponent(branch || 'main')}`, { headers: ghHeaders() });
-          if (check.ok) {
-            const exist = await check.json();
-            sha = exist.sha;
-          }
-        }
-        const u8 = new Uint8Array(book.fileBytes);
-        const body = {
-          message: `Upload ${fileName}`,
-          content: uint8ToBase64(u8),
-          branch: branch || 'main'
-        };
-        if (sha) body.sha = sha;
-
-        const res = await fetch(apiUrl, {
-          method: 'PUT',
-          headers: ghHeaders({ 'Content-Type': 'application/json' }),
-          body: JSON.stringify(body)
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const resData = await res.json();
-        book.cloudPath = fileName;
-        book.cloudSha = resData.content && resData.content.sha ? resData.content.sha : '';
-        book.isCloudOnly = false;
-        await saveBookDB(book);
-        await pushMetaToGitHub(true);
-        renderLibrary();
-        showToast(`《${book.title}》已上传至私有仓`);
-      } catch (err) {
-        console.error(err);
-        showToast('上传失败（请确认单文件小于 25~50MB 且 Token 具备 Contents 读写权限）');
-      }
-    }
-
-    // ==================== 书架渲染与图1「管理书架」圆角弹窗 ====================
+    // ==================== 书架管理与圆角排序弹窗 ====================
     function renderShelves() {
       const box = $('custom-shelf-list');
       box.innerHTML = '';
@@ -740,10 +882,7 @@
         btn.type = 'button';
         btn.className = `w-full flex items-center gap-4 pl-6 pr-4 py-2.5 rounded-r-full text-[15px] transition cursor-pointer ${active ? 'bg-[#4a4a4a] text-white font-medium' : 'text-neutral-700 hover:bg-neutral-100'}`;
         btn.innerHTML = `<svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="5" rx="1.5"/><rect x="4" y="13" width="16" height="5" rx="1.5"/></svg><span class="truncate">${esc(name)}</span>`;
-        btn.onclick = () => {
-          state.currentNav = key;
-          updateNavSelection();
-        };
+        btn.onclick = () => { state.currentNav = key; updateNavSelection(); };
         box.appendChild(btn);
       });
     }
@@ -816,7 +955,7 @@
       setTimeout(() => $('modal-input').focus(), 30);
     }
 
-    // ==================== 书库网格渲染与单书 ••• 菜单（图4） ====================
+    // ==================== 书库卡片与 ••• 弹窗 ====================
     function renderLibrary() {
       const list = state.books.filter(b => {
         if (state.currentNav.startsWith('shelf:') && b.shelf !== state.currentNav.slice(6)) return false;
@@ -830,6 +969,7 @@
       if (!list.length) {
         $('empty-library-state').classList.remove('hidden');
         $('books-grid-container').classList.add('hidden');
+        updateStorageUsageDisplay();
         return;
       }
       $('empty-library-state').classList.add('hidden');
@@ -854,7 +994,7 @@
             ${coverHtml}
             <div class="absolute top-2 left-2 flex gap-1">
               ${book.pinned ? `<span class="px-1.5 py-0.5 rounded bg-black/70 text-white text-[10px]">置顶</span>` : ''}
-              ${book.isCloudOnly ? `<span class="px-1.5 py-0.5 rounded bg-sky-600/85 text-white text-[10px]">☁️ 云端</span>` : (book.cloudPath ? `<span class="px-1.5 py-0.5 rounded bg-emerald-600/85 text-white text-[10px]">☁️ 已同步</span>` : '')}
+              ${book.isCloudOnly ? `<span class="px-1.5 py-0.5 rounded bg-sky-600/90 text-white text-[10px]">☁️ 云端</span>` : ''}
             </div>
             ${state.multiSelectMode ? `<div class="absolute top-2.5 right-2.5 w-6 h-6 rounded-full border-2 flex items-center justify-center ${selected ? 'bg-[#3b3b3b] border-[#3b3b3b] text-white' : 'bg-white/85 border-neutral-400 text-transparent'}">✓</div>` : ''}
           </div>
@@ -878,92 +1018,362 @@
           e.stopPropagation();
           state.activeMenuBookId = book.id;
           $('book-act-pin-label').textContent = book.pinned ? '取消置顶' : '置顶';
+          updateCloudIndicator();   // 每次打开菜单刷新"云删除"的可用状态
           const pop = $('book-action-popover');
           pop.classList.remove('hidden');
           $('book-action-backdrop').classList.remove('hidden');
           const r = e.currentTarget.getBoundingClientRect();
-          pop.style.left = `${Math.max(12, Math.min(window.innerWidth - 190, r.right - 176))}px`;
-          pop.style.top = `${Math.min(window.innerHeight - 210, r.bottom + 6)}px`;
+          pop.style.left = `${Math.max(12, Math.min(window.innerWidth - 200, r.right - 186))}px`;
+          pop.style.top = `${Math.min(window.innerHeight - 260, r.bottom + 6)}px`;
         };
         grid.appendChild(card);
       });
+      updateStorageUsageDisplay();
     }
 
-    // ==================== EPUB / PDF 解析与云端按需流式下载 ====================
+    // ==================== EPUB / PDF 解析 ====================
+    // 图片一律转成 data URL：blob URL 只在当前文档生命周期内有效，
+    // 存进 IndexedDB 后刷新/重开书就会全部失效变成破图（本次修复的核心）
+    function blobToDataUrl(blob) {
+      return new Promise(res => {
+        const fr = new FileReader();
+        fr.onload = () => res(fr.result || '');
+        fr.onerror = () => res('');
+        fr.readAsDataURL(blob);
+      });
+    }
+
+    function mimeFromPath(p) {
+      const ext = (p.split('.').pop() || '').toLowerCase();
+      return ({ jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml', bmp: 'image/bmp' })[ext] || 'image/jpeg';
+    }
+
+    // 把 EPUB 里的路径统一成便于匹配的形式：去 query/fragment、解码、统一小写、去掉开头的 ./
+    function normalizeResPath(p) {
+      let s = String(p || '').trim();
+      if (!s) return '';
+      s = s.split('#')[0].split('?')[0];
+      try { s = decodeURIComponent(s); } catch (e) {}
+      s = s.replace(/\\/g, '/').replace(/^\.\//, '').replace(/^\/+/, '');
+      return s.toLowerCase();
+    }
+
+    // 以章节文件所在目录为基准，解析相对路径（../Images/a.jpg、Images/a.jpg、/OEBPS/Images/a.jpg）
+    function resolveRelativePath(baseFile, href) {
+      let s = String(href || '').trim().split('#')[0].split('?')[0];
+      if (!s) return '';
+      try { s = decodeURIComponent(s); } catch (e) {}
+      if (/^(https?:|data:|blob:)/i.test(s)) return '';
+      const baseParts = (baseFile || '').replace(/\\/g, '/').split('/').slice(0, -1);
+      const out = (s.startsWith('/') ? [] : baseParts.slice());
+      s.replace(/^\/+/, '').split('/').forEach(seg => {
+        if (!seg || seg === '.') return;
+        if (seg === '..') out.pop();
+        else out.push(seg);
+      });
+      return out.join('/');
+    }
+
     async function parseEpubBuffer(arrayBuffer, fallbackTitle) {
       const zip = await window.JSZip.loadAsync(arrayBuffer);
       const parser = new DOMParser();
-      const imgMap = {};
+      const imgMap = {};   // 完整路径 / 文件名 -> data URL
+      const imgPathList = [];
       let coverDataUrl = '';
 
       for (const [p, entry] of Object.entries(zip.files)) {
-        if (!entry.dir && /\.(jpe?g|png|webp|gif)$/i.test(p)) {
-          const blob = await entry.async('blob');
-          const url = URL.createObjectURL(blob);
-          imgMap[p.toLowerCase()] = url;
-          imgMap[p.split('/').pop().toLowerCase()] = url;
-          if (!coverDataUrl && /cover/i.test(p)) {
-            coverDataUrl = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
-          }
-        }
+        if (entry.dir || !/\.(jpe?g|png|webp|gif|svg|bmp)$/i.test(p)) continue;
+        // 显式给 blob 正确的 MIME：JSZip 的 blob 默认 type 为空，
+        // readAsDataURL 会退成 application/octet-stream，部分环境据此拒绝渲染
+        const raw = await entry.async('blob');
+        const blob = new Blob([raw], { type: mimeFromPath(p) });
+        const dataUrl = await blobToDataUrl(blob);
+        if (!dataUrl) continue;
+        imgMap[normalizeResPath(p)] = dataUrl;
+        imgMap[(p.split('/').pop() || '').toLowerCase()] = dataUrl;
+        imgPathList.push(p);
+        if (!coverDataUrl && /cover/i.test(p)) coverDataUrl = dataUrl;
       }
 
-      const htmlFiles = Object.keys(zip.files)
-        .filter(n => !zip.files[n].dir && /\.(xhtml|html|htm)$/i.test(n))
-        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+      // 读取图片真实像素尺寸，供分页时用 aspect-ratio 预先占位（避免图片未解码时高度为 0）
+      const dimCache = new Map();
+      const getImageSize = src => {
+        if (!src) return Promise.resolve(null);
+        if (dimCache.has(src)) return dimCache.get(src);
+        const pr = new Promise(res => {
+          const im = new Image();
+          im.onload = () => res({ w: im.naturalWidth || 0, h: im.naturalHeight || 0 });
+          im.onerror = () => res(null);
+          im.src = src;
+        });
+        dimCache.set(src, pr);
+        return pr;
+      };
+
+      // 用图片完整路径做模糊匹配：兼容 src=".../fig1.jpg"、文件名大小写差异、URL 编码等
+      const lookupImage = (baseFile, href) => {
+        const resolved = resolveRelativePath(baseFile, href);
+        const nResolved = normalizeResPath(resolved);
+        if (nResolved && imgMap[nResolved]) return imgMap[nResolved];
+
+        const nRaw = normalizeResPath(href);
+        if (nRaw && imgMap[nRaw]) return imgMap[nRaw];
+
+        const fileName = normalizeResPath((String(href || '').split('/').pop() || ''));
+        if (fileName && imgMap[fileName]) return imgMap[fileName];
+
+        // 最后兜底：同文件名、不同目录
+        if (fileName) {
+          const hit = imgPathList.find(p => normalizeResPath(p.split('/').pop()) === fileName);
+          if (hit) return imgMap[normalizeResPath(hit)];
+        }
+        return '';
+      };
+
+      // ===== 读取 EPUB 结构：container.xml -> .opf -> spine 顺序 =====
+      // 之前只按文件名排序、靠 h1-h4 判断章节，导致：
+      //  1) 章节顺序可能错乱；
+      //  2) 用 <p><strong> 当标题的书完全识别不到章节，章与章直接接排。
+      // 这里改为按 OPF 的 spine 顺序处理，每个 spine 项天然是一个章节，强制新开一页。
+      const findOpfPath = async () => {
+        const containerEntry = zip.file('META-INF/container.xml');
+        if (containerEntry) {
+          try {
+            const xml = await containerEntry.async('string');
+            const m = xml.match(/full-path\s*=\s*["']([^"']+\.opf)["']/i);
+            if (m) return m[1];
+          } catch (e) {}
+        }
+        return Object.keys(zip.files).find(n => /\.opf$/i.test(n)) || '';
+      };
+
+      const parseSpine = async opfPath => {
+        if (!opfPath || !zip.file(opfPath)) return null;
+        let xml = '';
+        try { xml = await zip.file(opfPath).async('string'); } catch (e) { return null; }
+        const doc = new DOMParser().parseFromString(xml, 'application/xml');
+        // manifest: id -> href（相对 opf 目录）
+        const baseDir = opfPath.includes('/') ? opfPath.slice(0, opfPath.lastIndexOf('/') + 1) : '';
+        const idToPath = {};
+        doc.querySelectorAll('manifest > item').forEach(it => {
+          const id = it.getAttribute('id');
+          const href = it.getAttribute('href');
+          if (!id || !href) return;
+          idToPath[id] = resolveRelativePath(opfPath, href) || (baseDir + href);
+        });
+        const spinePaths = [];
+        doc.querySelectorAll('spine > itemref').forEach(ir => {
+          const idref = ir.getAttribute('idref');
+          const p = idref && idToPath[idref];
+          if (p && /\.(xhtml|html|htm)$/i.test(p)) spinePaths.push(p);
+        });
+        if (!spinePaths.length) return null;
+
+        // 目录文件（nav.xhtml / toc.ncx）里给出的章节标题，用于识别章节首标题
+        const navTitles = [];
+        for (const pid of Object.keys(idToPath)) {
+          const p = idToPath[pid];
+          if (!/\.(ncx)$/i.test(p) && !/nav\.x?html?$/i.test(p)) continue;
+          try {
+            const nx = await zip.file(p).async('string');
+            const nd = new DOMParser().parseFromString(nx, 'text/html');
+            nd.querySelectorAll('a, navPoint > navLabel > text, navLabel text').forEach(a => {
+              const tt = (a.textContent || '').replace(/\s+/g, ' ').trim();
+              if (tt && tt.length <= 120) navTitles.push(tt);
+            });
+          } catch (e) {}
+        }
+        return { spinePaths, navTitles };
+      };
+
+      const opfPath = await findOpfPath();
+      const spineInfo = await parseSpine(opfPath);
+      const allHtml = Object.keys(zip.files)
+        .filter(n => !zip.files[n].dir && /\.(xhtml|html|htm)$/i.test(n));
+      const normSet = new Set(allHtml.map(n => normalizeResPath(n)));
+
+      // 按 spine 顺序排列；spine 未覆盖到的文件（附录等）追加到末尾，避免丢内容
+      let htmlFiles;
+      if (spineInfo) {
+        const ordered = [];
+        const used = new Set();
+        for (const p of spineInfo.spinePaths) {
+          const hit = allHtml.find(n => normalizeResPath(n) === normalizeResPath(p));
+          if (hit && !used.has(hit)) { ordered.push(hit); used.add(hit); }
+        }
+        const rest = allHtml
+          .filter(n => !used.has(n))
+          .filter(n => !/nav\.x?html?$/i.test(n) && !/\.ncx$/i.test(n) && !/cover\.x?html?$/i.test(n))
+          .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+        htmlFiles = ordered.concat(rest);
+      } else {
+        htmlFiles = allHtml.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+      }
+      const spineFileSet = new Set((spineInfo ? spineInfo.spinePaths : [])
+        .map(p => {
+          const hit = allHtml.find(n => normalizeResPath(n) === normalizeResPath(p));
+          return hit ? normalizeResPath(hit) : '';
+        }).filter(Boolean));
+
+      const navTitleSet = new Set((spineInfo && spineInfo.navTitles || []).map(t => String(t).replace(/\s+/g, ' ').trim()));
 
       const rawBlocks = [];
+      // base64 / 编码残留清洗。
+      // 之前的版本只按"整块文本"判断，一旦乱码嵌在正文中间（如截图中
+      // "…悲剧的来源" 后面直接跟一段 base64），就整块通过、乱码照旧显示。
+      // 这里改为从文本中直接剔除 base64 片段，只保留正常文字。
+      const cleanText = s => {
+        let t = String(s || '');
+        if (!t) return '';
+
+        // 1) data URL（可能含换行）
+        t = t.replace(/data:[a-z]+\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=\s]{16,}/gi, ' ');
+
+        // 2) 连续 base64 字符片段：长度 >= 32 且含 + 或 / 或 =，或纯字母数字但极长（>= 60）
+        //    先按"可能带换行/空格断行"的连续 base64 块整体匹配
+        t = t.replace(/(?:[A-Za-z0-9+/]{4,}={0,2}\s+){3,}[A-Za-z0-9+/]{4,}={0,2}/g, m => {
+          const compact = m.replace(/\s+/g, '');
+          const hasSym = /[+/=]/.test(compact);
+          const cjk = (compact.match(/[\u4e00-\u9fff]/g) || []).length;
+          if (cjk === 0 && compact.length >= 32 && hasSym) return ' ';
+          return m;
+        });
+
+        // 3) 单段长 base64（无断行）
+        t = t.replace(/[A-Za-z0-9+/]{32,}={0,2}/g, m => {
+          // 仅当含 base64 特征符号，或长度很长且不含常见英文词时剔除
+          if (/[+/=]/.test(m)) return ' ';
+          if (m.length >= 60 && !/[aeiou]{2,}/i.test(m)) return ' ';
+          return m;
+        });
+
+        // 4) 长十六进制串
+        t = t.replace(/\b[0-9a-f]{40,}\b/gi, ' ');
+
+        return t.replace(/\s+/g, ' ').trim();
+      };
+
+      // 清洗后若几乎不剩正常内容，则整块丢弃
+      const isUsableText = s => {
+        const t = cleanText(s);
+        if (!t) return false;
+        if (t.length < 2) return false;
+        return true;
+      };
+
+      let firstSpineFile = true;
       for (const f of htmlFiles) {
         const u8 = await zip.file(f).async('uint8array');
         const txt = new TextDecoder('utf-8').decode(u8);
         const doc = parser.parseFromString(txt, 'text/html');
-        doc.querySelectorAll('script, style').forEach(el => el.remove());
-        const els = doc.body ? doc.body.querySelectorAll('h1,h2,h3,h4,p,div,blockquote,img,li') : [];
+        // 去掉 style/script，另外清掉 SVG 里的 style 与所有元素的 data-* 大段内联数据
+        doc.querySelectorAll('script, style, svg style').forEach(el => el.remove());
+        doc.querySelectorAll('[style]').forEach(el => {
+          const st = el.getAttribute('style') || '';
+          if (/base64,/i.test(st) || st.length > 600) el.removeAttribute('style');
+        });
+        const els = doc.body ? doc.body.querySelectorAll('h1,h2,h3,h4,p,div,blockquote,img,li,figure,svg,image') : [];
         let addedInChapter = 0;
+
+        // 每个 spine 文件视为一个章节：章节首块之前强制分页
+        const isSpineFile = spineFileSet.has(normalizeResPath(f));
+        let chapterStartMarked = false;
+        const markChapterStart = () => {
+          if (chapterStartMarked) return false;
+          chapterStartMarked = true;
+          if (!isSpineFile) return false;
+          if (rawBlocks.length === 0 && firstSpineFile) return false; // 全书第一页无需分页
+          return true;
+        };
+
+        const pushImg = (src, alt, w, h) => {
+          if (!src) return;
+          const last = rawBlocks[rawBlocks.length - 1];
+          if (last && last.type === 'img' && last.src === src) return;
+          const newPage = markChapterStart();
+          rawBlocks.push({ type: 'img', src, alt: alt || '', w: Number(w) || 0, h: Number(h) || 0, forceNewPage: newPage });
+          addedInChapter++;
+        };
+
         els.forEach(el => {
           const tag = el.tagName.toLowerCase();
           if (tag === 'img') {
-            const src = (el.getAttribute('src') || '').split('/').pop().toLowerCase();
-            if (imgMap[src]) rawBlocks.push({ type: 'img', src: imgMap[src] });
+            const href = el.getAttribute('src') || el.getAttribute('data-src') || '';
+            pushImg(lookupImage(f, href), el.getAttribute('alt'),
+              el.getAttribute('width'), el.getAttribute('height'));
             return;
           }
+          if (tag === 'image') {
+            pushImg(lookupImage(f, el.getAttribute('xlink:href') || el.getAttribute('href') || ''), el.getAttribute('alt'),
+              el.getAttribute('width'), el.getAttribute('height'));
+            return;
+          }
+          if (tag === 'svg') return;
           if (tag === 'div' && el.children.length > 0) return;
-          const t = (el.textContent || '').replace(/\s+/g, ' ').trim();
-          if (!t) return;
-          if (/^h[1-4]$/.test(tag)) {
-            rawBlocks.push({ type: 'heading', text: t, forceNewPage: addedInChapter === 0 && rawBlocks.length > 0 });
+          if (tag === 'figure') return;
+          const rawT = (el.textContent || '').replace(/\s+/g, ' ').trim();
+          if (!rawT) return;
+          // 从文本中剔除 base64 / 编码残留；若清洗后没有可用内容则整块跳过
+          const t = cleanText(rawT);
+          if (!isUsableText(rawT)) return;
+
+          const isHeadingTag = /^h[1-4]$/.test(tag);
+          // 目录里登记过的标题，即使用 <p> 写也当作章节标题
+          const isNavTitle = navTitleSet.has(String(t).replace(/\s+/g, ' ').trim());
+          if (isHeadingTag) {
+            const newPage = markChapterStart();
+            rawBlocks.push({ type: 'heading', text: t, forceNewPage: newPage });
           } else {
-            rawBlocks.push({ type: 'p', text: t });
+            const newPage = markChapterStart() || (isNavTitle && addedInChapter === 0);
+            rawBlocks.push({ type: isNavTitle ? 'heading' : 'p', text: t, forceNewPage: newPage });
           }
           addedInChapter++;
         });
+        firstSpineFile = false;
       }
+      // 补齐图片真实宽高（EPUB 没写 width/height 时，靠解码拿尺寸，供分页占位用）
+      for (const b of rawBlocks) {
+        if (b.type !== 'img') continue;
+        const usable = typeof b.src === 'string' && b.src.startsWith('data:image/');
+        // 无法解码的图片直接标记为不可用，分页与渲染都会跳过它，
+        // 避免按 302px 预留整页空白却渲染不出任何东西
+        if (!usable) { b.dead = true; continue; }
+        if (b.w > 0 && b.h > 0) continue;
+        const dim = await getImageSize(b.src);
+        if (dim && dim.w > 0 && dim.h > 0) { b.w = dim.w; b.h = dim.h; }
+        else b.dead = true;
+      }
+
       if (!rawBlocks.length) rawBlocks.push({ type: 'p', text: `《${fallbackTitle}》已载入。` });
-      return { rawBlocks, coverDataUrl };
+      // parseVer 用于识别旧版解析结果：升级解析逻辑后，打开旧书会自动重新解析，
+      // 否则用户会一直看到旧数据里的乱码 / 缺失的章节标记
+      return { rawBlocks, coverDataUrl, parseVer: PARSE_VERSION };
     }
 
-    async function handleFilesImport(files) {
+    // 导入本地文件。uploadToCloud=true 时（云导入）在导入后把原文件上传到私有仓。
+    async function handleFilesImport(files, uploadToCloud = false) {
       for (const file of Array.from(files || [])) {
         const ext = file.name.split('.').pop().toLowerCase();
         const title = file.name.replace(/\.(epub|pdf)$/i, '');
         const buf = await file.arrayBuffer();
         const defaultShelf = state.currentNav.startsWith('shelf:') ? state.currentNav.slice(6) : '';
+        let created = null;
 
         if (ext === 'epub') {
           showToast(`正在解析《${title}》...`);
-          const { rawBlocks, coverDataUrl } = await parseEpubBuffer(buf, title);
+          const parsed = await parseEpubBuffer(buf, title);
+          const { rawBlocks, coverDataUrl } = parsed;
           const newBook = {
             id: 'book-' + Date.now() + Math.random().toString(36).slice(2, 6),
             title, fileName: file.name, format: 'EPUB', shelf: defaultShelf,
             pinned: false, addedAt: Date.now(), coverUrl: coverDataUrl,
             hasBeenRead: false, progressPercent: 0, lastPageIndex: 0,
-            rawBlocks, fileBytes: buf, isCloudOnly: false
+            rawBlocks, fileBytes: buf, isCloudOnly: false, parseVer: parsed.parseVer
           };
           state.books.unshift(newBook);
           await saveBookDB(newBook);
           renderLibrary();
-          if ($('auto-upload-checkbox').checked) uploadBookToGitHub(newBook);
-          openBook(newBook);
+          created = newBook;
         } else if (ext === 'pdf') {
           showToast(`正在载入 PDF《${title}》...`);
           const pdfDoc = await window.pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
@@ -977,21 +1387,101 @@
           state.books.unshift(newBook);
           await saveBookDB(newBook);
           renderLibrary();
-          if ($('auto-upload-checkbox').checked) uploadBookToGitHub(newBook);
-          openBook(newBook);
+          created = newBook;
         }
+
+        // 云导入：同时把这本书上传到私有仓
+        if (created && uploadToCloud) {
+          if (!isCloudConnected()) {
+            showToast('未连接私有仓，已仅导入本地');
+          } else {
+            try {
+              showToast(`正在上传《${created.title}》到私有仓...`);
+              await uploadBookToCloud(created);
+              await saveBookDB(created);
+              showToast(`已导入并上传《${created.title}》`);
+            } catch (e) {
+              showToast(`上传失败：${e.message || '请检查仓库权限'}`);
+            }
+          }
+        }
+
+        if (created) openBook(created);
       }
     }
 
-    // 打开图书（若为仅云端图书，自动通过 Raw 流式接口下载并缓存到本地）
+    // 旧版本把图片存成 blob: URL，刷新后必然失效（显示成 alt 文字 / 破图）。
+    // 这里做自愈：打开书时若发现失效图片地址，就用本地缓存的原始文件重新解析并落库，
+    // 用户无需重新导入。
+    function hasStaleImageBlock(book) {
+      if (!book || book.format !== 'EPUB') return false;
+      const blocks = book.rawBlocks || [];
+      return blocks.some(b => {
+        if (!b || b.type !== 'img') return false;
+        const src = String(b.src || '');
+        // 旧版存的是 blob: URL（早已失效）；空 src 同样是坏数据
+        return src === '' || src.startsWith('blob:');
+      });
+    }
+
+    async function healStaleImages(book) {
+      if (!hasStaleImageBlock(book)) return false;
+      // 有原始文件就重新解析成 data URL（彻底修好）
+      if (book.fileBytes) {
+        try {
+          const parsed = await parseEpubBuffer(book.fileBytes.slice(0), book.title);
+          const hasImg = parsed.rawBlocks.some(b => b.type === 'img');
+          if (hasImg) {
+            book.rawBlocks = parsed.rawBlocks;
+            book.pages = undefined; // 强制重新分页
+            if (parsed.coverDataUrl) book.coverUrl = parsed.coverDataUrl;
+            await saveBookDB(book);
+            return true;
+          }
+        } catch (e) {}
+      }
+      // 没有原始文件（已被释放空间）：把失效图块标记为 dead，
+      // 分页时不再为它们预留整页高度，避免出现整页空白
+      let marked = 0;
+      (book.rawBlocks || []).forEach(b => {
+        if (b && b.type === 'img' && !b.dead) {
+          const src = String(b.src || '');
+          if (src === '' || src.startsWith('blob:')) { b.dead = true; marked++; }
+        }
+      });
+      if (marked) {
+        book.pages = undefined;
+        return false;
+      }
+      return false;
+    }
+
     async function openBook(book) {
+      // 旧版解析结果自动重建：乱码清洗、章节识别、图片 data URL 都是后加的规则，
+      // 旧数据里没有这些结果，直接打开会继续看到乱码。这里统一重解析一次。
+      if (book.format === 'EPUB' && book.fileBytes && (book.parseVer || 0) < PARSE_VERSION) {
+        try {
+          const parsed = await parseEpubBuffer(book.fileBytes.slice(0), book.title);
+          book.rawBlocks = parsed.rawBlocks;
+          book.parseVer = parsed.parseVer;
+          book.pages = undefined;
+          if (parsed.coverDataUrl) book.coverUrl = parsed.coverDataUrl;
+          await saveBookDB(book);
+          showToast('已按新版规则重新解析本书');
+        } catch (e) {}
+      }
+
+      // 兜底：修复旧版遗留的图片地址，避免用户看到 alt 文字/破图
+      const healed = await healStaleImages(book);
+      if (healed) showToast('已修复本书图片显示');
+
       if (book.isCloudOnly && book.cloudPath) {
         const { owner, repo, branch, token } = state.github;
         if (!owner || !repo || !token) {
           $('cloud-hub-modal').classList.remove('hidden');
-          return showToast('请先配置 GitHub Token 以流式下载云端图书');
+          return showToast('请配置 GitHub Token 以拉取书籍内容');
         }
-        showToast(`正在从私有仓下载《${book.title}》...`);
+        showToast(`正在下载《${book.title}》...`);
         try {
           const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeURIComponent(book.cloudPath)}?ref=${encodeURIComponent(branch || 'main')}`;
           const res = await fetch(url, { headers: ghHeaders({ 'Accept': 'application/vnd.github.raw' }) });
@@ -1001,6 +1491,7 @@
           if (book.format === 'EPUB') {
             const parsed = await parseEpubBuffer(buf, book.title);
             book.rawBlocks = parsed.rawBlocks;
+            book.parseVer = parsed.parseVer;
             if (parsed.coverDataUrl) book.coverUrl = parsed.coverDataUrl;
           } else {
             book.pdfDoc = await window.pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
@@ -1009,8 +1500,7 @@
           book.isCloudOnly = false;
           await saveBookDB(book);
         } catch (e) {
-          console.error(e);
-          return showToast('从私有云下载图书失败');
+          return showToast('云端图书下载失败');
         }
       } else if (book.format === 'PDF' && !book.pdfDoc && book.fileBytes) {
         book.pdfDoc = await window.pdfjsLib.getDocument({ data: book.fileBytes.slice(0) }).promise;
@@ -1023,32 +1513,39 @@
 
       $('library-view').classList.add('hidden');
       $('reader-view').classList.remove('hidden');
-      $('header-book-title').textContent = book.title;
 
-      applyReaderStyles();
+      applyThemeColors();
+      applyLayoutStyles();
       requestAnimationFrame(() => {
         repaginate();
         renderReaderPages();
       });
     }
 
-    // ==================== 阅读器排版、分页与图2纯自定义颜色 ====================
-    function applyReaderStyles() {
+    // ==================== 性能核心：颜色0ms修改 vs 几何排版防抖 ====================
+    // 仅更新 CSS 变量，完全不重新排版（0 毫秒秒切，手机完全不卡顿）
+    function applyThemeColors() {
       const c = state.readerConfig;
       const root = document.documentElement;
-      // 都不选中颜色时（null），还原展示原书白底与深黑文字
       root.style.setProperty('--reader-bg', c.bgColor || '#ffffff');
       root.style.setProperty('--reader-text', c.textColor || '#1f1f1f');
+      root.style.setProperty('--reader-brightness', c.brightness);
+    }
+
+    // 仅在字号、边距等物理尺寸变化时更新
+    function applyLayoutStyles() {
+      const c = state.readerConfig;
+      const root = document.documentElement;
       root.style.setProperty('--reader-font-size', c.fontSize + 'px');
       root.style.setProperty('--reader-letter-spacing', c.letterSpacing + 'px');
       root.style.setProperty('--reader-para-spacing', c.paraSpacing + 'px');
-      root.style.setProperty('--reader-brightness', c.brightness);
-      root.style.setProperty('--reader-font-family', state.fontMap[c.fontFamily] || state.fontMap.yeliqun);
+      root.style.setProperty('--reader-font-family', state.fontMap[c.fontFamily] || state.fontMap.system);
 
-      const padX = Math.max(16, (isMobile() ? 22 : 52) + Number(c.margin));
-      const padY = Math.max(16, (isMobile() ? 24 : 36) + Number(c.margin) * 0.4);
-      $('page-left').style.padding = `${padY}px ${padX}px 8px ${padX}px`;
-      $('page-right').style.padding = `${padY}px ${padX}px 8px ${padX}px`;
+      const padX = Math.max(16, (isMobile() ? 20 : 48) + Number(c.margin));
+      const padY = Math.max(16, (isMobile() ? 22 : 36) + Number(c.margin) * 0.4);
+      // 页码已去掉，底部不再为它留空间，与顶部保持对称
+      $('page-left').style.padding = `${padY}px ${padX}px ${padY}px ${padX}px`;
+      $('page-right').style.padding = `${padY}px ${padX}px ${padY}px ${padX}px`;
 
       $('dual-page-spine').classList.toggle('hidden', c.viewMode !== 'dual');
       $('page-right-wrapper').classList.toggle('hidden', c.viewMode !== 'dual');
@@ -1060,11 +1557,50 @@
       });
     }
 
+    // 图片块：用记录的宽高比预占高度，避免测量时高度为 0 导致分页错误。
+    // 关键：图片加载失败（旧数据 blob: 失效、文件损坏）时不能留 alt 文字占位，
+    // 否则会出现整页都是“……请先往上看看……”这种空行（本次反馈的"只有文字没有图"）。
+    function imgBlockHtml(item) {
+      const alt = esc(item.alt || '');
+      const w = Number(item.w) || 0;
+      const h = Number(item.h) || 0;
+      const ratio = (w > 0 && h > 0) ? `aspect-ratio:${w}/${h};` : '';
+      const sizeStyle = (w > 0 && h > 0)
+        ? `width:100%;max-width:min(100%, ${Math.round(w)}px);${ratio}`
+        : 'width:100%;';
+      return `<div class="fig-wrap my-3 flex justify-center"><img src="${esc(item.src)}" alt="${alt}" style="${sizeStyle}height:auto;max-height:45vh;object-fit:contain;border-radius:6px;" class="object-contain" loading="eager" decoding="sync" /></div>`;
+    }
+
     function blockHtml(item) {
       if (!item) return '';
       if (item.type === 'heading') return `<h2 class="font-semibold mt-3" style="margin-bottom:var(--reader-para-spacing);font-size:calc(var(--reader-font-size)*1.22);">${esc(item.text)}</h2>`;
-      if (item.type === 'img') return `<div class="my-3 flex justify-center"><img src="${esc(item.src)}" class="max-h-[45vh] max-w-full object-contain rounded"/></div>`;
+      if (item.type === 'img') return item.dead ? '' : imgBlockHtml(item);
       return `<p style="margin-bottom:var(--reader-para-spacing);text-align:justify;">${esc(item.text)}</p>`;
+    }
+
+    // 渲染后兜底：图片若加载失败（旧 blot 地址失效 / 文件损坏），
+    // 直接移除该占位，避免留下 alt 文字空行和大片空白
+    let imgFailHandlerBound = false;
+    function bindImageFallback() {
+      if (imgFailHandlerBound) return;
+      imgFailHandlerBound = true;
+      // 捕获阶段监听 error，能覆盖动态插入的 img
+      document.addEventListener('error', e => {
+        const t = e.target;
+        if (!t || t.tagName !== 'IMG') return;
+        const wrap = t.closest('.fig-wrap');
+        if (wrap) wrap.remove();
+        else t.remove();
+      }, true);
+    }
+
+    let repaginateTimer = null;
+    function repaginateDebounced() {
+      clearTimeout(repaginateTimer);
+      repaginateTimer = setTimeout(() => {
+        repaginate();
+        renderReaderPages();
+      }, 280);
     }
 
     function repaginate() {
@@ -1074,35 +1610,159 @@
       const pageLeft = $('page-left');
       const measure = $('page-measure-box');
       const cs = getComputedStyle(pageLeft);
-      const availW = Math.max(180, pageLeft.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
-      const availH = Math.max(160, pageLeft.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 6);
+      const availW = Math.max(160, pageLeft.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
+      const availH = Math.max(140, pageLeft.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 6);
 
       measure.style.width = availW + 'px';
-      measure.innerHTML = `<div id="m-col" style="font-size:var(--reader-font-size);letter-spacing:var(--reader-letter-spacing);line-height:1.72;"></div>`;
+      // 注意：不要在这里重新声明 --reader-font-size / --reader-para-spacing。
+      // 写成 --x:var(--x) 会形成自引用，自定义属性解析失败后退成初始值（16px/0px），
+      // 测量高度会整体偏小一半，分页就会塞进两倍内容并溢出被裁。
+      // 这些变量本来就从 :root 继承，无需重复设置。
+      measure.innerHTML = `<div id="m-col" style="width:100%;font-family:var(--reader-font-family);font-size:var(--reader-font-size);letter-spacing:var(--reader-letter-spacing);line-height:1.72;"></div>`;
       const col = $('m-col');
 
       const pages = [];
       let cur = [];
-      const flush = () => { if (cur.length) { pages.push(cur); cur = []; col.innerHTML = ''; } };
+      const flush = () => {
+        if (!cur.length) return;
+        pages.push(cur);
+        cur = [];
+        col.innerHTML = '';
+      };
 
-      for (const b of blocks) {
-        if (b.forceNewPage && cur.length) flush();
-        const wrap = document.createElement('div');
-        wrap.innerHTML = blockHtml(b);
-        const node = wrap.firstElementChild;
-        col.appendChild(node);
+      // 将一个纯文本段落按"能放进剩余高度"的最长前缀切开。
+      // 返回 [前半, 后半]；若整段都放得下则返回 [整段, '']。
+      // 二分查找行数，避免逐字试探导致卡顿。
+      const splitParagraph = (text, remainH) => {
+        if (remainH <= 0) return ['', text];
+        const probe = document.createElement('p');
+        // 关键：probe 的 margin-bottom 会穿透测量容器（最后子元素边距塌陷），
+        // 导致测得的高度比实际渲染小一整段段间距，拆分后就会溢出被裁。
+        // 这里用 padding-bottom 代替 margin 来精确计量可占用的总高度。
+        probe.style.cssText = 'margin:0;padding-bottom:var(--reader-para-spacing);text-align:justify;';
+        col.appendChild(probe);
+        // 留 2px 安全余量，避免亚像素误差导致刚好差 1px 溢出
+        const limit = remainH - 2;
+        let lo = 0, hi = text.length, best = 0;
+        while (lo <= hi) {
+          const mid = (lo + hi) >> 1;
+          probe.textContent = text.slice(0, mid);
+          if (probe.scrollHeight <= limit) { best = mid; lo = mid + 1; }
+          else hi = mid - 1;
+        }
+        col.removeChild(probe);
+        if (best <= 0) return ['', text];
+        if (best >= text.length) return [text, ''];
+        // 尽量在标点处断句，避免半个词；断点提前后长度必然更短，不会溢出
+        const head = text.slice(0, best);
+        const m = head.match(/[\s，。、；：！？,.;:!?）》」』】—…](?![\s\S]*[\s，。、；：！？,.;:!?）》」』】—…])/);
+        let cut = best;
+        if (m && m.index > best * 0.6) cut = m.index + 1;
+        return [text.slice(0, cut), text.slice(cut)];
+      };
+
+      // 把某个块渲染进测量容器，返回该节点（用于撤下 / 复用）
+      const renderInto = (item, container) => {
+        const w = document.createElement('div');
+        w.innerHTML = blockHtml(item);
+        const n = w.firstElementChild;
+        if (n) container.appendChild(n);
+        return n;
+      };
+
+      // 重建测量容器内容，使其严格等于 cur 中的块。
+      // 这是分页正确的关键：拆分/回填后 col 必须与 cur 完全一致，
+      // 否则 scrollHeight 只统计到部分块，remainH 会算错，从而产生大量碎片页。
+      const rebuildCol = () => {
+        col.innerHTML = '';
+        for (const it of cur) renderInto(it, col);
+      };
+
+      const queue = blocks.slice();
+      let guard = 0; // 防止拆分产生极短片段时反复回炉导致死循环
+      // 双页模式下左页是偶数索引：章节必须从"翻页后的左页"开始。
+      // 若上一章结束在左页(偶数)，右页(奇数)必须留空，让新章从下一页左页开始。
+      const isDual = state.readerConfig.viewMode === 'dual';
+      const forceChapterStart = () => {
+        if (cur.length) flush();
+        if (isDual && pages.length % 2 === 1) {
+          // 当前落点在右页，补一个空页使新章落在左页
+          pages.push([]);
+        }
+      };
+
+      for (let qi = 0; qi < queue.length; qi++) {
+        if (++guard > 200000) break;
+        const b = queue[qi];
+        if (b.forceNewPage) { forceChapterStart(); }
+        // 已判定不可用的图片直接跳过：不占位、不产生空白页
+        if (b.type === 'img' && b.dead) continue;
+
+        const node = renderInto(b, col);
+        if (!node) continue;
+
         if (col.scrollHeight <= availH) {
           cur.push(b);
+          continue;
+        }
+
+        // 放不下：先撤下，再计算本页剩余高度
+        col.removeChild(node);
+        const remainH = availH - col.scrollHeight;
+        const lineH = parseFloat(getComputedStyle(col).lineHeight) || 40;
+
+        // 纯文本段落：只有当本页剩余空间还够放"至少两行"时才拆分。
+        // 只够放一行就整段下移，避免产生单行碎段独占页面。
+        const isPlainText = b.type === 'p' && typeof b.text === 'string' && b.text.length > 0;
+        // 拆过一次的尾巴（b.splitFrom）不再参与拆分，避免"拆完放回又被拆"的死循环
+        if (isPlainText && !b.splitFrom && remainH >= lineH * 2) {
+          const [head, tail] = splitParagraph(b.text, remainH);
+          // 拆出的前半至少要有一行，尾巴也不能短到只剩几个字
+          if (head && head.length >= 8 && tail && tail.length >= 8) {
+            cur.push({ type: 'p', text: head });
+            rebuildCol();                                  // col 与 cur 严格同步
+            // 关键：尾巴放回队列紧接着处理，并且不 flush。
+            // 这样尾巴会先尝试填满本页剩余空间（几行也算），填不下才自然换页；
+            // 若在这里 flush，21 字的小尾巴就会独占一整页（空页的根源）。
+            queue.splice(qi + 1, 0, { ...b, text: tail, splitFrom: true });
+            continue;
+          }
+        }
+
+        // 不拆分：整段挪到下一页作为新页首块
+        flush();
+        renderInto(b, col);
+        cur.push(b);
+      }
+      if (cur.length) pages.push(cur);
+      measure.innerHTML = '';
+
+      // 合并"只有图片、没有文字"的孤立页（连续两页纯图片时合并，减少整页留白）。
+      // 注意：空页（章节对齐用的占位）必须原样保留，否则会打乱双页左右位置。
+      const merged = [];
+      for (const pg of pages) {
+        if (!pg.length) { merged.push([]); continue; }   // 占位空页不参与合并
+        const onlyImgs = pg.every(b => b.type === 'img');
+        const last = merged[merged.length - 1];
+        if (onlyImgs && last && last.length && last.every(b => b.type === 'img')) {
+          last.push(...pg);
         } else {
-          col.removeChild(node);
-          flush();
-          cur.push(b);
-          col.innerHTML = blockHtml(b);
+          merged.push(pg.slice());
         }
       }
-      if (cur.length) flush();
-      measure.innerHTML = '';
-      book.pages = pages.length ? pages : [[{ type: 'p', text: '暂无内容' }]];
+
+      // 双页模式最后再对齐一次：确保每个章节首块都落在偶数索引（左页）。
+      // 因为上面的合并可能改变了页数，进而改变奇偶性。
+      if (isDual) {
+        for (let i = 0; i < merged.length; i++) {
+          const pg = merged[i];
+          if (!pg.length) continue;
+          if (!pg[0] || !pg[0].forceNewPage) continue;
+          if (i % 2 === 1) merged.splice(i, 0, []);   // 落在右页 -> 前面插入空页
+        }
+      }
+
+      book.pages = merged.length ? merged : [[{ type: 'p', text: '暂无内容' }]];
     }
 
     async function renderPdfPage(pdfDoc, num, box) {
@@ -1134,20 +1794,15 @@
       if (book.format === 'PDF' && book.pdfDoc) {
         await renderPdfPage(book.pdfDoc, state.currentPageIndex + 1, pL);
         if (mode === 'dual') await renderPdfPage(book.pdfDoc, state.currentPageIndex + 2, pR);
-        $('footer-left-page-num').textContent = `第 ${state.currentPageIndex + 1} / ${total} 页`;
-        $('footer-right-page-num').textContent = state.currentPageIndex + 2 <= total ? `第 ${state.currentPageIndex + 2} 页` : '';
         return;
       }
 
       if (mode === 'scroll') {
         pL.innerHTML = `<div style="font-size:var(--reader-font-size);letter-spacing:var(--reader-letter-spacing);line-height:1.72;">${(book.rawBlocks || []).map(blockHtml).join('')}</div>`;
-        $('footer-left-page-num').textContent = `共 ${total} 页`;
       } else {
         const renderLeaf = idx => `<div style="font-size:var(--reader-font-size);letter-spacing:var(--reader-letter-spacing);line-height:1.72;">${((book.pages && book.pages[idx]) || []).map(blockHtml).join('')}</div>`;
         pL.innerHTML = renderLeaf(state.currentPageIndex);
         if (mode === 'dual') pR.innerHTML = renderLeaf(state.currentPageIndex + 1);
-        $('footer-left-page-num').textContent = `第 ${state.currentPageIndex + 1} / ${total} 页`;
-        $('footer-right-page-num').textContent = state.currentPageIndex + 2 <= total ? `第 ${state.currentPageIndex + 2} 页` : '';
       }
     }
 
@@ -1162,13 +1817,12 @@
       renderReaderPages();
     }
 
-    // 渲染图2纯自定义颜色圆圈（带 ⋮ 添加、右上角 × 删除、再次点击取消选中还原原书颜色）
+    // 纯自定义配色（点击0ms生效，取消选中恢复原书配色）
     function renderColorSwatches() {
       const cfg = state.readerConfig;
       const buildGroup = (containerId, listKey, activeKey, pickerId, emptyNotice) => {
         const box = $(containerId);
         box.innerHTML = '';
-        // 第一个圆圈：竖排三点 ⋮ 添加自定义颜色
         const addBtn = document.createElement('button');
         addBtn.type = 'button';
         addBtn.className = 'w-11 h-11 rounded-full bg-white border border-neutral-200 shadow-sm flex items-center justify-center text-[#554940] hover:bg-neutral-50 cursor-pointer';
@@ -1189,34 +1843,49 @@
           wrap.querySelector('.swatch-btn').onclick = () => {
             cfg[activeKey] = selected ? null : color;
             if (selected) showToast(emptyNotice);
-            savePrefs(); applyReaderStyles(); renderColorSwatches();
+            savePrefs();
+            applyThemeColors(); // 0ms 纯变量修改，不引起重新排版
+            renderColorSwatches();
           };
           wrap.querySelector('.del-swatch').onclick = e => {
             e.stopPropagation();
             cfg[listKey] = cfg[listKey].filter(c => c.toLowerCase() !== color.toLowerCase());
             if (selected) cfg[activeKey] = null;
-            savePrefs(); applyReaderStyles(); renderColorSwatches();
+            savePrefs();
+            applyThemeColors();
+            renderColorSwatches();
           };
           box.appendChild(wrap);
         });
       };
 
-      buildGroup('bg-color-swatches', 'customBgColors', 'bgColor', 'native-bg-picker', '已取消选中，展示原书背景颜色');
-      buildGroup('text-color-swatches', 'customTextColors', 'textColor', 'native-text-picker', '已取消选中，展示原书文字颜色');
+      buildGroup('bg-color-swatches', 'customBgColors', 'bgColor', 'native-bg-picker', '已取消，恢复原书背景');
+      buildGroup('text-color-swatches', 'customTextColors', 'textColor', 'native-text-picker', '已取消，恢复原书文字色');
     }
 
-    // ==================== 初始化与事件绑定 ====================
+    // ==================== 事件监听绑定与初始化 ====================
     window.addEventListener('DOMContentLoaded', async () => {
       loadPrefs();
       state.books = await loadAllBooksDB();
 
-      // 构建阅读器滑块项
+      // 恢复上次导入的本地字体（存在 IndexedDB，刷新后依然可用）
+      state.localFonts = await loadAllLocalFonts();
+      state.localFonts.forEach(rec => {
+        state.fontMap[rec.id] = `'${rec.family}', 'PingFang SC', 'Microsoft YaHei', sans-serif`;
+        registerLocalFontFace(rec);
+      });
+      // 自愈：上次选的本地字体已被删除 / 数据丢失时回落到系统字体，避免整段文字变默认衬线
+      if (state.readerConfig.fontFamily && !state.fontMap[state.readerConfig.fontFamily]) {
+        state.readerConfig.fontFamily = 'system';
+        savePrefs();
+      }
+
       const sliderDefs = [
-        { key: 'fontSize', label: '字体大小', min: 13, max: 40, step: 1 },
-        { key: 'margin', label: '页边距', min: -40, max: 80, step: 1 },
-        { key: 'letterSpacing', label: '字间距', min: 0, max: 20, step: 1 },
-        { key: 'paraSpacing', label: '段落间距', min: 0, max: 100, step: 1 },
-        { key: 'brightness', label: '屏幕亮度', min: 0.4, max: 1, step: 0.05 }
+        { key: 'fontSize', label: '字体大小', min: 13, max: 40, step: 1, isLayout: true },
+        { key: 'margin', label: '页边距', min: -40, max: 80, step: 1, isLayout: true },
+        { key: 'letterSpacing', label: '字间距', min: 0, max: 20, step: 1, isLayout: true },
+        { key: 'paraSpacing', label: '段落间距', min: 0, max: 100, step: 1, isLayout: true },
+        { key: 'brightness', label: '屏幕亮度', min: 0.4, max: 1, step: 0.05, isLayout: false }
       ];
       const sBox = $('sliders-container');
       sliderDefs.forEach(d => {
@@ -1230,20 +1899,47 @@
           </div>
           <input id="rng-${d.key}" type="range" min="${d.min}" max="${d.max}" step="${d.step}" value="${val}" class="onereader-slider" />`;
         sBox.appendChild(div);
+
+        // 拖动时仅平滑更新数值与快速变量，排版异步防抖，彻底消除手机卡顿
         div.querySelector('input').oninput = e => {
-          state.readerConfig[d.key] = Number(e.target.value);
+          const v = Number(e.target.value);
+          state.readerConfig[d.key] = v;
           $(`lbl-${d.key}`).textContent = e.target.value;
-          savePrefs(); applyReaderStyles();
-          if (d.key !== 'brightness') { repaginate(); renderReaderPages(); }
+          savePrefs();
+          if (!d.isLayout) {
+            applyThemeColors();
+          } else {
+            applyLayoutStyles();
+            repaginateDebounced(); // 280ms 防抖
+          }
         };
       });
 
       renderShelves();
       renderLibrary();
       renderColorSwatches();
+      renderFontOptions();
+      applyThemeColors();
+      applyLayoutStyles();
       updateCloudIndicator();
+      updateStorageUsageDisplay();
 
-      // 侧边栏折叠
+      // 全屏切换按钮（顶部正中，与四角按钮一致：靠近才浮现，不再常驻遮挡正文）
+      $('reader-fullscreen-toggle').onclick = toggleReaderFullscreen;
+
+      // 移动端：点屏幕中央唤出控制条后，6 秒无操作自动收起，避免长期盖住正文
+      let mobileCtrlTimer = null;
+      const autoHideMobileControls = () => {
+        clearTimeout(mobileCtrlTimer);
+        mobileCtrlTimer = setTimeout(() => {
+          $('reader-view').classList.remove('mobile-controls-active');
+        }, 6000);
+      };
+      $('reader-view').addEventListener('touchstart', () => {
+        if ($('reader-view').classList.contains('mobile-controls-active')) autoHideMobileControls();
+      }, { passive: true });
+
+      // 侧边栏
       $('toggle-sidebar-btn').onclick = () => {
         const sb = $('library-sidebar');
         if (isMobile()) {
@@ -1260,18 +1956,16 @@
         state.currentNav = 'all';
         updateNavSelection();
       };
-
       $('shelf-collapse-btn').onclick = () => {
         $('shelf-items-container').classList.toggle('hidden');
         $('shelf-chevron').classList.toggle('-rotate-90');
       };
-
       $('library-search-input').oninput = e => {
         state.searchQuery = e.target.value.trim();
         renderLibrary();
       };
 
-      // 新建与管理书架
+      // 书架管理
       $('create-shelf-btn').onclick = () => {
         openPrompt('新建书架', '请输入新书架名称：', '', name => {
           if (!name || state.shelves.includes(name)) return;
@@ -1286,20 +1980,19 @@
         $('custom-modal').classList.add('hidden');
         if (state.modalConfirmCallback) state.modalConfirmCallback(v);
       };
-
       $('manage-shelf-btn').onclick = () => {
         renderManageShelvesList();
         $('manage-shelves-modal').classList.remove('hidden');
       };
       $('close-manage-shelves-btn').onclick = () => $('manage-shelves-modal').classList.add('hidden');
 
-      // 右上角云标志与 GitHub 私有仓配置弹窗
+      // 云端弹窗交互
       $('open-cloud-modal-btn').onclick = () => {
         $('gh-owner-input').value = state.github.owner || '';
         $('gh-repo-input').value = state.github.repo || '';
         $('gh-branch-input').value = state.github.branch || '';
         $('gh-token-input').value = state.github.token || '';
-        $('auto-upload-checkbox').checked = Boolean(state.github.autoUpload);
+        updateStorageUsageDisplay();
         $('cloud-hub-modal').classList.remove('hidden');
       };
       $('close-cloud-modal-btn').onclick = () => $('cloud-hub-modal').classList.add('hidden');
@@ -1309,25 +2002,26 @@
         inp.type = isPwd ? 'text' : 'password';
         e.currentTarget.textContent = isPwd ? '隐藏' : '显示';
       };
-      $('auto-upload-checkbox').onchange = e => {
-        state.github.autoUpload = e.target.checked;
-        savePrefs();
-      };
       $('gh-connect-pull-btn').onclick = pullFromGitHubPrivateRepo;
-      $('gh-push-meta-btn').onclick = () => pushMetaToGitHub(false);
       $('gh-clear-config-btn').onclick = () => {
-        state.github = { owner: '', repo: '', branch: '', token: '', autoUpload: false, metaSha: '' };
-        $('gh-owner-input').value = '';
-        $('gh-repo-input').value = '';
-        $('gh-branch-input').value = '';
-        $('gh-token-input').value = '';
-        savePrefs();
-        updateCloudIndicator();
-        showToast('已清除本地保存的 GitHub 密钥与连接信息');
+        state.github = { owner: '', repo: '', branch: '', token: '', metaSha: '' };
+        $('gh-owner-input').value = ''; $('gh-repo-input').value = ''; $('gh-branch-input').value = ''; $('gh-token-input').value = '';
+        savePrefs(); updateCloudIndicator();
+        showToast('已清除本地 GitHub 密钥');
       };
+      $('purge-all-cache-btn').onclick = purgeAllLocalCache;
 
+      // 导入（仅本地）
       $('hub-import-local-btn').onclick = () => {
         $('cloud-hub-modal').classList.add('hidden');
+        pendingUploadToCloud = false;
+        $('file-upload-input').click();
+      };
+      // 云导入（本地 + 上传到私有仓），仅连接仓库后可用
+      $('hub-import-cloud-btn').onclick = () => {
+        if (!isCloudConnected()) return showToast('请先连接私有仓');
+        $('cloud-hub-modal').classList.add('hidden');
+        pendingUploadToCloud = true;
         $('file-upload-input').click();
       };
       $('hub-download-html-btn').onclick = () => {
@@ -1336,14 +2030,16 @@
         a.href = URL.createObjectURL(new Blob([src], { type: 'text/html;charset=utf-8' }));
         a.download = 'index.html';
         a.click();
-        showToast('已导出 index.html');
+        showToast('已下载 index.html');
       };
       $('file-upload-input').onchange = e => {
-        handleFilesImport(e.target.files);
+        const toCloud = pendingUploadToCloud;
+        pendingUploadToCloud = false;
+        handleFilesImport(e.target.files, toCloud);
         e.target.value = '';
       };
 
-      // 单本书 ••• 弹窗事件
+      // 单书 ••• 菜单
       const closeBookMenu = () => {
         $('book-action-popover').classList.add('hidden');
         $('book-action-backdrop').classList.add('hidden');
@@ -1363,7 +2059,6 @@
             $('assign-shelf-modal').classList.add('hidden');
             state.multiSelectMode = false; state.selectedBookIds.clear();
             renderLibrary();
-            pushMetaToGitHub(true);
             showToast(`已添加到「${s}」`);
           };
           box.appendChild(b);
@@ -1383,12 +2078,21 @@
       $('book-act-pin').onclick = () => {
         closeBookMenu();
         const bk = state.books.find(b => b.id === state.activeMenuBookId);
-        if (bk) { bk.pinned = !bk.pinned; saveBookDB(bk); renderLibrary(); pushMetaToGitHub(true); }
+        if (bk) { bk.pinned = !bk.pinned; saveBookDB(bk); renderLibrary(); }
       };
-      $('book-act-upload-cloud').onclick = () => {
+      // 释放单本书的本地空间
+      $('book-act-purge-one').onclick = async () => {
         closeBookMenu();
         const bk = state.books.find(b => b.id === state.activeMenuBookId);
-        if (bk) uploadBookToGitHub(bk);
+        if (bk) {
+          bk.fileBytes = null;
+          bk.rawBlocks = null;
+          bk.pdfDoc = null;
+          bk.isCloudOnly = true;
+          await saveBookDB(bk);
+          renderLibrary();
+          showToast(`已释放《${bk.title}》的本地缓存空间`);
+        }
       };
       $('book-act-delete').onclick = async () => {
         closeBookMenu();
@@ -1400,8 +2104,26 @@
           showToast(`已删除《${removed.title}》`);
         }
       };
+      // 云删除：同时删除阅读器上的图书与私有仓里的对应文件
+      $('book-act-cloud-delete').onclick = async () => {
+        closeBookMenu();
+        if (!isCloudConnected()) return showToast('请先连接私有仓');
+        const idx = state.books.findIndex(b => b.id === state.activeMenuBookId);
+        if (idx === -1) return;
+        const bk = state.books[idx];
+        try {
+          showToast(`正在从私有仓删除《${bk.title}》...`);
+          await deleteBookFromCloud(bk);
+          state.books.splice(idx, 1);
+          await deleteBookDB(bk.id);
+          renderLibrary();
+          showToast(`已从本地与私有仓删除《${bk.title}》`);
+        } catch (e) {
+          showToast(`云端删除失败：${e.message || '请检查仓库权限'}`);
+        }
+      };
 
-      // 多选批量栏
+      // 批量栏
       $('batch-add-shelf-btn').onclick = () => openAssignModal(Array.from(state.selectedBookIds));
       $('batch-pin-btn').onclick = () => {
         state.books.forEach(b => { if (state.selectedBookIds.has(b.id)) { b.pinned = true; saveBookDB(b); } });
@@ -1416,12 +2138,11 @@
       };
       $('batch-exit-btn').onclick = () => { state.multiSelectMode = false; state.selectedBookIds.clear(); renderLibrary(); };
 
-      // 阅读器控制与返回主页（返回时自动后台同步进度）
+      // 返回主页与设置抽屉
       $('reader-home-trigger').onclick = () => {
         $('reader-view').classList.add('hidden');
         $('library-view').classList.remove('hidden');
         renderLibrary();
-        pushMetaToGitHub(true);
       };
       $('reader-settings-trigger').onclick = () => {
         $('reader-settings-drawer').classList.remove('translate-x-full');
@@ -1437,79 +2158,99 @@
       document.querySelectorAll('.view-mode-btn').forEach(b => {
         b.onclick = () => {
           state.readerConfig.viewMode = b.dataset.mode;
-          savePrefs(); applyReaderStyles(); repaginate(); renderReaderPages();
+          savePrefs(); applyLayoutStyles(); repaginate(); renderReaderPages();
         };
       });
 
-      // 纯自定义背景色与文字色添加/清除
+      // 颜色增删与清除（0ms 直接作用于 CSS 变量）
       $('native-bg-picker').onchange = e => {
         const hex = e.target.value;
         if (!state.readerConfig.customBgColors.includes(hex)) state.readerConfig.customBgColors.push(hex);
         state.readerConfig.bgColor = hex;
-        savePrefs(); applyReaderStyles(); renderColorSwatches();
+        savePrefs(); applyThemeColors(); renderColorSwatches();
       };
       $('native-text-picker').onchange = e => {
         const hex = e.target.value;
         if (!state.readerConfig.customTextColors.includes(hex)) state.readerConfig.customTextColors.push(hex);
         state.readerConfig.textColor = hex;
-        savePrefs(); applyReaderStyles(); renderColorSwatches();
+        savePrefs(); applyThemeColors(); renderColorSwatches();
       };
       $('clear-bg-custom-btn').onclick = () => {
         state.readerConfig.customBgColors = [];
         state.readerConfig.bgColor = null;
-        savePrefs(); applyReaderStyles(); renderColorSwatches();
-        showToast('已清除背景色，还原原书背景');
+        savePrefs(); applyThemeColors(); renderColorSwatches();
+        showToast('已清除，还原原书背景');
       };
       $('clear-text-custom-btn').onclick = () => {
         state.readerConfig.customTextColors = [];
         state.readerConfig.textColor = null;
-        savePrefs(); applyReaderStyles(); renderColorSwatches();
-        showToast('已清除文字色，还原原书文字颜色');
+        savePrefs(); applyThemeColors(); renderColorSwatches();
+        showToast('已清除，还原原书文字色');
       };
 
-      // 字体切换与本地字体导入
       $('select-font-family').onchange = e => {
         state.readerConfig.fontFamily = e.target.value;
-        savePrefs(); applyReaderStyles(); repaginate(); renderReaderPages();
-      };
-      $('import-local-font-btn').onclick = () => $('font-upload-input').click();
-      $('font-upload-input').onchange = async e => {
-        const f = e.target.files[0];
-        if (!f) return;
-        const name = f.name.replace(/\.(ttf|otf|woff2?)$/i, '');
-        const face = new FontFace(name, await f.arrayBuffer());
-        await face.load();
-        document.fonts.add(face);
-        const key = 'custom_' + Date.now();
-        state.fontMap[key] = `'${name}', sans-serif`;
-        const opt = new Option(name, key, true, true);
-        $('select-font-family').add(opt);
-        state.readerConfig.fontFamily = key;
-        applyReaderStyles(); repaginate(); renderReaderPages();
-        showToast(`已载入字体：${name}`);
+        savePrefs(); applyLayoutStyles(); repaginate(); renderReaderPages();
       };
 
-      // 翻页交互：左右按钮、点击屏幕边缘、手势滑动、键盘方向键
+      // 【修复】本地字体按钮此前完全没有绑定事件，点击无反应
+      $('import-local-font-btn').onclick = () => $('font-upload-input').click();
+      $('font-upload-input').onchange = async e => {
+        const file = e.target.files && e.target.files[0];
+        e.target.value = '';
+        await handleLocalFontImport(file);
+      };
+
+      // ==================== 全能翻页：键盘、滚轮、触屏滑动 ====================
       $('prev-page-btn').onclick = () => turnPage(-1);
       $('next-page-btn').onclick = () => turnPage(1);
-      $('reader-content-viewport').onclick = e => {
-        if (window.getSelection().toString()) return;
-        const x = e.clientX, w = window.innerWidth;
-        if (x < w * 0.25) turnPage(-1);
-        else if (x > w * 0.75) turnPage(1);
-        else $('reader-view').classList.toggle('mobile-controls-active');
-      };
-      let tx = 0;
-      $('reader-content-viewport').addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive: true });
-      $('reader-content-viewport').addEventListener('touchend', e => {
-        const dx = e.changedTouches[0].clientX - tx;
-        if (Math.abs(dx) > 45) turnPage(dx < 0 ? 1 : -1);
+
+      // 1. 鼠标滚轮防抖翻页（上滚上一页，下滚下一页）
+      let lastWheelTime = 0;
+      window.addEventListener('wheel', e => {
+        if ($('reader-view').classList.contains('hidden')) return;
+        const now = Date.now();
+        if (now - lastWheelTime < 240) return; // 240ms 节流防连跳
+        if (Math.abs(e.deltaY) > 20) {
+          lastWheelTime = now;
+          turnPage(e.deltaY > 0 ? 1 : -1);
+        }
       }, { passive: true });
+
+      // 2. 键盘全方向键支持（上/左 = 上翻，下/右/空格 = 下翻）
       window.addEventListener('keydown', e => {
         if ($('reader-view').classList.contains('hidden')) return;
-        if (e.key === 'ArrowLeft' || e.key === 'PageUp') turnPage(-1);
-        if (e.key === 'ArrowRight' || e.key === 'PageDown') turnPage(1);
+        if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) turnPage(-1);
+        if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(e.key)) turnPage(1);
       });
+
+      // 3. 手机端触屏滑动适配（左划下翻，右划上翻）
+      let touchStartX = 0, touchStartY = 0;
+      $('reader-content-viewport').addEventListener('touchstart', e => {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      }, { passive: true });
+
+      $('reader-content-viewport').addEventListener('touchend', e => {
+        if (window.getSelection().toString()) return;
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = e.changedTouches[0].clientY - touchStartY;
+        // 水平滑动位移显著大于垂直滑动且超过 40px
+        if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+          turnPage(dx < 0 ? 1 : -1); // 左滑(dx<0)下翻，右滑(dx>0)上翻
+        } else if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+          // 点击屏幕中央唤出边角控制条，点击左右两侧直接翻页
+          const x = e.changedTouches[0].clientX, w = window.innerWidth;
+          if (x < w * 0.25) turnPage(-1);
+          else if (x > w * 0.75) turnPage(1);
+          else {
+            const v = $('reader-view');
+            v.classList.toggle('mobile-controls-active');
+            if (v.classList.contains('mobile-controls-active')) autoHideMobileControls();
+            else clearTimeout(mobileCtrlTimer);
+          }
+        }
+      }, { passive: true });
     });
   </script>
 </body>
