@@ -67,9 +67,24 @@
         </button>
         <div class="flex items-center ml-1 sm:ml-14 md:ml-20 flex-1 min-w-0">
           <div class="relative w-full max-w-[270px]">
-            <input id="library-search-input" type="text" placeholder="搜索我的书库" class="w-full h-11 pl-5 pr-10 rounded-full bg-[#ebebeb] text-[15px] text-neutral-700 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-neutral-400 transition" />
-            <svg class="w-5 h-5 text-neutral-500 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M20 20l-3.5-3.5"/></svg>
+            <!-- 搜索只在「按回车」或「点放大镜」时执行，输入过程中不过滤。
+                 原因：浏览器自动填充在确认时会触发 input/change 事件，
+                 若把 input 当搜索指令，点页面任何地方确认填充都会变成"搜索仓库名"，
+                 书库被过滤成空。 -->
+            <input id="library-search-input" type="text" placeholder="搜索我的书库"
+                   name="onereader-q-not-a-real-field" autocomplete="off" autocorrect="off"
+                   autocapitalize="off" spellcheck="false" enterkeyhint="search"
+                   data-lpignore="true" data-form-type="other"
+                   class="w-full h-11 pl-5 pr-10 rounded-full bg-[#ebebeb] text-[15px] text-neutral-700 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-neutral-400 transition" />
+            <button id="library-search-btn" type="button" title="搜索" class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full text-neutral-500 hover:text-black hover:bg-neutral-200/70 transition cursor-pointer">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M20 20l-3.5-3.5"/></svg>
+            </button>
           </div>
+          <!-- 当前生效的搜索条件（可一键清除），让"正在筛选"这件事可见 -->
+          <button id="library-search-chip" type="button" class="hidden ml-2 shrink-0 max-w-[180px] flex items-center gap-1 px-2.5 py-1 rounded-full bg-neutral-800 text-white text-[12px] cursor-pointer">
+            <span id="library-search-chip-text" class="truncate"></span>
+            <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
         </div>
       </div>
 
@@ -3376,10 +3391,73 @@
         $('shelf-items-container').classList.toggle('hidden');
         $('shelf-chevron').classList.toggle('-rotate-90');
       };
-      $('library-search-input').oninput = e => {
-        state.searchQuery = e.target.value.trim();
+      // ==================== 书库搜索：显式提交 ====================
+      // 不再监听 input 做即时过滤。浏览器自动填充在"确认"时会触发 input/change，
+      // 一旦把它当搜索指令，点页面任何位置确认填充就等于"搜索了仓库名"，书库被过滤成空。
+      // 现在只有「按回车」或「点放大镜」才真正执行搜索。
+      const libSearch = $('library-search-input');
+
+      function applyLibrarySearch() {
+        if (!libSearch) return;
+        const kw = libSearch.value.trim();
+        state.searchQuery = kw;
+        const chip = $('library-search-chip');
+        if (chip) {
+          chip.classList.toggle('hidden', !kw);
+          $('library-search-chip-text').textContent = kw;
+        }
         renderLibrary();
-      };
+      }
+
+      function clearLibrarySearch() {
+        if (libSearch) libSearch.value = '';
+        state.searchQuery = '';
+        const chip = $('library-search-chip');
+        if (chip) chip.classList.add('hidden');
+        renderLibrary();
+      }
+
+      if (libSearch) {
+        // 输入过程中只做视觉维护，绝不改变书库显示
+        libSearch.addEventListener('input', () => {
+          const chip = $('library-search-chip');
+          // 用户手动清空输入框时，同时清掉已生效的搜索，避免"框空了还在筛"
+          if (libSearch.value.trim() === '' && state.searchQuery) {
+            state.searchQuery = '';
+            if (chip) chip.classList.add('hidden');
+            renderLibrary();
+          }
+        });
+
+        libSearch.addEventListener('keydown', e => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            applyLibrarySearch();
+            libSearch.blur();          // 收起焦点，避免锁在搜索框
+          } else if (e.key === 'Escape') {
+            libSearch.value = '';
+            clearLibrarySearch();
+            libSearch.blur();
+          }
+          e.stopPropagation();          // 不触发阅读器的方向键/空格逻辑
+        });
+
+        // 失焦时丢弃自动填充塞进来的值（不是用户主动搜索，不应用）
+        libSearch.addEventListener('blur', () => {
+          if (libSearch.value && document.activeElement !== libSearch) {
+            if (libSearch.value.trim() !== state.searchQuery) {
+              libSearch.value = state.searchQuery;
+            }
+          }
+        });
+      }
+
+      $('library-search-btn').onclick = applyLibrarySearch;
+      $('library-search-chip').onclick = clearLibrarySearch;
+
+      // 初始化：一开始没有任何搜索条件
+      state.searchQuery = '';
+      if (libSearch) libSearch.value = '';
 
       // 书架管理
       $('create-shelf-btn').onclick = () => {
