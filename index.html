@@ -29,7 +29,6 @@
     .paginated-leaf { overflow: hidden !important; }
     .paginated-leaf::-webkit-scrollbar { display: none !important; }
     #reader-view.mobile-controls-active .corner-float-btn { opacity: 1 !important; pointer-events: auto !important; }
-    /* 触屏设备没有可靠的 hover：顶部中间感应区不拦截任何点击/滑动，避免盖住“点屏幕中央唤出控制条”的手势 */
     @media (hover: none) {
       #fs-sense-zone { pointer-events: none !important; }
       #fs-sense-zone #reader-fullscreen-toggle { pointer-events: none; }
@@ -37,11 +36,8 @@
     }
     @keyframes cloudPulse { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
     .cloud-btn-hover:hover svg .cloud-arrow { animation: cloudPulse 1.2s ease-in-out infinite; }
-    /* 云同步进行中：图标缓慢旋转，代替原来的文字状态 */
     @keyframes noteSyncSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     #notes-sync-btn.is-syncing svg { animation: noteSyncSpin 1.4s linear infinite; }
-    /* 笔记正文描边：叶立群几何体本身偏细，用极轻的描边增加笔画厚度，
-       且不影响字重（不用 bold，避免变成艺术字） */
     .note-card-text {
       -webkit-text-stroke: 0.35px currentColor;
       text-shadow: 0.2px 0 0 currentColor, -0.2px 0 0 currentColor;
@@ -67,10 +63,6 @@
         </button>
         <div class="flex items-center ml-1 sm:ml-14 md:ml-20 flex-1 min-w-0">
           <div class="relative w-full max-w-[270px]">
-            <!-- 搜索只在「按回车」或「点放大镜」时执行，输入过程中不过滤。
-                 原因：浏览器自动填充在确认时会触发 input/change 事件，
-                 若把 input 当搜索指令，点页面任何地方确认填充都会变成"搜索仓库名"，
-                 书库被过滤成空。 -->
             <input id="library-search-input" type="text" placeholder="搜索我的书库"
                    name="onereader-q-not-a-real-field" autocomplete="off" autocorrect="off"
                    autocapitalize="off" spellcheck="false" enterkeyhint="search"
@@ -80,7 +72,6 @@
               <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M20 20l-3.5-3.5"/></svg>
             </button>
           </div>
-          <!-- 当前生效的搜索条件（可一键清除），让"正在筛选"这件事可见 -->
           <button id="library-search-chip" type="button" class="hidden ml-2 shrink-0 max-w-[180px] flex items-center gap-1 px-2.5 py-1 rounded-full bg-neutral-800 text-white text-[12px] cursor-pointer">
             <span id="library-search-chip-text" class="truncate"></span>
             <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -156,9 +147,6 @@
 
         <!-- 我的笔记 -->
         <div id="notes-view" class="hidden">
-          <!-- 这一栏与左侧「全部图书」平高：
-               用负外边距抵消 main 的 pt-6/sm:pt-8，再用固定行高 h-[47px] 与左栏按钮等高，
-               这样右侧控件与左侧导航处在同一条水平线上 -->
           <div class="flex items-center justify-end gap-2 -mt-6 sm:-mt-8 h-[47px] mb-4">
             <label class="text-sm text-neutral-500">按图书筛选</label>
             <select id="notes-book-filter" class="h-9 px-2.5 rounded-lg border border-neutral-300 bg-white text-sm text-neutral-700 focus:outline-none cursor-pointer max-w-[240px]">
@@ -230,7 +218,7 @@
         <p class="text-[11px] text-neutral-400 leading-tight">注：清空缓存仅删除手机内占空间的电子书大文件，保留云端记录和阅读进度，需阅读时可重新从私库拉取。</p>
       </div>
 
-      <!-- GitHub 配置（完全留空） -->
+      <!-- GitHub 配置 -->
       <div class="pt-4 space-y-3.5 text-sm">
         <div class="flex items-center justify-between">
           <span class="text-xs font-medium text-neutral-400 uppercase tracking-wider">GitHub 私有仓直连</span>
@@ -357,7 +345,7 @@
     <div class="relative flex-1 w-full h-full p-0 sm:p-[6px] bg-[#dcd7cc] overflow-hidden flex items-center justify-center">
       <div id="book-stage" class="relative w-full h-full border border-[#bfbab0] overflow-hidden flex flex-col transition-colors duration-150" style="background-color: var(--reader-bg); color: var(--reader-text); filter: brightness(var(--reader-brightness));">
         
-        <!-- 顶部正中沉浸全屏切换：与两角按钮同款「靠近才浮现」感应区，平时完全透明不遮挡正文 -->
+        <!-- 顶部正中沉浸全屏切换 -->
         <div id="fs-sense-zone" class="group absolute top-0 left-1/2 -translate-x-1/2 w-28 h-14 z-30 flex items-start justify-center pt-2">
           <button id="reader-fullscreen-toggle" type="button" title="切换沉浸全屏" class="corner-float-btn opacity-0 group-hover:opacity-100 transition-all duration-150 w-9 h-9 rounded-full bg-black/[0.05] hover:bg-black/[0.12] active:scale-95 text-[#59524c] hover:text-[#2f2a25] flex items-center justify-center backdrop-blur-sm cursor-pointer shadow-[0_1px_4px_rgba(0,0,0,0.08)] border border-black/[0.04]">
             <svg id="fs-icon-expand" class="w-[15px] h-[15px]" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M10 4H6a2 2 0 00-2 2v4"/><path d="M14 20h4a2 2 0 002-2v-4"/><path d="M20 10V6a2 2 0 00-2-2h-4"/><path d="M4 14v4a2 2 0 002 2h4"/></svg>
@@ -377,16 +365,16 @@
           </button>
         </div>
 
-        <!-- 左侧中心：目录 / 书签（与设置同样式的靠近浮现弹窗） -->
+        <!-- 左侧中心：目录 / 书签 -->
         <div id="toc-sense-zone" class="group absolute top-1/2 left-0 -translate-y-1/2 w-14 h-28 z-30 flex items-center justify-start pl-2">
           <button id="reader-toc-trigger" type="button" title="目录与书签" class="corner-float-btn opacity-0 group-hover:opacity-100 transition w-10 h-10 rounded-full bg-black/[0.05] hover:bg-black/[0.12] flex items-center justify-center text-[#59524c] hover:text-[#2f2a25] shadow-[0_1px_4px_rgba(0,0,0,0.08)] border border-black/[0.04] cursor-pointer">
             <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M4 5.5A1.5 1.5 0 015.5 4H9v16H5.5A1.5 1.5 0 014 18.5v-13z"/><path d="M9 4h9.5A1.5 1.5 0 0120 5.5v13a1.5 1.5 0 01-1.5 1.5H9"/><path d="M12.5 9h4M12.5 13h4"/></svg>
           </button>
         </div>
 
-        <!-- 页面阅读内容容器：正文占满整页，不保留页码栏（EPUB 反转页码无意义，直接去掉） -->
+        <!-- 页面阅读内容容器 -->
         <div id="reader-content-viewport" class="relative flex-1 w-full h-full overflow-hidden flex items-stretch justify-center">
-          <div id="dual-page-spine" class="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 w-[2px] bg-[#b8b3a8] z-10"></div>
+          <div id="dual-page-spine" class="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 w-[2px] bg-[#b8b3a8] z-10 select-none"></div>
           <div id="page-left-wrapper" class="relative flex-1 h-full overflow-hidden">
             <div id="page-left" class="paginated-leaf absolute inset-0 w-full overflow-hidden select-text"></div>
           </div>
@@ -398,25 +386,21 @@
       </div>
     </div>
 
-    <!-- 左侧目录 / 书签面板（与设置面板同样的侧拉逻辑） -->
+    <!-- 左侧目录 / 书签面板 -->
     <div id="toc-backdrop" class="hidden fixed inset-0 z-40 bg-black/10"></div>
     <aside id="reader-toc-drawer" class="fixed top-0 left-0 bottom-0 max-w-full bg-white border-r border-neutral-200 shadow-2xl z-50 flex flex-col transform -translate-x-full transition-transform duration-200 ease-out" style="font-family: var(--reader-font-family); font-size: calc(var(--reader-font-size) * 0.78); width: clamp(290px, calc(var(--reader-font-size) * 17), 430px);">
-      <!-- 顶部栏：目录 / 书签 / 全书搜索 / ＋（按截图排布） -->
       <div class="relative h-[68px] flex items-center justify-between gap-2 px-4 shrink-0">
         <div class="flex items-center gap-6 shrink-0">
           <button id="toc-tab-toc" type="button" class="py-1 cursor-pointer">目录</button>
           <button id="toc-tab-bm" type="button" class="py-1 cursor-pointer">书签</button>
         </div>
-        <!-- 全书搜索入口：点击后展开搜索界面 -->
         <button id="toc-search-open" type="button" title="全书搜索" class="flex-1 max-w-[190px] h-10 flex items-center justify-between gap-2 px-3.5 rounded-full bg-[#f0f0f0] hover:bg-[#e8e8e8] text-[#4a4a4a] transition cursor-pointer">
           <span class="text-[14px] truncate">全书搜索</span>
           <svg class="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M20 20l-3.5-3.5"/></svg>
         </button>
         <button id="add-bookmark-btn" type="button" title="把当前页加入书签" class="w-10 h-10 flex items-center justify-center rounded-lg text-neutral-700 hover:bg-neutral-100 leading-none cursor-pointer shrink-0" style="font-size: 1.4em;">＋</button>
       </div>
-      <!-- 分隔线 -->
       <div class="h-px bg-neutral-200 shrink-0"></div>
-      <!-- 搜索界面（默认隐藏，点「全书搜索」后覆盖列表区） -->
       <div id="toc-search-panel" class="hidden flex-1 flex flex-col min-h-0">
         <div class="flex items-center justify-between px-4 pt-4 pb-3 shrink-0">
           <span class="text-[17px] font-semibold text-[#2b2b2b]">全书搜索</span>
@@ -438,9 +422,10 @@
       <div id="toc-list" class="flex-1 overflow-y-auto py-1 text-[#3a3a3a]"></div>
     </aside>
 
-    <!-- 侧拉设置面板（性能极致优化：颜色0ms直接响应，滑块智能防抖） -->
+    <!-- 侧拉设置面板 -->
     <div id="settings-backdrop" class="hidden fixed inset-0 z-40 bg-black/10"></div>
-    <aside id="reader-settings-drawer" class="fixed top-0 right-0 bottom-0 w-[330px] max-w-full bg-[#fafafa] border-l border-neutral-200 shadow-2xl z-50 flex flex-col transform translate-x-full transition-transform duration-200 ease-out">      <div class="h-14 px-5 flex items-center justify-between border-b border-neutral-100 shrink-0">
+    <aside id="reader-settings-drawer" class="fixed top-0 right-0 bottom-0 w-[330px] max-w-full bg-[#fafafa] border-l border-neutral-200 shadow-2xl z-50 flex flex-col transform translate-x-full transition-transform duration-200 ease-out">
+      <div class="h-14 px-5 flex items-center justify-between border-b border-neutral-100 shrink-0">
         <span class="text-[18px] text-[#383838]">阅读选项</span>
         <button id="close-settings-drawer-btn" type="button" class="p-1.5 text-neutral-500 hover:text-black cursor-pointer">✕</button>
       </div>
@@ -454,7 +439,7 @@
           </div>
         </div>
 
-        <!-- 背景颜色（无固定色，0毫秒极速响应） -->
+        <!-- 背景颜色 -->
         <div>
           <div class="flex items-center gap-3 mb-3">
             <span class="text-[17px]">背景颜色</span>
@@ -467,7 +452,7 @@
           <div id="bg-color-swatches" class="grid grid-cols-5 gap-y-4 gap-x-3 items-center justify-items-center"></div>
         </div>
 
-        <!-- 文字颜色（无固定色，0毫秒极速响应） -->
+        <!-- 文字颜色 -->
         <div>
           <div class="flex items-center gap-3 mb-3">
             <span class="text-[17px]">文字颜色</span>
@@ -501,8 +486,6 @@
     </aside>
 
     <!-- ==================== 划线弹窗 ==================== -->
-    <!-- 必须放在 #reader-view 内部：全屏时浏览器只渲染全屏元素的子树，
-         放在外面会导致全屏下完全不可见（这正是"全屏不弹窗"的根因） -->
     <div id="selection-popover" class="hidden fixed z-[60] bg-[#fbfbfb] rounded-2xl shadow-[0_8px_28px_rgba(0,0,0,0.18)] border border-neutral-200/70 px-3 py-2 flex items-center gap-3 select-none">
       <button id="sel-note-btn" type="button" title="添加笔记（可写备注）" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-neutral-100 cursor-pointer text-[#1f6b4a]">
         <svg class="w-[19px] h-[19px]" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M4 20l4.5-1.2L20 7.3a2 2 0 000-2.8l-.5-.5a2 2 0 00-2.8 0L5.2 15.5 4 20z"/></svg>
@@ -517,7 +500,7 @@
       <div id="sel-colors" class="flex items-center gap-2"></div>
     </div>
 
-    <!-- ==================== 笔记编辑弹窗（同样必须在 #reader-view 内） ==================== -->
+    <!-- ==================== 笔记编辑弹窗 ==================== -->
     <div id="note-editor-modal" class="hidden fixed inset-0 z-[70] bg-black/35 flex items-center justify-center p-4">
       <div class="bg-white rounded-2xl w-full max-w-[560px] shadow-2xl p-6 flex flex-col" style="font-family: var(--reader-font-family);">
         <div class="flex gap-3">
@@ -578,21 +561,18 @@
         letterSpacing: 0,
         paraSpacing: 15,
         brightness: 1,
-        // 默认就用叶立群几何体测试版：设备装了该字体即生效，没装则按字体栈回落到系统黑体
         fontFamily: 'yeliqun'
       }
     };
 
     const PREFS_KEY = 'onereader_prefs_v4';
     const GH_KEY = 'onereader_gh_v4';
-    const PREFS_VER = 2;   // 配置结构版本，用于把旧的默认字体迁移到新默认值
+    const PREFS_VER = 2;
     const DB_NAME = 'OneReaderDB_v4';
     const FONT_DB_NAME = 'OneReaderFonts_v1';
-    // 解析逻辑版本号：解析规则有破坏性变更时 +1，旧书打开时会自动重新解析
     const PARSE_VERSION = 3;
 
     let toastTimer = null;
-    // 云导入：点按钮时置为 true，文件选择完成后据此决定是否上传到私有仓
     let pendingUploadToCloud = false;
     function showToast(msg) {
       const el = $('toast-message');
@@ -614,8 +594,6 @@
         const p = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
         if (Array.isArray(p.shelves) && p.shelves.length) state.shelves = p.shelves;
         if (p.readerConfig) Object.assign(state.readerConfig, p.readerConfig);
-        // 迁移：老配置里 fontFamily 是 'system'（当时的默认值）。
-        // 默认字体已改为叶立群几何体测试版，这里把旧的默认值升级过来。
         if (p.prefsVer !== PREFS_VER) {
           if (state.readerConfig.fontFamily === 'system') state.readerConfig.fontFamily = 'yeliqun';
         }
@@ -666,10 +644,7 @@
     }
 
     // ==================== 笔记：数据层 ====================
-    // 只有一个实体「笔记」：content 为空 = 纯摘抄，非空 = 带备注。
-    // 不设 type 字段，避免人为制造两种东西。
     const NOTES_STORE = 'notes';
-    // 高亮色（与阅读背景色无关，只用于标记笔记在书中的高亮）
     const HIGHLIGHT_COLORS = [
       { key: 'pink',   label: '粉', bg: '#f6c9c9' },
       { key: 'yellow', label: '黄', bg: '#f7e7a6' },
@@ -695,7 +670,6 @@
       return 'n_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     }
 
-    // 笔记库独立于书籍库，避免书籍重解析牵动笔记
     function openNotesDB() {
       return new Promise(res => {
         if (!window.indexedDB) return res(null);
@@ -732,7 +706,6 @@
       db.transaction(NOTES_STORE, 'readwrite').objectStore(NOTES_STORE).delete(id);
     }
 
-    // 按最后修改时间倒序（新写的 / 刚改过的排前面）
     function sortedNotes(list) {
       return list
         .filter(n => !n.deletedAt)
@@ -781,7 +754,6 @@
       db.transaction('fonts', 'readwrite').objectStore('fonts').delete(id);
     }
 
-    // 把已导入的字体注册进 document.fonts，供排版与测量使用
     function registerLocalFontFace(rec) {
       if (!rec || !rec.buffer || !rec.family) return;
       try {
@@ -790,7 +762,6 @@
       } catch (e) {}
     }
 
-    // 系统里已装的「叶立群几何体测试版」若存在则直接可用；此处无需注册，字体栈自动回落
     function renderFontOptions() {
       const sel = $('select-font-family');
       if (!sel) return;
@@ -829,7 +800,6 @@
       });
     }
 
-    // 读取字体元信息：优先用 File System Access API 的 queryLocalFonts 风格解析，失败则用文件名
     function guessFontFamilyFromName(name) {
       return String(name || '').replace(/\.(ttf|otf|woff2?|ttc)$/i, '').replace(/[_-]+/g, ' ').trim() || '本地字体';
     }
@@ -863,7 +833,6 @@
       showToast(`已导入并启用「${displayName}」`);
     }
 
-    // 统计本地 IndexedDB 存储体积 (MB)
     function updateStorageUsageDisplay() {
       let totalBytes = 0;
       let cachedCount = 0;
@@ -877,7 +846,6 @@
       $('local-storage-size').textContent = `已用 ${mb} MB (${cachedCount} 本已离线)`;
     }
 
-    // 清理本地书籍缓存（防存储爆炸：释放二进制占用，保留云端条目和进度）
     async function purgeAllLocalCache() {
       let freed = 0;
       for (const b of state.books) {
@@ -896,8 +864,6 @@
     }
 
     // ==================== 全屏沉浸切换 ====================
-    // 只让「阅读器视图」进入全屏，而不是整个文档。
-    // 之前是对 documentElement 请求全屏，导致返回书库后主页也被放大。
     function toggleReaderFullscreen() {
       const doc = document;
       const isFs = doc.fullscreenElement || doc.webkitFullscreenElement;
@@ -909,7 +875,6 @@
       }
     }
 
-    // 若当前处于全屏则退出（离开阅读器时调用）
     function exitFullscreenIfAny() {
       const doc = document;
       if (doc.fullscreenElement || doc.webkitFullscreenElement) {
@@ -921,8 +886,6 @@
       const isFs = Boolean(document.fullscreenElement || document.webkitFullscreenElement);
       $('fs-icon-expand').classList.toggle('hidden', isFs);
       $('fs-icon-shrink').classList.toggle('hidden', !isFs);
-      // 全屏切换时把笔记编辑弹窗挪到正确的层：
-      // 进入全屏 -> 必须在 #reader-view 内，否则不渲染；退出全屏 -> 可以留在内部
       const modal = $('note-editor-modal');
       if (modal) {
         const readerView = $('reader-view');
@@ -932,10 +895,7 @@
           document.body.appendChild(modal);
         }
       }
-      // 进出全屏后可用空间变了，必须重新分页，否则页数/行宽还是旧尺寸，
-      // 多出来的空间会变成大片留白（本次反馈的问题 3）
       if (state.currentBook) {
-        // 等浏览器完成布局再测量
         setTimeout(() => {
           applyLayoutStyles();
           repaginate();
@@ -946,7 +906,6 @@
     document.addEventListener('fullscreenchange', updateFullscreenIcons);
     document.addEventListener('webkitfullscreenchange', updateFullscreenIcons);
 
-    // 窗口尺寸变化（含全屏切换、手机横竖屏）也要重新分页
     let resizeTimer = null;
     window.addEventListener('resize', () => {
       if (!state.currentBook) return;
@@ -965,7 +924,6 @@
       const badge = $('cloud-conn-badge');
       badge.textContent = connected ? `已连 ${state.github.owner}/${state.github.repo}` : '未连接';
       badge.className = `text-xs px-2.5 py-0.5 rounded-full ${connected ? 'bg-emerald-50 text-emerald-700 font-medium' : 'bg-neutral-100 text-neutral-500'}`;
-      // 云导入 / 云删除：仅连接私有仓后可用（置灰并给出说明）
       const cloudButtons = {
         'hub-import-cloud-btn': '连接仓库后可用：导入并同时上传到仓库',
         'book-act-cloud-delete': '连接仓库后可用：同时删除仓库里的这本'
@@ -986,7 +944,6 @@
       };
     }
 
-    // 是否已连接私有仓（云导入 / 云删除仅在连接后可用）
     function isCloudConnected() {
       return Boolean(state.github.owner && state.github.repo && state.github.token);
     }
@@ -996,7 +953,6 @@
       return `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
     }
 
-    // 数组缓冲 -> base64（GitHub contents API 要求 base64 内容）
     function arrayBufferToBase64(buf) {
       const bytes = new Uint8Array(buf);
       let binary = '';
@@ -1007,18 +963,16 @@
       return btoa(binary);
     }
 
-    // 查询云端某文件当前的 sha（更新或删除都需要）。不存在返回 null。
     async function getCloudFileSha(path) {
       const branch = state.github.branch || 'main';
-      const url = `${repoApiBase()}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`;
-      const res = await fetch(url, { headers: ghHeaders() });
+      const url = `${repoApiBase()}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}&_t=${Date.now()}`;
+      const res = await fetch(url, { headers: ghHeaders(), cache: 'no-store' });
       if (res.status === 404) return null;
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       return data && data.sha ? data.sha : null;
     }
 
-    // 上传（或覆盖）一本书到私有仓根目录
     async function uploadBookToCloud(book) {
       if (!isCloudConnected()) throw new Error('未连接私有仓');
       if (!book.fileBytes) throw new Error('本地没有原始文件，无法上传');
@@ -1046,14 +1000,13 @@
       return path;
     }
 
-    // 从私有仓删除一本书
     async function deleteBookFromCloud(book) {
       if (!isCloudConnected()) throw new Error('未连接私有仓');
       const branch = state.github.branch || 'main';
       const path = book.cloudPath || book.fileName;
       if (!path) throw new Error('该书没有云端路径');
       const sha = await getCloudFileSha(path);
-      if (!sha) return { skipped: true };  // 云端本来就没有
+      if (!sha) return { skipped: true };
       const res = await fetch(`${repoApiBase()}/contents/${encodeURIComponent(path)}`, {
         method: 'DELETE',
         headers: ghHeaders({ 'Content-Type': 'application/json' }),
@@ -1068,7 +1021,6 @@
       return { deleted: true };
     }
 
-    // 拉取私有仓书库列表
     async function pullFromGitHubPrivateRepo() {
       const owner = $('gh-owner-input').value.trim();
       const repo = $('gh-repo-input').value.trim();
@@ -1087,8 +1039,8 @@
       progBar.style.width = '20%';
 
       try {
-        const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents?ref=${encodeURIComponent(branch)}`;
-        const resp = await fetch(url, { headers: ghHeaders() });
+        const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents?ref=${encodeURIComponent(branch)}&_t=${Date.now()}`;
+        const resp = await fetch(url, { headers: ghHeaders(), cache: 'no-store' });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const files = await resp.json();
         if (!Array.isArray(files)) throw new Error('返回结构异常');
@@ -1158,7 +1110,6 @@
         b.className = `nav-item w-full flex items-center gap-4 pl-6 pr-4 py-3 rounded-r-full text-[15px] transition cursor-pointer ${active ? 'bg-[#4a4a4a] text-white font-medium' : 'text-neutral-700 hover:bg-neutral-100'}`;
       });
       renderShelves();
-      // 笔记视图与书库视图互斥，避免互相覆盖显示状态
       if (state.currentNav === 'notes') { showNotesView(); return; }
       hideNotesView();
       renderLibrary();
@@ -1223,10 +1174,7 @@
       setTimeout(() => $('modal-input').focus(), 30);
     }
 
-    // ==================== 书库卡片与 ••• 弹窗 ====================
     // ==================== 笔记：列表渲染 ====================
-    // 卡片模板固定：时间 / 备注区 / 摘抄区 / 来源 + 图标。
-    // 备注区与摘抄区位置大小固定（透明占位），内容为空时不渲染但位置保留。
     function fmtNoteTime(ts) {
       const d = new Date(ts || Date.now());
       const p = n => String(n).padStart(2, '0');
@@ -1241,12 +1189,10 @@
       let list = sortedNotes(state.notes);
 
       if (filterBook) {
-        // 按图书筛选：为了体现书本逻辑流程，同一本书内按创建时间正序（早的在前）
         list = list
           .filter(n => n.bookFile === filterBook)
           .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
       } else {
-        // 全部笔记：按最后修改时间倒序（最新在最前）
         list = list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
       }
 
@@ -1255,21 +1201,17 @@
 
       list.forEach(n => {
         const card = document.createElement('div');
-        // 固定高度 290px：保证网格整齐，摘抄/备注超长都在各自区域内截断
         card.className = 'relative bg-white rounded-2xl border border-neutral-200/80 shadow-[0_1px_4px_rgba(0,0,0,0.04)] p-4 flex flex-col';
         card.style.height = '290px';
         card.style.fontFamily = 'var(--reader-font-family)';
         card.innerHTML = `
           <div class="text-[13.5px] text-neutral-500 shrink-0 note-card-text">${fmtNoteTime(n.createdAt)}</div>
-          <!-- 备注区：固定高度，内容为空时保留空白占位 -->
           <div class="shrink-0 mt-4" style="height:96px;">
-            ${n.content ? `<p class="note-card-text text-[15.5px] leading-relaxed text-[#2f2f2f] overflow-hidden" style="display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;">${esc(n.content)}</p>` : ''}
+            ${n.content ? `<p class="note-card-text text-[15.5px] leading-relaxed text-[#2f2f2f] overflow-hidden whitespace-pre-wrap" style="display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;">${esc(n.content)}</p>` : ''}
           </div>
-          <!-- 摘抄区：固定高度，超出截断加省略号（不显示高亮底色，高亮只在原书里） -->
           <div class="flex-1 min-h-0">
-            <p class="note-card-text text-[15.5px] leading-relaxed text-[#3a3a3a] overflow-hidden" style="display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;">${esc(n.quote)}</p>
+            <p class="note-card-text text-[15.5px] leading-relaxed text-[#3a3a3a] overflow-hidden whitespace-pre-wrap" style="display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;">${esc(n.quote)}</p>
           </div>
-          <!-- 来源 + 图标 -->
           <div class="shrink-0 mt-2">
             <div class="text-[12px] text-neutral-400 truncate text-right">来自《${esc(n.bookTitle || '')}》${esc(n.chapter || '')}</div>
             <div class="flex items-center justify-end gap-1 mt-1.5">
@@ -1287,7 +1229,6 @@
       });
     }
 
-    // 填充「按图书筛选」下拉：只列出有笔记的书
     function renderNotesBookFilter() {
       const sel = $('notes-book-filter');
       if (!sel) return;
@@ -1309,7 +1250,6 @@
       state.notesBookFilter = sel.value;
     }
 
-    // 笔记视图与书库视图互斥
     function showNotesView() {
       $('empty-library-state').classList.add('hidden');
       $('books-grid-container').classList.add('hidden');
@@ -1330,7 +1270,7 @@
     }
 
     // ==================== 笔记：划线弹窗 ====================
-    let pendingSelection = null;   // { quote, blockIndex, chapter }
+    let pendingSelection = null;   // { quote, blockIndex, rect, color }
 
     function buildColorDots(container, activeKey, onPick) {
       container.innerHTML = '';
@@ -1351,18 +1291,15 @@
       const pop = $('selection-popover');
       pop.classList.remove('hidden');
       const r = pop.getBoundingClientRect();
-      // 贴在选区下方 8px，避开浏览器自带的选区菜单（Chrome/Safari 默认在选区上方）
       let left = rect.left + rect.width / 2 - r.width / 2;
       let top = rect.bottom + 8;
       left = Math.max(8, Math.min(window.innerWidth - r.width - 8, left));
-      // 下方放不下就翻到上方；上方也放不下就夹在视口内
       if (top + r.height > window.innerHeight - 8) {
         const above = rect.top - r.height - 8;
         top = above >= 8 ? above : Math.max(8, window.innerHeight - r.height - 8);
       }
       pop.style.left = left + 'px';
       pop.style.top = top + 'px';
-      // 颜色记忆：记录本次选择，下次新建笔记时默认选中；也作为本次笔记的颜色
       const pick = key => {
         setLastNoteColor(key);
         if (pendingSelection) pendingSelection.color = key;
@@ -1390,17 +1327,11 @@
         buildColorDots($('note-editor-colors'), key, pick);
       };
       buildColorDots($('note-editor-colors'), note.color || lastNoteColor(), pick);
-      // 编辑弹窗位于 #reader-view 内（全屏时需要这样才可见）。
-      // 但从书库/笔记页打开时 #reader-view 是 hidden，会让弹窗也不可见。
-      // 这里按需把它挪到 body 上（非全屏时），全屏时保留在原地。
       mountNoteEditor();
       $('note-editor-modal').classList.remove('hidden');
       setTimeout(() => $('note-editor-content').focus(), 60);
     }
 
-    // 让编辑弹窗出现在「当前可见的层」：
-    // - 全屏中：必须待在 #reader-view 内，否则浏览器只渲染全屏子树
-    // - 非全屏：挂到 body 上，这样从书库/笔记页打开也可见
     let editorMountParent = null;
     function mountNoteEditor() {
       const modal = $('note-editor-modal');
@@ -1412,7 +1343,6 @@
         return;
       }
       if (modal.parentElement === readerView) {
-        // 从 reader-view 里挪出来，挂到 body，避免被父级 hidden 连带隐藏
         document.body.appendChild(modal);
       }
     }
@@ -1428,15 +1358,21 @@
       const now = Date.now();
       const existing = state.notes.find(n => n.id === editingNote.id);
       const note = existing || editingNote;
-      note.content = content;                 // 空字符串 = 纯摘抄
-      note.color = editingNote.color;         // 高亮色（非冲突项，直接覆盖）
+      const contentChanged = (note.content || '') !== content;
+      note.content = content;
+      note.color = editingNote.color;
       note.updatedAt = now;
+      if (contentChanged) {
+        note.contentUpdatedAt = now;
+      }
       if (!existing) {
         note.createdAt = note.createdAt || now;
+        note.contentUpdatedAt = now;
         state.notes.push(note);
       }
       await putNoteDB(note);
       closeNoteEditor();
+      if (!$('reader-view').classList.contains('hidden')) renderReaderPages();
       renderNotesBookFilter();
       renderNotes();
       showToast(content ? '已保存笔记' : '已保存为摘抄');
@@ -1446,18 +1382,17 @@
       if (!editingNote) return;
       const note = state.notes.find(n => n.id === editingNote.id);
       if (note) {
-        // 软删除：留下墓碑，避免另一台设备同步时把已删的笔记又推回来
         note.deletedAt = Date.now();
         note.updatedAt = note.deletedAt;
         await putNoteDB(note);
       }
       closeNoteEditor();
+      if (!$('reader-view').classList.contains('hidden')) renderReaderPages();
       renderNotesBookFilter();
       renderNotes();
       showToast('已删除笔记');
     }
 
-    // 当前页所属章节名：向前找最近的 heading
     function currentChapterName() {
       const book = state.currentBook;
       if (!book) return '';
@@ -1472,44 +1407,97 @@
       return '';
     }
 
-    // ==================== 笔记：选中文字 -> 划线弹窗 ====================
-    // 规则：选到哪摘到哪，一个字符不多、一个字符不少。
-    //   1) 只要选区起终点都在 #reader-content-viewport（阅读正文区）内就放行，
-    //      单页、双页横跨一律允许，不再做跨页/跨段拦截。
-    //   2) 用 range.cloneContents() 取真实 DOM 片段，只剔除 #dual-page-spine
-    //      分割线；跨段落处补一个换行，段内文字原样保留（不压缩空白）。
-    //   3) 高亮与跳转见 applyNoteHighlights / jumpToNote，均按「整页文本 + 字符映射」处理。
-    const BLOCK_TAGS = ['P', 'H2', 'H3', 'LI'];
+    // ==================== 核心修复 1：选中哪就摘抄哪（支持跨页、跨段，一字不差） ====================
+    function extractExactRangeText(range) {
+      const frag = range.cloneContents();
+      const spine = frag.querySelector && frag.querySelector('#dual-page-spine');
+      if (spine) spine.remove();
 
-    // 把选区克隆出的片段转成纯文本：
-    // - 空行分割线之类的非正文节点整块跳过
-    // - 块级元素之间补 '\n'，块内文字逐字保留
-    function fragmentToQuote(frag) {
-      let out = '';
-      const pushBreak = () => { if (out && !out.endsWith('\n')) out += '\n'; };
-      const walk = node => {
-        if (node.nodeType === 3) {                       // 文本节点：原样追加
-          out += node.nodeValue;
-          return;
+      const blockTags = new Set(['P', 'H1', 'H2', 'H3', 'H4', 'LI', 'BLOCKQUOTE']);
+      const blocks = [];
+      let inlineBuf = '';
+
+      const flushInline = () => {
+        if (inlineBuf.length > 0) {
+          blocks.push(inlineBuf);
+          inlineBuf = '';
         }
-        if (node.nodeType !== 1) return;
-        const el = node;
-        // 剔除非正文元素：双页分割线、图片、测量盒、隐藏节点
-        if (el.id === 'dual-page-spine') return;
-        if (el.id === 'page-measure-box') return;
-        if (['IMG', 'BR', 'CANVAS', 'SCRIPT', 'STYLE'].includes(el.tagName)) {
-          if (el.tagName === 'BR') pushBreak();
-          return;
-        }
-        const isBlock = BLOCK_TAGS.includes(el.tagName)
-          || ['DIV', 'SECTION', 'ARTICLE', 'BLOCKQUOTE'].includes(el.tagName);
-        if (isBlock) pushBreak();
-        el.childNodes.forEach(walk);
-        if (isBlock) pushBreak();
       };
-      frag.childNodes.forEach(walk);
-      // 去掉首尾多余的换行，内部换行（段落边界）保留
-      return out.replace(/^\n+/, '').replace(/\n+$/, '');
+
+      const walk = node => {
+        if (!node) return;
+        if (node.nodeType === Node.TEXT_NODE) {
+          inlineBuf += node.nodeValue || '';
+          return;
+        }
+        if (node.nodeType !== Node.ELEMENT_NODE) return;
+        if (node.id === 'dual-page-spine') return;
+
+        if (blockTags.has(node.tagName)) {
+          flushInline();
+          const txt = node.textContent || '';
+          if (txt.length > 0) blocks.push(txt);
+          return;
+        }
+        for (const child of node.childNodes) walk(child);
+      };
+
+      for (const child of frag.childNodes) walk(child);
+      flushInline();
+
+      if (!blocks.length) return range.toString();
+
+      // 若是跨页选区，且左页最后一个段落恰好是被分页拆开的半截段落（splitFrom），
+      // 则左页末尾与右页开头原本属于同一自然段，直接无缝拼接，不插入多余换行
+      if (blocks.length >= 2 && state.currentBook && state.readerConfig.viewMode === 'dual') {
+        const pages = state.currentBook.pages || [];
+        const rightPage = pages[state.currentPageIndex + 1] || [];
+        const firstRightBlock = rightPage[0];
+        if (firstRightBlock && firstRightBlock.splitFrom) {
+          const leafL = $('page-left');
+          const leafR = $('page-right');
+          const spansBoth = leafL && leafR &&
+            (leafL.contains(range.startContainer) || range.startContainer === leafL) &&
+            (leafR.contains(range.endContainer) || range.endContainer === leafR);
+          if (spansBoth) {
+            const leftWrapper = frag.querySelector && frag.querySelector('#page-left-wrapper');
+            const rightWrapper = frag.querySelector && frag.querySelector('#page-right-wrapper');
+            if (leftWrapper && rightWrapper) {
+              const collectFrom = root => {
+                const arr = [];
+                let buf = '';
+                const f = () => { if (buf.length > 0) { arr.push(buf); buf = ''; } };
+                const w = n => {
+                  if (n.nodeType === Node.TEXT_NODE) { buf += n.nodeValue || ''; return; }
+                  if (n.nodeType !== Node.ELEMENT_NODE) return;
+                  if (blockTags.has(n.tagName)) { f(); if ((n.textContent || '').length > 0) arr.push(n.textContent); return; }
+                  for (const c of n.childNodes) w(c);
+                };
+                for (const c of root.childNodes) w(c);
+                f();
+                return arr;
+              };
+              const leftArr = collectFrom(leftWrapper);
+              const rightArr = collectFrom(rightWrapper);
+              if (leftArr.length && rightArr.length) {
+                const leftDomBlocks = leafL.querySelectorAll('p, h2, h3, li');
+                const rightDomBlocks = leafR.querySelectorAll('p, h2, h3, li');
+                const lastLeftDom = leftDomBlocks[leftDomBlocks.length - 1];
+                const firstRightDom = rightDomBlocks[0];
+                const touchesLeftEnd = lastLeftDom && range.intersectsNode(lastLeftDom);
+                const touchesRightStart = firstRightDom && range.intersectsNode(firstRightDom);
+                if (touchesLeftEnd && touchesRightStart) {
+                  leftArr[leftArr.length - 1] = leftArr[leftArr.length - 1] + rightArr[0];
+                  rightArr.shift();
+                  return leftArr.concat(rightArr).join('\n');
+                }
+              }
+            }
+          }
+        }
+      }
+
+      return blocks.join('\n');
     }
 
     function captureSelection() {
@@ -1518,34 +1506,41 @@
 
       const range = sel.getRangeAt(0);
       const viewport = $('reader-content-viewport');
+      const leafL = $('page-left'), leafR = $('page-right');
       if (!viewport) return null;
 
-      // ---- 放行判定：起终点都在阅读正文区内即可（含横跨双页）----
-      const inViewport = node => {
-        if (!node) return false;
-        const el = node.nodeType === 1 ? node : node.parentElement;
-        return Boolean(el && viewport.contains(el));
-      };
-      if (!inViewport(range.startContainer) || !inViewport(range.endContainer)) return null;
+      // 只要选区起点和终点落在阅读视口内（无论是左页、右页，还是跨左右双页），一律允许
+      const startIn = viewport.contains(range.startContainer);
+      const endIn = viewport.contains(range.endContainer);
+      if (!startIn || !endIn) return null;
 
-      // ---- 一字不差提取：克隆片段 -> 纯文本（保留段落换行）----
-      let quote = '';
-      try {
-        quote = fragmentToQuote(range.cloneContents());
-      } catch (e) {
-        quote = range.toString();        // 极端情况退回浏览器文本
+      // 精确提取用户选中的字符，不截断跨段、不截断跨页、不增删任何选区字符
+      const quote = extractExactRangeText(range);
+      if (!quote || quote.length < 1) return null;
+
+      let rect = null;
+      const clientRects = range.getClientRects();
+      const spansDualPages = leafL && leafR &&
+        (leafL.contains(range.startContainer) || range.startContainer === leafL) &&
+        (leafR.contains(range.endContainer) || range.endContainer === leafR);
+
+      if (spansDualPages && clientRects && clientRects.length) {
+        for (let i = clientRects.length - 1; i >= 0; i--) {
+          const r = clientRects[i];
+          if (r.width > 0 || r.height > 0) {
+            rect = r;
+            break;
+          }
+        }
       }
-      // 去掉首尾空白判断有效性，但内容本身不做压缩
-      if (!quote.trim() || quote.trim().length < 2) return null;
 
-      // ---- 弹窗定位 ----
-      // 跨页时 range 外接矩形可能横跨两页，取起点所在页的可见位置更稳妥
-      let rect = range.getBoundingClientRect();
-      if (!rect || (!rect.width && !rect.height)) {
-        const rects = range.getClientRects();
-        if (rects && rects.length) {
+      if (!rect) {
+        const bRect = range.getBoundingClientRect();
+        if (bRect && (bRect.width || bRect.height)) {
+          rect = bRect;
+        } else if (clientRects && clientRects.length) {
           let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
-          for (const r of rects) {
+          for (const r of clientRects) {
             if (!r.width && !r.height) continue;
             left = Math.min(left, r.left); top = Math.min(top, r.top);
             right = Math.max(right, r.right); bottom = Math.max(bottom, r.bottom);
@@ -1553,41 +1548,17 @@
           if (isFinite(left)) rect = { left, top, right, bottom, width: right - left, height: bottom - top };
         }
       }
-      if (!rect || (!rect.width && !rect.height)) {
-        // 兜底：用起点所在页可视区域
-        const el = range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentElement;
-        const pageEl = el && el.closest && el.closest('#page-left, #page-right');
-        const ar = pageEl && pageEl.getBoundingClientRect();
-        if (ar && ar.width) rect = { left: ar.left + 16, top: ar.top + ar.height / 2, right: ar.left + 16, bottom: ar.top + ar.height / 2, width: 0, height: 0 };
-        else return null;
-      }
+      if (!rect || (!rect.width && !rect.height)) return null;
 
-      // ---- 定位块：用于章节推断（取起点所在的块）----
-      let startEl = range.startContainer;
-      while (startEl && startEl !== viewport && !(startEl.nodeType === 1 && BLOCK_TAGS.includes(startEl.tagName))) {
-        startEl = startEl.parentElement;
-      }
-      if (startEl === viewport) startEl = null;
-
-      // ---- blockIndex：跨段/跨页时整串找不到，按首个片段定位 ----
       const book = state.currentBook;
-      const norm = s => String(s || '').replace(/\s+/g, ' ').trim();
+      const norm = s => String(s || '').replace(/\s+/g, '');
+      const firstLine = norm(quote.split('\n')[0] || quote);
       let idx = -1;
-      if (book) {
-        const blocks = book.rawBlocks || [];
-        const flat = norm(quote);
-        idx = blocks.findIndex(b => b.type !== 'img' && norm(b.text).includes(flat));
+      if (book && firstLine) {
+        idx = (book.rawBlocks || []).findIndex(b => b.type !== 'img' && norm(b.text).includes(firstLine));
         if (idx < 0) {
-          // 按换行切片：取第一个足够长的片段作为锚点
-          const pieces = quote.split('\n').map(norm).filter(p => p.length >= 4);
-          for (const p of pieces) {
-            idx = blocks.findIndex(b => b.type !== 'img' && norm(b.text).includes(p));
-            if (idx >= 0) break;
-          }
-        }
-        if (idx < 0 && startEl) {
-          const head = norm(startEl.textContent).slice(0, 12);
-          if (head) idx = blocks.findIndex(b => b.type !== 'img' && norm(b.text).includes(head));
+          const head = firstLine.slice(0, 12);
+          if (head) idx = (book.rawBlocks || []).findIndex(b => b.type !== 'img' && norm(b.text).includes(head));
         }
       }
 
@@ -1609,29 +1580,16 @@
         const bk = state.currentBook;
         const blocks = bk.rawBlocks || [];
         const pages = bk.pages || [];
-        const norm = s => String(s || '').replace(/\s+/g, ' ').trim();
-        const target = norm(note.quote);
+        const norm = s => String(s || '').replace(/\s+/g, '');
+        const firstPara = String(note.quote || '').split('\n').map(s => s.trim()).find(Boolean) || '';
+        const target = norm(firstPara);
 
-        // 定位优先级：整串命中 > 段落切片命中 > 前 12 字 > 章节。
-        // 跨段/跨页摘抄的 quote 含换行，整串不会出现在任何单个 block.text 里，
-        // 所以必须按段落切片逐片尝试，才能精确定位到起点段。
-        let blockIdx = -1;
-        if (target) {
+        let blockIdx = typeof note.blockIndex === 'number' && note.blockIndex >= 0 ? note.blockIndex : -1;
+        if (blockIdx < 0 && target) {
           blockIdx = blocks.findIndex(b => b.type !== 'img' && norm(b.text).includes(target));
           if (blockIdx < 0) {
-            // 按换行切片，从第一片开始找（第一片就是摘抄起点所在段）
-            const pieces = String(note.quote || '')
-              .split('\n')
-              .map(norm)
-              .filter(p => p.length >= 4);
-            for (const p of pieces) {
-              blockIdx = blocks.findIndex(b => b.type !== 'img' && norm(b.text).includes(p));
-              if (blockIdx >= 0) break;
-            }
-          }
-          if (blockIdx < 0) {
             const head = target.slice(0, 12);
-            blockIdx = blocks.findIndex(b => b.type !== 'img' && norm(b.text).includes(head));
+            if (head) blockIdx = blocks.findIndex(b => b.type !== 'img' && norm(b.text).includes(head));
           }
         }
         if (blockIdx < 0 && note.chapter) {
@@ -1640,8 +1598,8 @@
         if (blockIdx >= 0) {
           const blk = blocks[blockIdx];
           for (let i = 0; i < pages.length; i++) {
-            if (pages[i].some(x => x === blk || (x.type === blk.type && norm(x.text) === norm(blk.text)))) {
-              state.currentPageIndex = i;
+            if (pages[i].some(x => x === blk || (x.type === blk.type && norm(x.text).includes(target.slice(0, 12))))) {
+              state.currentPageIndex = state.readerConfig.viewMode === 'dual' ? (i - (i % 2)) : i;
               break;
             }
           }
@@ -1654,211 +1612,274 @@
       }
     }
 
-    // ==================== 笔记：高亮渲染 ====================
-    // 打开书 / 翻页后，把这本书的笔记按颜色高亮到对应文字上。
-    // 摘抄可能跨段落、跨页，所以不能再用「单块内 indexOf」那套。
-    // 做法：
-    //   1) 把一个渲染叶（page-left / page-right，卷轴模式则整篇）的块级元素
-    //      拼成一段「整页文本」，块之间用 '\n' 连接，并记录每个字符属于哪个块、
-    //      块内偏移是多少（字符映射）。
-    //   2) 把笔记 quote 按 '\n' 切成段落片段，逐片在整页文本里匹配；
-    //      整串匹配优先，失败再逐片段匹配。
-    //   3) 命中区间映射回具体块 + 块内偏移，再逐块从后往前包裹 <mark>。
-    // 这样跨段摘抄会在每段都亮，跨页摘抄在左右两页各自亮各自的部分。
-    function buildLeafTextMap(root) {
-      const blocks = Array.from(root.querySelectorAll('p, h2, h3, li'));
-      const map = [];        // 每个字符: { el, offsetInEl }
-      let text = '';
-      blocks.forEach((el, bi) => {
-        if (bi > 0) { text += '\n'; map.push(null); }   // 块间换行，不映射到具体字符
-        const t = el.textContent;
-        for (let i = 0; i < t.length; i++) map.push({ el, offset: i });
-        text += t;
-      });
-      return { text, map, blocks };
+    // ==================== 核心修复 2：支持单段、跨段、跨页的精确高亮 ====================
+    function wrapTextNodeSlice(textNode, startOffset, endOffset, note) {
+      if (!textNode || endOffset <= startOffset) return;
+      try {
+        const range = document.createRange();
+        range.setStart(textNode, startOffset);
+        range.setEnd(textNode, endOffset);
+        const mark = document.createElement('mark');
+        mark.dataset.noteId = note.id;
+        mark.style.background = colorOf(note.color).bg;
+        mark.style.color = 'inherit';
+        mark.style.borderRadius = '2px';
+        mark.style.cursor = 'pointer';
+        mark.onclick = e => {
+          e.stopPropagation();
+          openNoteEditor(note);
+        };
+        range.surroundContents(mark);
+      } catch (e) {}
     }
 
     function applyNoteHighlights(root) {
       if (!root) return;
       const book = state.currentBook;
       if (!book) return;
-      const list = notesOfBook(book).filter(n => n.quote);
+      const list = notesOfBook(book).filter(n => n.quote && n.quote.length > 0);
       if (!list.length) return;
 
-      const { text, map } = buildLeafTextMap(root);
-      if (!text) return;
+      root.querySelectorAll('mark[data-note-id]').forEach(m => {
+        const parent = m.parentNode;
+        while (m.firstChild) parent.insertBefore(m.firstChild, m);
+        parent.removeChild(m);
+        parent.normalize();
+      });
 
-      // 已占用的字符区间，避免不同笔记重叠包裹
-      const taken = [];
-      // 元素 -> [{ at, end, note }]，最终逐块从后往前包裹
-      const perBlock = new Map();
+      const blockEls = Array.from(root.querySelectorAll('p, h2, h3, li'));
+      if (!blockEls.length) return;
 
-      // 把一个「整页文本区间」拆成按块分段的块内区间，登记到 perBlock
-      const markRange = (from, end, note) => {
-        let i = from;
-        while (i < end) {
-          const m = map[i];
-          if (!m) { i++; continue; }               // 跳过块间换行
-          const el = m.el;
-          const startOff = m.offset;
-          let j = i;
-          while (j < end && map[j] && map[j].el === el) j++;
-          const endOff = map[j - 1].offset + 1;
-          if (endOff > startOff) {
-            if (!perBlock.has(el)) perBlock.set(el, []);
-            perBlock.get(el).push({ at: startOff, end: endOff, note });
+      const charMap = [];
+      let streamStr = '';
+
+      blockEls.forEach(el => {
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+        let tn;
+        while ((tn = walker.nextNode())) {
+          const s = tn.nodeValue || '';
+          for (let i = 0; i < s.length; i++) {
+            const ch = s[i];
+            if (/\s/.test(ch)) continue;
+            streamStr += ch;
+            charMap.push({ node: tn, offset: i });
           }
-          i = j;
         }
+      });
+
+      if (!streamStr.length) return;
+
+      const taken = [];
+      const sliceOps = [];
+
+      const addMatchRange = (sIdx, eIdx, note) => {
+        taken.push([sIdx, eIdx]);
+        let curNode = null;
+        let segStart = 0;
+        let segEnd = 0;
+        for (let k = sIdx; k < eIdx; k++) {
+          const item = charMap[k];
+          if (item.node !== curNode) {
+            if (curNode) sliceOps.push({ node: curNode, start: segStart, end: segEnd, note });
+            curNode = item.node;
+            segStart = item.offset;
+            segEnd = item.offset + 1;
+          } else {
+            segEnd = item.offset + 1;
+          }
+        }
+        if (curNode) sliceOps.push({ node: curNode, start: segStart, end: segEnd, note });
       };
 
       list.slice()
         .sort((a, b) => (b.quote || '').length - (a.quote || '').length)
-        .forEach(n => {
-          // 段落切片：整页文本用 '\n' 连接块，所以 quote 也按 '\n' 切。
-          // 整串（含 '\n'）优先匹配，命中就说明是完整的一段连续选区；
-          // 命中失败再逐片段匹配，让跨段摘抄在每段各自亮起来。
-          const rawQuote = String(n.quote || '');
-          const whole = rawQuote.trim();
-          if (!whole || whole.length < 2) return;
-          const pieces = rawQuote.split('\n')
-            .map(s => s.trim())
-            .filter(s => s.length >= 2);
+        .forEach(note => {
+          const cleanNeedle = String(note.quote || '').replace(/\s+/g, '');
+          if (!cleanNeedle) return;
 
-          let matchedWhole = false;
-          const needles = [whole];
-          // 整串先试一次；成功后不再用片段，避免重复包裹
-          for (const needle of needles) {
-            if (needle.length < 2) continue;
-            let from = 0;
-            while (from <= text.length - needle.length) {
-              const at = text.indexOf(needle, from);
-              if (at < 0) break;
-              const end = at + needle.length;
-              if (taken.some(([s, e]) => at < e && s < end)) { from = at + 1; continue; }
-              const s0 = map[at];
-              if (!s0) { from = at + 1; continue; }
-              taken.push([at, end]);
-              matchedWhole = true;
-              markRange(at, end, n);
-              from = at + 1;
+          let pos = streamStr.indexOf(cleanNeedle);
+          if (pos >= 0) {
+            const end = pos + cleanNeedle.length;
+            if (!taken.some(([s, e]) => pos < e && s < end)) {
+              addMatchRange(pos, end, note);
+              return;
             }
           }
-          if (matchedWhole) return;
 
-          for (const needle of pieces) {
-            if (needle.length < 2) continue;
-            let from = 0;
-            while (from <= text.length - needle.length) {
-              const at = text.indexOf(needle, from);
-              if (at < 0) break;
-              const end = at + needle.length;
-              if (taken.some(([s, e]) => at < e && s < end)) { from = at + 1; continue; }
-              const s0 = map[at];
-              if (!s0) { from = at + 1; continue; }
-              taken.push([at, end]);
-              markRange(at, end, n);
-              from = at + 1;
+          if (cleanNeedle.length >= 6) {
+            const maxOverlap = Math.min(cleanNeedle.length - 1, streamStr.length);
+            for (let len = maxOverlap; len >= 4; len--) {
+              if (streamStr.endsWith(cleanNeedle.slice(0, len))) {
+                const s = streamStr.length - len;
+                const e = streamStr.length;
+                if (!taken.some(([ts, te]) => s < te && ts < e)) {
+                  addMatchRange(s, e, note);
+                }
+                break;
+              }
+            }
+            for (let len = maxOverlap; len >= 4; len--) {
+              if (streamStr.startsWith(cleanNeedle.slice(cleanNeedle.length - len))) {
+                const s = 0;
+                const e = len;
+                if (!taken.some(([ts, te]) => s < te && ts < e)) {
+                  addMatchRange(s, e, note);
+                }
+                break;
+              }
             }
           }
         });
 
-      // 逐块从后往前包裹，前面偏移不受影响
-      perBlock.forEach((hits, el) => {
-        hits.sort((a, b) => b.at - a.at).forEach(h => {
-          try {
-            const sp = locateOffset(el, h.at);
-            const ep = locateOffset(el, h.end);
-            if (!sp || !ep) return;
-            const range = document.createRange();
-            range.setStart(sp.node, sp.offset);
-            range.setEnd(ep.node, ep.offset);
-            const mark = document.createElement('mark');
-            mark.dataset.noteId = h.note.id;
-            mark.style.background = colorOf(h.note.color).bg;
-            mark.style.color = 'inherit';
-            mark.style.borderRadius = '2px';
-            mark.style.cursor = 'pointer';
-            mark.onclick = () => openNoteEditor(h.note);
-            range.surroundContents(mark);
-          } catch (e) { /* 极端情况跳过，不影响其它高亮 */ }
-        });
+      if (!sliceOps.length) return;
+
+      const byNode = new Map();
+      sliceOps.forEach(op => {
+        if (!byNode.has(op.node)) byNode.set(op.node, []);
+        byNode.get(op.node).push(op);
+      });
+
+      byNode.forEach((ops, textNode) => {
+        ops.sort((a, b) => b.start - a.start);
+        ops.forEach(op => wrapTextNodeSlice(textNode, op.start, op.end, op.note));
       });
     }
 
-    // 在元素内按字符偏移定位到具体文本节点
-    function locateOffset(rootEl, offset) {
-      let remain = offset;
-      const walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT, null);
-      let n;
-      while ((n = walker.nextNode())) {
-        const len = n.textContent.length;
-        if (remain <= len) return { node: n, offset: remain };
-        remain -= len;
-      }
-      return null;
-    }
-
-    // ==================== 笔记：云同步（手动触发） ====================
-    // GitHub Contents API 只能整文件替换，所以流程必须是「读 → 合并 → 带 sha 写」。
-    // 安全性来自：写之前一定先读、带 sha 提交、409 时重试。
+    // ==================== 核心修复 3：笔记多端零丢失同步机制 ====================
     const NOTES_CLOUD_PATH = 'data/notes.json';
 
-    function notePayload() {
-      return {
-        version: 1,
-        updatedAt: Date.now(),
-        notes: state.notes
-      };
+    // 生成确定性的冲突副本 ID，防止多次同步或重试时无限裂变出重复副本
+    function deterministicConflictId(baseId, content, quote) {
+      const str = `${baseId}|${quote || ''}|${content || ''}`;
+      let h = 2166136261;
+      for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return `${baseId}_c_${(h >>> 0).toString(36)}`;
     }
 
-    // 合并两份笔记列表：按 id 并集；同 id 取 updatedAt 新者；时间接近且内容不同 -> 保留双份
+    // 多端安全合并算法：
+    // 1. 改颜色不覆盖备注文字：对比 syncedContent（上次同步基准）或 contentUpdatedAt，单端修改文字直接获胜。
+    // 2. 双端同时修改了不同备注文字：不论时间差是几秒还是几小时，绝不静默丢弃！新者为主笔记，旧者生成唯一冲突副本保留。
+    // 3. 删除保护：若一端删除了空摘抄，但另一端新写了实质文字备注，则自动复活保留文字，防止误杀长评。
     function mergeNoteLists(localList, remoteList) {
       const byId = new Map();
-      const pushConflictCopy = (base, other) => {
-        const copy = { ...other, id: newNoteId(), conflictOf: base.id };
-        copy.createdAt = other.createdAt || Date.now();
-        copy.updatedAt = other.updatedAt || Date.now();
-        byId.set(copy.id, copy);
+
+      const saveConflictCopy = (winner, loser) => {
+        const loserContent = (loser.content || '').trim();
+        const winnerContent = (winner.content || '').trim();
+        if (!loserContent || loserContent === winnerContent) return;
+        const cid = deterministicConflictId(winner.id, loserContent, loser.quote);
+        if (byId.has(cid)) return;
+        const alreadyExists = Array.from(byId.values()).some(x =>
+          !x.deletedAt &&
+          (x.conflictOf === winner.id || x.id === winner.id) &&
+          (x.content || '').trim() === loserContent &&
+          (x.quote || '') === (loser.quote || '')
+        );
+        if (alreadyExists) return;
+        byId.set(cid, {
+          ...loser,
+          id: cid,
+          conflictOf: winner.id,
+          deletedAt: null,
+          createdAt: loser.createdAt || Date.now(),
+          updatedAt: loser.updatedAt || Date.now(),
+          syncedContent: loserContent
+        });
       };
-      const consider = n => {
+
+      const mergeTwo = (cur, inc) => {
+        const curDel = Boolean(cur.deletedAt);
+        const incDel = Boolean(inc.deletedAt);
+        const curText = (cur.content || '').trim();
+        const incText = (inc.content || '').trim();
+        const baseText = (cur.syncedContent ?? inc.syncedContent ?? '').trim();
+
+        // 情况 A：至少有一端标记了删除
+        if (curDel || incDel) {
+          if (curDel && incDel) {
+            return (inc.updatedAt || 0) > (cur.updatedAt || 0) ? { ...inc } : { ...cur };
+          }
+          const alive = curDel ? inc : cur;
+          const dead = curDel ? cur : inc;
+          const aliveText = (alive.content || '').trim();
+          const deadText = (dead.content || '').trim();
+          const aliveContentTime = alive.contentUpdatedAt || alive.updatedAt || 0;
+          const delTime = dead.deletedAt || dead.updatedAt || 0;
+
+          // 如果存活端相比删除端新增/修改了实质文字（或文字修改时间晚于删除时间），保留存活端，绝不误删文字
+          if (aliveText && (aliveText !== deadText || aliveContentTime > delTime)) {
+            return { ...alive, deletedAt: null, updatedAt: Math.max(alive.updatedAt || 0, delTime + 1) };
+          }
+          return { ...dead };
+        }
+
+        // 情况 B：两端都未删除，且备注文字与摘抄完全一致（例如只改了颜色）
+        if (curText === incText && (cur.quote || '') === (inc.quote || '')) {
+          const newer = (inc.updatedAt || 0) >= (cur.updatedAt || 0) ? inc : cur;
+          return { ...newer, syncedContent: curText };
+        }
+
+        // 情况 C：两端备注文字不同，利用基准 syncedContent 判断是否只有单端修改了文字
+        const curChanged = curText !== baseText;
+        const incChanged = incText !== baseText;
+
+        if (curChanged && !incChanged) {
+          // 只有本地修改了文字（远端可能只是改了颜色），本地文字获胜，同时吸收最新颜色
+          const latestColor = (inc.updatedAt || 0) > (cur.updatedAt || 0) ? inc.color : cur.color;
+          return { ...cur, color: latestColor, updatedAt: Math.max(cur.updatedAt || 0, inc.updatedAt || 0), syncedContent: curText };
+        }
+        if (!curChanged && incChanged) {
+          // 只有远端修改了文字（本地可能只是改了颜色），远端文字获胜，同时吸收最新颜色
+          const latestColor = (cur.updatedAt || 0) > (inc.updatedAt || 0) ? cur.color : inc.color;
+          return { ...inc, color: latestColor, updatedAt: Math.max(cur.updatedAt || 0, inc.updatedAt || 0), syncedContent: incText };
+        }
+
+        // 若一方为空摘抄、另一方有文字，且无基准记录（首次跨端合并），有文字的一方直接获胜，不产生空摘抄副本
+        if (!curText && incText) {
+          return { ...inc, updatedAt: Math.max(cur.updatedAt || 0, inc.updatedAt || 0), syncedContent: incText };
+        }
+        if (curText && !incText) {
+          return { ...cur, updatedAt: Math.max(cur.updatedAt || 0, inc.updatedAt || 0), syncedContent: curText };
+        }
+
+        // 情况 D：两端都修改了实质文字且内容不同 -> 绝不静默覆盖！保留较新者为主卡片，较旧者存为确定性冲突副本
+        const curTime = cur.contentUpdatedAt || cur.updatedAt || 0;
+        const incTime = inc.contentUpdatedAt || inc.updatedAt || 0;
+        const winner = incTime >= curTime ? { ...inc, syncedContent: incText } : { ...cur, syncedContent: curText };
+        const loser = incTime >= curTime ? cur : inc;
+        saveConflictCopy(winner, loser);
+        return winner;
+      };
+
+      localList.forEach(n => {
+        if (!n || !n.id) return;
+        byId.set(n.id, { ...n });
+      });
+
+      remoteList.forEach(n => {
         if (!n || !n.id) return;
         const cur = byId.get(n.id);
-        if (!cur) { byId.set(n.id, { ...n }); return; }
-        const a = cur.updatedAt || 0, b = n.updatedAt || 0;
-        const sameContent = (cur.content || '') === (n.content || '') && (cur.quote || '') === (n.quote || '');
-        const bothDeleted = Boolean(cur.deletedAt) && Boolean(n.deletedAt);
-        if (sameContent) {
-          // 仅颜色等元信息不同：按时间新者胜，不产生双份
-          if (b > a) byId.set(n.id, { ...n });
-          return;
-        }
-        if (bothDeleted) { if (b > a) byId.set(n.id, { ...n }); return; }
-        // 两边都改过且内容不同
-        const diff = Math.abs(b - a);
-        if (diff > 60 * 1000) {
-          // 时间差明显：新者胜，不产生双份（一端的修改就是过期数据）
-          const winner = b > a ? n : cur;
-          byId.set(winner.id, { ...winner });
+        if (!cur) {
+          byId.set(n.id, { ...n, syncedContent: (n.content || '').trim() });
         } else {
-          // 时间接近，无法判断先后 -> 保留双份（删除优先，避免复活）
-          if (cur.deletedAt || n.deletedAt) {
-            const del = cur.deletedAt ? cur : n;
-            byId.set(del.id, { ...del });
-          } else {
-            byId.set(cur.id, { ...cur });
-            pushConflictCopy(cur, n);
-          }
+          const mergedNote = mergeTwo(cur, n);
+          byId.set(n.id, mergedNote);
         }
-      };
-      localList.forEach(consider);
-      remoteList.forEach(consider);
+      });
+
+      // 所有合并完成后的存活笔记统一更新 syncedContent 基准
+      for (const [id, note] of byId.entries()) {
+        if (!note.deletedAt) {
+          note.syncedContent = (note.content || '').trim();
+        }
+      }
+
       return Array.from(byId.values());
     }
 
-    // 计算笔记数组的稳定签名：按 id 排序后序列化，**不含 updatedAt**。
-    // 原因：updatedAt 是"何时改的"元信息，同一份内容在两端的 updatedAt 可能不同，
-    // 若把它算进签名，就永远判不出"内容没变"，跳过推送也就失效了。
     function notesSignature(notes) {
       const rows = (notes || [])
         .map(n => [
@@ -1880,9 +1901,6 @@
     async function syncNotesWithCloud() {
       if (!isCloudConnected()) return showToast('请先连接私有仓');
       const btn = $('notes-sync-btn');
-      // 注意：这里绝不能写 btn.textContent，否则会把按钮里的 SVG 图标整个替换成文字，
-      // 造成"云同步"三个字时不时冒出来（同步时出现、结束后又变回图标）。
-      // 状态只通过 disabled 和旋转动画表达。
       btn.disabled = true;
       btn.classList.add('is-syncing');
       try {
@@ -1893,7 +1911,6 @@
           const remoteNotes = (got && got.data && Array.isArray(got.data.notes)) ? got.data.notes : [];
           merged = mergeNoteLists(state.notes, remoteNotes);
 
-          // 内容签名一致 => 云端已是最新，跳过这次 PUT（避免产生无意义的提交）
           const remoteSig = notesSignature(remoteNotes);
           const mergedSig = notesSignature(merged);
           if (got && remoteSig === mergedSig) {
@@ -1904,23 +1921,20 @@
           const payload = { version: 1, updatedAt: Date.now(), notes: merged };
           const ok = await putCloudJSON(NOTES_CLOUD_PATH, payload, got ? got.sha : null, 'notes: sync');
           if (ok) { jsonPushed = true; break; }
-          merged = null;   // sha 冲突，重来
+          merged = null;
         }
         if (!merged) throw new Error('多次重试仍冲突，请稍后再试');
         state.notes = merged;
-        // 落库到本地
         const db = await openNotesDB();
         if (db) {
           const tx = db.transaction(NOTES_STORE, 'readwrite');
           const store = tx.objectStore(NOTES_STORE);
           await new Promise(res => { tx.oncomplete = res; tx.onerror = res; store.clear(); merged.forEach(n => store.put(n)); });
         }
+        if (!$('reader-view').classList.contains('hidden')) renderReaderPages();
         renderNotesBookFilter();
         renderNotes();
 
-        // 同步一份人可直接阅读的 HTML。
-        // 内容与云端完全一致时跳过推送，避免每次同步都产生提交。
-        // 这一步失败不影响 JSON 同步结果，只提示。
         let htmlNote = '';
         try {
           const built = buildNotesHtml(state.notes);
@@ -1952,39 +1966,41 @@
       }
     }
 
-    // 读云端 JSON（404 时返回 null）
-    async function getCloudJSON(path) {
+    // 读取云端文本/JSON：强制绕过浏览器与 CDN 缓存，且支持超过 1MB 的大文件自动回退 Git Blob API
+    async function getCloudJSONRaw(path) {
       const branch = state.github.branch || 'main';
-      const url = `${repoApiBase()}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`;
-      const res = await fetch(url, { headers: ghHeaders() });
+      const url = `${repoApiBase()}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}&_t=${Date.now()}`;
+      const res = await fetch(url, { headers: ghHeaders(), cache: 'no-store' });
       if (res.status === 404) return null;
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const meta = await res.json();
-      const raw = meta.content ? atob(meta.content.replace(/\s/g, '')) : '';
+      let b64 = meta.content ? meta.content.replace(/\s/g, '') : '';
+      // 当文件超过 1MB 时，Contents API 的 content 为空，自动通过 Git Blobs API 获取完整内容
+      if (!b64 && meta.sha) {
+        const blobUrl = `${repoApiBase()}/git/blobs/${encodeURIComponent(meta.sha)}?_t=${Date.now()}`;
+        const blobRes = await fetch(blobUrl, { headers: ghHeaders(), cache: 'no-store' });
+        if (blobRes.ok) {
+          const blobMeta = await blobRes.json();
+          b64 = blobMeta.content ? blobMeta.content.replace(/\s/g, '') : '';
+        }
+      }
+      const raw = b64 ? atob(b64) : '';
       const text = new TextDecoder('utf-8').decode(Uint8Array.from(raw, c => c.charCodeAt(0)));
-      let data = null;
-      try { data = JSON.parse(text); } catch (e) {}
-      return { data, sha: meta.sha };
+      return { sha: meta.sha, text };
     }
 
-    // 写云端 JSON，返回是否成功（false 表示 sha 冲突）
+    async function getCloudJSON(path) {
+      const got = await getCloudJSONRaw(path);
+      if (!got) return null;
+      let data = null;
+      try { data = JSON.parse(got.text); } catch (e) {}
+      return { data, sha: got.sha };
+    }
+
     async function putCloudJSON(path, obj, sha, message) {
       return putCloudText(path, JSON.stringify(obj, null, 2), sha, message);
     }
 
-    // 读云端任意文本文件（只取 sha 与原文），404 返回 null
-    async function getCloudJSONRaw(path) {
-      const branch = state.github.branch || 'main';
-      const url = `${repoApiBase()}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`;
-      const res = await fetch(url, { headers: ghHeaders() });
-      if (res.status === 404) return null;
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const meta = await res.json();
-      const raw = meta.content ? atob(meta.content.replace(/\s/g, '')) : '';
-      return { sha: meta.sha, text: new TextDecoder('utf-8').decode(Uint8Array.from(raw, c => c.charCodeAt(0))) };
-    }
-
-    // 写云端文本（JSON / HTML 共用），返回是否成功（false 表示 sha 冲突）
     async function putCloudText(path, text, sha, message) {
       const branch = state.github.branch || 'main';
       const bytes = new TextEncoder().encode(text);
@@ -1995,7 +2011,8 @@
       const res = await fetch(`${repoApiBase()}/contents/${encodeURIComponent(path)}`, {
         method: 'PUT',
         headers: ghHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        cache: 'no-store'
       });
       if (res.status === 409 || res.status === 422) return false;
       if (!res.ok) {
@@ -2005,14 +2022,10 @@
       return true;
     }
 
-    // 生成笔记的 HTML 全文（导出与云同步共用同一份模板，避免两处样式不一致）。
-    // 结构：按书分组；书与书按「最后修改时间倒序」（最近改动过的书在前）；
-    //       同一本书内按「最后修改时间正序」（越早的越在前，保持阅读顺序）。
     function buildNotesHtml(notes) {
       const list = (notes || []).filter(n => !n.deletedAt && (n.bookFile || n.quote));
       if (!list.length) return '';
 
-      // 按书分组，并记录每本书的最后修改时间
       const groups = new Map();
       list.forEach(n => {
         const key = n.bookFile || '未关联书籍';
@@ -2024,9 +2037,7 @@
         g.lastUpdated = Math.max(g.lastUpdated, n.updatedAt || 0);
       });
 
-      // 书与书：最后修改时间倒序（最新的书在最前）
       const books = [...groups.values()].sort((a, b) => b.lastUpdated - a.lastUpdated);
-      // 书内笔记：最后修改时间正序（越久的越靠前）
       books.forEach(b => b.notes.sort((x, y) => (x.updatedAt || 0) - (y.updatedAt || 0)));
 
       const fmtDate = ts => {
@@ -2100,8 +2111,6 @@
     }
 
     function renderLibrary() {
-      // 书库与笔记是互斥视图：这里统一保证「渲染书库时一定收起笔记视图」，
-      // 否则从笔记页触发书架点击/搜索/批量操作等会调到本函数，两套卡片叠在一起
       $('notes-view').classList.add('hidden');
 
       const list = state.books.filter(b => {
@@ -2165,7 +2174,7 @@
           e.stopPropagation();
           state.activeMenuBookId = book.id;
           $('book-act-pin-label').textContent = book.pinned ? '取消置顶' : '置顶';
-          updateCloudIndicator();   // 每次打开菜单刷新"云删除"的可用状态
+          updateCloudIndicator();
           const pop = $('book-action-popover');
           pop.classList.remove('hidden');
           $('book-action-backdrop').classList.remove('hidden');
@@ -2179,8 +2188,6 @@
     }
 
     // ==================== EPUB / PDF 解析 ====================
-    // 图片一律转成 data URL：blob URL 只在当前文档生命周期内有效，
-    // 存进 IndexedDB 后刷新/重开书就会全部失效变成破图（本次修复的核心）
     function blobToDataUrl(blob) {
       return new Promise(res => {
         const fr = new FileReader();
@@ -2195,7 +2202,6 @@
       return ({ jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml', bmp: 'image/bmp' })[ext] || 'image/jpeg';
     }
 
-    // 把 EPUB 里的路径统一成便于匹配的形式：去 query/fragment、解码、统一小写、去掉开头的 ./
     function normalizeResPath(p) {
       let s = String(p || '').trim();
       if (!s) return '';
@@ -2205,7 +2211,6 @@
       return s.toLowerCase();
     }
 
-    // 以章节文件所在目录为基准，解析相对路径（../Images/a.jpg、Images/a.jpg、/OEBPS/Images/a.jpg）
     function resolveRelativePath(baseFile, href) {
       let s = String(href || '').trim().split('#')[0].split('?')[0];
       if (!s) return '';
@@ -2224,14 +2229,12 @@
     async function parseEpubBuffer(arrayBuffer, fallbackTitle) {
       const zip = await window.JSZip.loadAsync(arrayBuffer);
       const parser = new DOMParser();
-      const imgMap = {};   // 完整路径 / 文件名 -> data URL
+      const imgMap = {};
       const imgPathList = [];
       let coverDataUrl = '';
 
       for (const [p, entry] of Object.entries(zip.files)) {
         if (entry.dir || !/\.(jpe?g|png|webp|gif|svg|bmp)$/i.test(p)) continue;
-        // 显式给 blob 正确的 MIME：JSZip 的 blob 默认 type 为空，
-        // readAsDataURL 会退成 application/octet-stream，部分环境据此拒绝渲染
         const raw = await entry.async('blob');
         const blob = new Blob([raw], { type: mimeFromPath(p) });
         const dataUrl = await blobToDataUrl(blob);
@@ -2242,7 +2245,6 @@
         if (!coverDataUrl && /cover/i.test(p)) coverDataUrl = dataUrl;
       }
 
-      // 读取图片真实像素尺寸，供分页时用 aspect-ratio 预先占位（避免图片未解码时高度为 0）
       const dimCache = new Map();
       const getImageSize = src => {
         if (!src) return Promise.resolve(null);
@@ -2257,7 +2259,6 @@
         return pr;
       };
 
-      // 用图片完整路径做模糊匹配：兼容 src=".../fig1.jpg"、文件名大小写差异、URL 编码等
       const lookupImage = (baseFile, href) => {
         const resolved = resolveRelativePath(baseFile, href);
         const nResolved = normalizeResPath(resolved);
@@ -2269,7 +2270,6 @@
         const fileName = normalizeResPath((String(href || '').split('/').pop() || ''));
         if (fileName && imgMap[fileName]) return imgMap[fileName];
 
-        // 最后兜底：同文件名、不同目录
         if (fileName) {
           const hit = imgPathList.find(p => normalizeResPath(p.split('/').pop()) === fileName);
           if (hit) return imgMap[normalizeResPath(hit)];
@@ -2277,11 +2277,6 @@
         return '';
       };
 
-      // ===== 读取 EPUB 结构：container.xml -> .opf -> spine 顺序 =====
-      // 之前只按文件名排序、靠 h1-h4 判断章节，导致：
-      //  1) 章节顺序可能错乱；
-      //  2) 用 <p><strong> 当标题的书完全识别不到章节，章与章直接接排。
-      // 这里改为按 OPF 的 spine 顺序处理，每个 spine 项天然是一个章节，强制新开一页。
       const findOpfPath = async () => {
         const containerEntry = zip.file('META-INF/container.xml');
         if (containerEntry) {
@@ -2299,7 +2294,6 @@
         let xml = '';
         try { xml = await zip.file(opfPath).async('string'); } catch (e) { return null; }
         const doc = new DOMParser().parseFromString(xml, 'application/xml');
-        // manifest: id -> href（相对 opf 目录）
         const baseDir = opfPath.includes('/') ? opfPath.slice(0, opfPath.lastIndexOf('/') + 1) : '';
         const idToPath = {};
         doc.querySelectorAll('manifest > item').forEach(it => {
@@ -2316,7 +2310,6 @@
         });
         if (!spinePaths.length) return null;
 
-        // 目录文件（nav.xhtml / toc.ncx）里给出的章节标题，用于识别章节首标题
         const navTitles = [];
         for (const pid of Object.keys(idToPath)) {
           const p = idToPath[pid];
@@ -2337,9 +2330,7 @@
       const spineInfo = await parseSpine(opfPath);
       const allHtml = Object.keys(zip.files)
         .filter(n => !zip.files[n].dir && /\.(xhtml|html|htm)$/i.test(n));
-      const normSet = new Set(allHtml.map(n => normalizeResPath(n)));
 
-      // 按 spine 顺序排列；spine 未覆盖到的文件（附录等）追加到末尾，避免丢内容
       let htmlFiles;
       if (spineInfo) {
         const ordered = [];
@@ -2365,19 +2356,10 @@
       const navTitleSet = new Set((spineInfo && spineInfo.navTitles || []).map(t => String(t).replace(/\s+/g, ' ').trim()));
 
       const rawBlocks = [];
-      // base64 / 编码残留清洗。
-      // 之前的版本只按"整块文本"判断，一旦乱码嵌在正文中间（如截图中
-      // "…悲剧的来源" 后面直接跟一段 base64），就整块通过、乱码照旧显示。
-      // 这里改为从文本中直接剔除 base64 片段，只保留正常文字。
       const cleanText = s => {
         let t = String(s || '');
         if (!t) return '';
-
-        // 1) data URL（可能含换行）
         t = t.replace(/data:[a-z]+\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=\s]{16,}/gi, ' ');
-
-        // 2) 连续 base64 字符片段：长度 >= 32 且含 + 或 / 或 =，或纯字母数字但极长（>= 60）
-        //    先按"可能带换行/空格断行"的连续 base64 块整体匹配
         t = t.replace(/(?:[A-Za-z0-9+/]{4,}={0,2}\s+){3,}[A-Za-z0-9+/]{4,}={0,2}/g, m => {
           const compact = m.replace(/\s+/g, '');
           const hasSym = /[+/=]/.test(compact);
@@ -2385,22 +2367,15 @@
           if (cjk === 0 && compact.length >= 32 && hasSym) return ' ';
           return m;
         });
-
-        // 3) 单段长 base64（无断行）
         t = t.replace(/[A-Za-z0-9+/]{32,}={0,2}/g, m => {
-          // 仅当含 base64 特征符号，或长度很长且不含常见英文词时剔除
           if (/[+/=]/.test(m)) return ' ';
           if (m.length >= 60 && !/[aeiou]{2,}/i.test(m)) return ' ';
           return m;
         });
-
-        // 4) 长十六进制串
         t = t.replace(/\b[0-9a-f]{40,}\b/gi, ' ');
-
         return t.replace(/\s+/g, ' ').trim();
       };
 
-      // 清洗后若几乎不剩正常内容，则整块丢弃
       const isUsableText = s => {
         const t = cleanText(s);
         if (!t) return false;
@@ -2413,7 +2388,6 @@
         const u8 = await zip.file(f).async('uint8array');
         const txt = new TextDecoder('utf-8').decode(u8);
         const doc = parser.parseFromString(txt, 'text/html');
-        // 去掉 style/script，另外清掉 SVG 里的 style 与所有元素的 data-* 大段内联数据
         doc.querySelectorAll('script, style, svg style').forEach(el => el.remove());
         doc.querySelectorAll('[style]').forEach(el => {
           const st = el.getAttribute('style') || '';
@@ -2422,14 +2396,13 @@
         const els = doc.body ? doc.body.querySelectorAll('h1,h2,h3,h4,p,div,blockquote,img,li,figure,svg,image') : [];
         let addedInChapter = 0;
 
-        // 每个 spine 文件视为一个章节：章节首块之前强制分页
         const isSpineFile = spineFileSet.has(normalizeResPath(f));
         let chapterStartMarked = false;
         const markChapterStart = () => {
           if (chapterStartMarked) return false;
           chapterStartMarked = true;
           if (!isSpineFile) return false;
-          if (rawBlocks.length === 0 && firstSpineFile) return false; // 全书第一页无需分页
+          if (rawBlocks.length === 0 && firstSpineFile) return false;
           return true;
         };
 
@@ -2460,12 +2433,10 @@
           if (tag === 'figure') return;
           const rawT = (el.textContent || '').replace(/\s+/g, ' ').trim();
           if (!rawT) return;
-          // 从文本中剔除 base64 / 编码残留；若清洗后没有可用内容则整块跳过
           const t = cleanText(rawT);
           if (!isUsableText(rawT)) return;
 
           const isHeadingTag = /^h[1-4]$/.test(tag);
-          // 目录里登记过的标题，即使用 <p> 写也当作章节标题
           const isNavTitle = navTitleSet.has(String(t).replace(/\s+/g, ' ').trim());
           if (isHeadingTag) {
             const newPage = markChapterStart();
@@ -2478,12 +2449,10 @@
         });
         firstSpineFile = false;
       }
-      // 补齐图片真实宽高（EPUB 没写 width/height 时，靠解码拿尺寸，供分页占位用）
+
       for (const b of rawBlocks) {
         if (b.type !== 'img') continue;
         const usable = typeof b.src === 'string' && b.src.startsWith('data:image/');
-        // 无法解码的图片直接标记为不可用，分页与渲染都会跳过它，
-        // 避免按 302px 预留整页空白却渲染不出任何东西
         if (!usable) { b.dead = true; continue; }
         if (b.w > 0 && b.h > 0) continue;
         const dim = await getImageSize(b.src);
@@ -2492,12 +2461,9 @@
       }
 
       if (!rawBlocks.length) rawBlocks.push({ type: 'p', text: `《${fallbackTitle}》已载入。` });
-      // parseVer 用于识别旧版解析结果：升级解析逻辑后，打开旧书会自动重新解析，
-      // 否则用户会一直看到旧数据里的乱码 / 缺失的章节标记
       return { rawBlocks, coverDataUrl, parseVer: PARSE_VERSION };
     }
 
-    // 导入本地文件。uploadToCloud=true 时（云导入）在导入后把原文件上传到私有仓。
     async function handleFilesImport(files, uploadToCloud = false) {
       for (const file of Array.from(files || [])) {
         const ext = file.name.split('.').pop().toLowerCase();
@@ -2537,7 +2503,6 @@
           created = newBook;
         }
 
-        // 云导入：同时把这本书上传到私有仓
         if (created && uploadToCloud) {
           if (!isCloudConnected()) {
             showToast('未连接私有仓，已仅导入本地');
@@ -2557,38 +2522,31 @@
       }
     }
 
-    // 旧版本把图片存成 blob: URL，刷新后必然失效（显示成 alt 文字 / 破图）。
-    // 这里做自愈：打开书时若发现失效图片地址，就用本地缓存的原始文件重新解析并落库，
-    // 用户无需重新导入。
     function hasStaleImageBlock(book) {
       if (!book || book.format !== 'EPUB') return false;
       const blocks = book.rawBlocks || [];
       return blocks.some(b => {
         if (!b || b.type !== 'img') return false;
         const src = String(b.src || '');
-        // 旧版存的是 blob: URL（早已失效）；空 src 同样是坏数据
         return src === '' || src.startsWith('blob:');
       });
     }
 
     async function healStaleImages(book) {
       if (!hasStaleImageBlock(book)) return false;
-      // 有原始文件就重新解析成 data URL（彻底修好）
       if (book.fileBytes) {
         try {
           const parsed = await parseEpubBuffer(book.fileBytes.slice(0), book.title);
           const hasImg = parsed.rawBlocks.some(b => b.type === 'img');
           if (hasImg) {
             book.rawBlocks = parsed.rawBlocks;
-            book.pages = undefined; // 强制重新分页
+            book.pages = undefined;
             if (parsed.coverDataUrl) book.coverUrl = parsed.coverDataUrl;
             await saveBookDB(book);
             return true;
           }
         } catch (e) {}
       }
-      // 没有原始文件（已被释放空间）：把失效图块标记为 dead，
-      // 分页时不再为它们预留整页高度，避免出现整页空白
       let marked = 0;
       (book.rawBlocks || []).forEach(b => {
         if (b && b.type === 'img' && !b.dead) {
@@ -2604,7 +2562,6 @@
     }
 
     // ==================== 目录 / 书签 ====================
-    // 目录：从 rawBlocks 里的 heading 生成（解析阶段已标记章节）
     function buildToc(book) {
       const toc = [];
       (book.rawBlocks || []).forEach((b, bi) => {
@@ -2613,7 +2570,6 @@
       return toc;
     }
 
-    // 根据块索引推算所在页（分页结果里每页存的是块对象引用）
     function findPageOfBlock(book, blockIndex) {
       const pages = book.pages || [];
       const block = (book.rawBlocks || [])[blockIndex];
@@ -2638,7 +2594,6 @@
           box.innerHTML = '<p class="text-sm text-neutral-400 mt-6 text-center">还没有书签，点右上角 ＋ 把当前页加入书签</p>';
           return;
         }
-        // 每条书签两行——第一行标题，第二行页码/进度，条目之间用细线分隔
         marks.forEach((m, i) => {
           const row = document.createElement('div');
           row.className = 'group flex items-start gap-2 px-5 py-4 border-b border-neutral-100 hover:bg-neutral-50 cursor-pointer';
@@ -2668,7 +2623,6 @@
         return;
       }
 
-      // 目录
       const toc = buildToc(book);
       if (!toc.length) {
         box.innerHTML = '<p class="text-sm text-neutral-400 mt-6 text-center">这本书没有识别到章节</p>';
@@ -2692,7 +2646,6 @@
     }
 
     function updateTocTabs() {
-      // 按截图：选中为深色加粗，未选中为浅灰；字号继承面板
       const on = 'py-1 cursor-pointer text-[#2b2b2b] font-semibold';
       const off = 'py-1 cursor-pointer text-[#b8b8b8] hover:text-[#6b6b6b]';
       const a = $('toc-tab-toc'), b = $('toc-tab-bm');
@@ -2701,12 +2654,10 @@
     }
 
     // ==================== 全书搜索 ====================
-    // 在 rawBlocks 全文里找关键词，按所属章节分组，命中处标红，点击跳转到该页。
     function escapeRegExp(s) {
       return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
-    // 把命中关键词包成红色 <strong>
     function highlightKeyword(text, keyword) {
       if (!keyword) return esc(text);
       const re = new RegExp(escapeRegExp(keyword), 'gi');
@@ -2717,13 +2668,12 @@
         out += esc(text.slice(last, m.index));
         out += `<strong class="text-[#e03131] font-semibold">${esc(m[0])}</strong>`;
         last = m.index + m[0].length;
-        if (m.index === re.lastIndex) re.lastIndex++;   // 防零宽匹配死循环
+        if (m.index === re.lastIndex) re.lastIndex++;
       }
       out += esc(text.slice(last));
       return out;
     }
 
-    // 当前关键词在块内首次出现位置附近截一段上下文（供结果显示）
     function snippetAround(text, keyword, radius = 40) {
       const flat = String(text || '');
       const at = flat.toLowerCase().indexOf(String(keyword).toLowerCase());
@@ -2755,13 +2705,11 @@
       const pages = book.pages || [];
       const lowerKw = kw.toLowerCase();
 
-      // 先算每个块所在的页（只算一次，避免重复遍历）
       const pageOfBlock = new Map();
       pages.forEach((pg, pi) => {
         pg.forEach(b => { if (!pageOfBlock.has(b)) pageOfBlock.set(b, pi); });
       });
 
-      // 按章节归组：遍历块，遇到 heading 就开新组
       const groups = [];
       let curGroup = null;
       blocks.forEach((b, bi) => {
@@ -2778,7 +2726,6 @@
           groups.push(curGroup);
         }
         if (text.toLowerCase().includes(lowerKw)) {
-          // 该块所在页：优先用分页映射，找不到就退回按块序号估算
           let pi = pageOfBlock.has(b) ? pageOfBlock.get(b) : -1;
           if (pi < 0) pi = Math.min((pages.length || 1) - 1, Math.floor(bi / 3));
           curGroup.items.push({ block: b, page: pi, snippet: snippetAround(text, kw) });
@@ -2839,7 +2786,7 @@
       state.tocTab = state.tocTab || 'toc';
       updateTocTabs();
       renderTocList();
-      closeTocSearch();   // 每次打开面板都回到目录/书签视图
+      closeTocSearch();
       $('reader-toc-drawer').classList.remove('-translate-x-full');
       $('toc-backdrop').classList.remove('hidden');
     }
@@ -2849,8 +2796,6 @@
     }
 
     async function openBook(book) {
-      // 旧版解析结果自动重建：乱码清洗、章节识别、图片 data URL 都是后加的规则，
-      // 旧数据里没有这些结果，直接打开会继续看到乱码。这里统一重解析一次。
       if (book.format === 'EPUB' && book.fileBytes && (book.parseVer || 0) < PARSE_VERSION) {
         try {
           const parsed = await parseEpubBuffer(book.fileBytes.slice(0), book.title);
@@ -2863,7 +2808,6 @@
         } catch (e) {}
       }
 
-      // 兜底：修复旧版遗留的图片地址，避免用户看到 alt 文字/破图
       const healed = await healStaleImages(book);
       if (healed) showToast('已修复本书图片显示');
 
@@ -2875,8 +2819,8 @@
         }
         showToast(`正在下载《${book.title}》...`);
         try {
-          const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeURIComponent(book.cloudPath)}?ref=${encodeURIComponent(branch || 'main')}`;
-          const res = await fetch(url, { headers: ghHeaders({ 'Accept': 'application/vnd.github.raw' }) });
+          const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeURIComponent(book.cloudPath)}?ref=${encodeURIComponent(branch || 'main')}&_t=${Date.now()}`;
+          const res = await fetch(url, { headers: ghHeaders({ 'Accept': 'application/vnd.github.raw' }), cache: 'no-store' });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const buf = await res.arrayBuffer();
           book.fileBytes = buf;
@@ -2915,7 +2859,6 @@
     }
 
     // ==================== 性能核心：颜色0ms修改 vs 几何排版防抖 ====================
-    // 仅更新 CSS 变量，完全不重新排版（0 毫秒秒切，手机完全不卡顿）
     function applyThemeColors() {
       const c = state.readerConfig;
       const root = document.documentElement;
@@ -2924,7 +2867,6 @@
       root.style.setProperty('--reader-brightness', c.brightness);
     }
 
-    // 仅在字号、边距等物理尺寸变化时更新
     function applyLayoutStyles() {
       const c = state.readerConfig;
       const root = document.documentElement;
@@ -2935,16 +2877,12 @@
 
       const padX = Math.max(16, (isMobile() ? 20 : 48) + Number(c.margin));
       const padY = Math.max(16, (isMobile() ? 22 : 36) + Number(c.margin) * 0.4);
-      // 页码已去掉，底部不再为它留空间，与顶部保持对称
       $('page-left').style.padding = `${padY}px ${padX}px ${padY}px ${padX}px`;
       $('page-right').style.padding = `${padY}px ${padX}px ${padY}px ${padX}px`;
 
       $('dual-page-spine').classList.toggle('hidden', c.viewMode !== 'dual');
       $('page-right-wrapper').classList.toggle('hidden', c.viewMode !== 'dual');
 
-      // 卷轴模式：让左页脱离绝对定位、由内容自然撑高，并在 wrapper 上滚动。
-      // 之前只把 overflowY 改成 auto，但页元素是 absolute inset-0（高度被钉死），
-      // 内容再多也撑不开，所以完全滚不动。
       const isScroll = c.viewMode === 'scroll';
       const leftLeaf = $('page-left');
       const leftWrap = $('page-left-wrapper');
@@ -2972,9 +2910,6 @@
       });
     }
 
-    // 图片块：用记录的宽高比预占高度，避免测量时高度为 0 导致分页错误。
-    // 关键：图片加载失败（旧数据 blob: 失效、文件损坏）时不能留 alt 文字占位，
-    // 否则会出现整页都是“……请先往上看看……”这种空行（本次反馈的"只有文字没有图"）。
     function imgBlockHtml(item) {
       const alt = esc(item.alt || '');
       const w = Number(item.w) || 0;
@@ -2993,13 +2928,10 @@
       return `<p style="margin-bottom:var(--reader-para-spacing);text-align:justify;">${esc(item.text)}</p>`;
     }
 
-    // 渲染后兜底：图片若加载失败（旧 blot 地址失效 / 文件损坏），
-    // 直接移除该占位，避免留下 alt 文字空行和大片空白
     let imgFailHandlerBound = false;
     function bindImageFallback() {
       if (imgFailHandlerBound) return;
       imgFailHandlerBound = true;
-      // 捕获阶段监听 error，能覆盖动态插入的 img
       document.addEventListener('error', e => {
         const t = e.target;
         if (!t || t.tagName !== 'IMG') return;
@@ -3029,10 +2961,6 @@
       const availH = Math.max(140, pageLeft.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 6);
 
       measure.style.width = availW + 'px';
-      // 注意：不要在这里重新声明 --reader-font-size / --reader-para-spacing。
-      // 写成 --x:var(--x) 会形成自引用，自定义属性解析失败后退成初始值（16px/0px），
-      // 测量高度会整体偏小一半，分页就会塞进两倍内容并溢出被裁。
-      // 这些变量本来就从 :root 继承，无需重复设置。
       measure.innerHTML = `<div id="m-col" style="width:100%;font-family:var(--reader-font-family);font-size:var(--reader-font-size);letter-spacing:var(--reader-letter-spacing);line-height:1.72;"></div>`;
       const col = $('m-col');
 
@@ -3045,18 +2973,11 @@
         col.innerHTML = '';
       };
 
-      // 将一个纯文本段落按"能放进剩余高度"的最长前缀切开。
-      // 返回 [前半, 后半]；若整段都放得下则返回 [整段, '']。
-      // 二分查找行数，避免逐字试探导致卡顿。
       const splitParagraph = (text, remainH) => {
         if (remainH <= 0) return ['', text];
         const probe = document.createElement('p');
-        // 关键：probe 的 margin-bottom 会穿透测量容器（最后子元素边距塌陷），
-        // 导致测得的高度比实际渲染小一整段段间距，拆分后就会溢出被裁。
-        // 这里用 padding-bottom 代替 margin 来精确计量可占用的总高度。
         probe.style.cssText = 'margin:0;padding-bottom:var(--reader-para-spacing);text-align:justify;';
         col.appendChild(probe);
-        // 留 2px 安全余量，避免亚像素误差导致刚好差 1px 溢出
         const limit = remainH - 2;
         let lo = 0, hi = text.length, best = 0;
         while (lo <= hi) {
@@ -3068,7 +2989,6 @@
         col.removeChild(probe);
         if (best <= 0) return ['', text];
         if (best >= text.length) return [text, ''];
-        // 尽量在标点处断句，避免半个词；断点提前后长度必然更短，不会溢出
         const head = text.slice(0, best);
         const m = head.match(/[\s，。、；：！？,.;:!?）》」』】—…](?![\s\S]*[\s，。、；：！？,.;:!?）》」』】—…])/);
         let cut = best;
@@ -3076,7 +2996,6 @@
         return [text.slice(0, cut), text.slice(cut)];
       };
 
-      // 把某个块渲染进测量容器，返回该节点（用于撤下 / 复用）
       const renderInto = (item, container) => {
         const w = document.createElement('div');
         w.innerHTML = blockHtml(item);
@@ -3085,23 +3004,17 @@
         return n;
       };
 
-      // 重建测量容器内容，使其严格等于 cur 中的块。
-      // 这是分页正确的关键：拆分/回填后 col 必须与 cur 完全一致，
-      // 否则 scrollHeight 只统计到部分块，remainH 会算错，从而产生大量碎片页。
       const rebuildCol = () => {
         col.innerHTML = '';
         for (const it of cur) renderInto(it, col);
       };
 
       const queue = blocks.slice();
-      let guard = 0; // 防止拆分产生极短片段时反复回炉导致死循环
-      // 双页模式下左页是偶数索引：章节必须从"翻页后的左页"开始。
-      // 若上一章结束在左页(偶数)，右页(奇数)必须留空，让新章从下一页左页开始。
+      let guard = 0;
       const isDual = state.readerConfig.viewMode === 'dual';
       const forceChapterStart = () => {
         if (cur.length) flush();
         if (isDual && pages.length % 2 === 1) {
-          // 当前落点在右页，补一个空页使新章落在左页
           pages.push([]);
         }
       };
@@ -3110,7 +3023,6 @@
         if (++guard > 200000) break;
         const b = queue[qi];
         if (b.forceNewPage) { forceChapterStart(); }
-        // 已判定不可用的图片直接跳过：不占位、不产生空白页
         if (b.type === 'img' && b.dead) continue;
 
         const node = renderInto(b, col);
@@ -3121,30 +3033,21 @@
           continue;
         }
 
-        // 放不下：先撤下，再计算本页剩余高度
         col.removeChild(node);
         const remainH = availH - col.scrollHeight;
         const lineH = parseFloat(getComputedStyle(col).lineHeight) || 40;
 
-        // 纯文本段落：只有当本页剩余空间还够放"至少两行"时才拆分。
-        // 只够放一行就整段下移，避免产生单行碎段独占页面。
         const isPlainText = b.type === 'p' && typeof b.text === 'string' && b.text.length > 0;
-        // 拆过一次的尾巴（b.splitFrom）不再参与拆分，避免"拆完放回又被拆"的死循环
         if (isPlainText && !b.splitFrom && remainH >= lineH * 2) {
           const [head, tail] = splitParagraph(b.text, remainH);
-          // 拆出的前半至少要有一行，尾巴也不能短到只剩几个字
           if (head && head.length >= 8 && tail && tail.length >= 8) {
             cur.push({ type: 'p', text: head });
-            rebuildCol();                                  // col 与 cur 严格同步
-            // 关键：尾巴放回队列紧接着处理，并且不 flush。
-            // 这样尾巴会先尝试填满本页剩余空间（几行也算），填不下才自然换页；
-            // 若在这里 flush，21 字的小尾巴就会独占一整页（空页的根源）。
+            rebuildCol();
             queue.splice(qi + 1, 0, { ...b, text: tail, splitFrom: true });
             continue;
           }
         }
 
-        // 不拆分：整段挪到下一页作为新页首块
         flush();
         renderInto(b, col);
         cur.push(b);
@@ -3152,11 +3055,9 @@
       if (cur.length) pages.push(cur);
       measure.innerHTML = '';
 
-      // 合并"只有图片、没有文字"的孤立页（连续两页纯图片时合并，减少整页留白）。
-      // 注意：空页（章节对齐用的占位）必须原样保留，否则会打乱双页左右位置。
       const merged = [];
       for (const pg of pages) {
-        if (!pg.length) { merged.push([]); continue; }   // 占位空页不参与合并
+        if (!pg.length) { merged.push([]); continue; }
         const onlyImgs = pg.every(b => b.type === 'img');
         const last = merged[merged.length - 1];
         if (onlyImgs && last && last.length && last.every(b => b.type === 'img')) {
@@ -3166,28 +3067,23 @@
         }
       }
 
-      // 双页模式最后再对齐一次：确保每个章节首块都落在偶数索引（左页）。
-      // 因为上面的合并可能改变了页数，进而改变奇偶性。
       if (isDual) {
         for (let i = 0; i < merged.length; i++) {
           const pg = merged[i];
           if (!pg.length) continue;
           if (!pg[0] || !pg[0].forceNewPage) continue;
-          if (i % 2 === 1) merged.splice(i, 0, []);   // 落在右页 -> 前面插入空页
+          if (i % 2 === 1) merged.splice(i, 0, []);
         }
       }
 
       book.pages = merged.length ? merged : [[{ type: 'p', text: '暂无内容' }]];
     }
 
-    // 只重排当前页（拖动字号/边距等滑块时的轻量路径）。
-    // 不重新切分全书，只把当前页的内容按新字号等比切成"能放下的部分"，
-    // 使得拖动时立刻能看到效果，且开销与全书大小无关 —— 这是手机上不卡的关键。
     function repaginateCurrentPageOnly() {
       const book = state.currentBook;
       if (!book || book.format === 'PDF' || !book.pages) return;
       const mode = state.readerConfig.viewMode;
-      if (mode === 'scroll') { renderReaderPages(); return; }  // 卷轴不需要分页
+      if (mode === 'scroll') { renderReaderPages(); return; }
       const leaf = $('page-left');
       const measure = $('page-measure-box');
       if (!leaf) return;
@@ -3200,8 +3096,6 @@
       const col = $('m-cur');
 
       const idx = state.currentPageIndex;
-      const blocks = (book.pages[idx] || []).slice();
-      // 从当前页往后多取一些块，保证字号变小时能把后续内容补进本页
       const flat = [];
       for (let i = idx; i < book.pages.length && flat.length < 60; i++) flat.push(...book.pages[i]);
 
@@ -3224,7 +3118,6 @@
 
       if (out.length) {
         book.pages[idx] = out;
-        // 该页原后续内容若被吃掉，暂不重新分配全书（松手后会做完整分页）
       }
       renderReaderPages();
     }
@@ -3263,14 +3156,17 @@
 
       if (mode === 'scroll') {
         pL.innerHTML = `<div style="font-size:var(--reader-font-size);letter-spacing:var(--reader-letter-spacing);line-height:1.72;">${(book.rawBlocks || []).map(blockHtml).join('')}</div>`;
+        pR.innerHTML = '';
         applyNoteHighlights(pL);
       } else {
         const renderLeaf = idx => `<div style="font-size:var(--reader-font-size);letter-spacing:var(--reader-letter-spacing);line-height:1.72;">${((book.pages && book.pages[idx]) || []).map(blockHtml).join('')}</div>`;
         pL.innerHTML = renderLeaf(state.currentPageIndex);
-        applyNoteHighlights(pL);
         if (mode === 'dual') {
           pR.innerHTML = renderLeaf(state.currentPageIndex + 1);
-          applyNoteHighlights(pR);
+          applyNoteHighlights($('reader-content-viewport'));
+        } else {
+          pR.innerHTML = '';
+          applyNoteHighlights(pL);
         }
       }
     }
@@ -3283,10 +3179,10 @@
       if (next < 0) return showToast('已经是第一页');
       if (next >= total) return showToast('已经是最后一页');
       state.currentPageIndex = next;
+      hideSelectionPopover();
       renderReaderPages();
     }
 
-    // 纯自定义配色（点击0ms生效，取消选中恢复原书配色）
     function renderColorSwatches() {
       const cfg = state.readerConfig;
       const buildGroup = (containerId, listKey, activeKey, pickerId, emptyNotice) => {
@@ -3313,7 +3209,7 @@
             cfg[activeKey] = selected ? null : color;
             if (selected) showToast(emptyNotice);
             savePrefs();
-            applyThemeColors(); // 0ms 纯变量修改，不引起重新排版
+            applyThemeColors();
             renderColorSwatches();
           };
           wrap.querySelector('.del-swatch').onclick = e => {
@@ -3334,18 +3230,16 @@
 
     // ==================== 事件监听绑定与初始化 ====================
     window.addEventListener('DOMContentLoaded', async () => {
+      bindImageFallback();
       loadPrefs();
       state.books = await loadAllBooksDB();
-      // 笔记独立存储，与书籍数据分开加载
       state.notes = await loadAllNotesDB();
 
-      // 恢复上次导入的本地字体（存在 IndexedDB，刷新后依然可用）
       state.localFonts = await loadAllLocalFonts();
       state.localFonts.forEach(rec => {
         state.fontMap[rec.id] = `'${rec.family}', 'PingFang SC', 'Microsoft YaHei', sans-serif`;
         registerLocalFontFace(rec);
       });
-      // 自愈：上次选的本地字体已被删除 / 数据丢失时回落到默认字体，避免整段文字变默认衬线
       if (state.readerConfig.fontFamily && !state.fontMap[state.readerConfig.fontFamily]) {
         state.readerConfig.fontFamily = 'yeliqun';
         savePrefs();
@@ -3371,8 +3265,6 @@
           <input id="rng-${d.key}" type="range" min="${d.min}" max="${d.max}" step="${d.step}" value="${val}" class="onereader-slider" />`;
         sBox.appendChild(div);
 
-        // 拖动滑块时只做"轻量重排"：仅重排当前页，避免手机上对全书逐块测量导致卡顿。
-        // 松手(onchange)后再做一次完整分页，保证页数/章节位置准确。
         div.querySelector('input').oninput = e => {
           const v = Number(e.target.value);
           state.readerConfig[d.key] = v;
@@ -3383,13 +3275,12 @@
           } else {
             applyLayoutStyles();
             if (isMobile()) {
-              repaginateCurrentPageOnly();   // 拖动中：只重排当前页
+              repaginateCurrentPageOnly();
             } else {
               repaginateDebounced();
             }
           }
         };
-        // 松手：做一次完整分页，纠正页数与章节起始位置
         div.querySelector('input').onchange = () => {
           if (!d.isLayout) return;
           if (isMobile()) {
@@ -3408,14 +3299,9 @@
       updateCloudIndicator();
       updateStorageUsageDisplay();
 
-      // 全屏切换按钮（顶部正中，与四角按钮一致：靠近才浮现，不再常驻遮挡正文）
       $('reader-fullscreen-toggle').onclick = toggleReaderFullscreen;
 
       // ==================== 笔记：选中文字 -> 划线弹窗 ====================
-      // 桌面端：鼠标松开后弹窗。
-      // 移动端：长按选词/拖动手柄时，touchend 触发的那一刻选区常常还没建立完成
-      //        （系统菜单和选择手柄是异步出现的），所以不能只靠 touchend。
-      //        这里改用 selectionchange 持续监听 —— 只要选区稳定下来就弹窗。
       const handleSelectionEnd = () => {
         if ($('reader-view').classList.contains('hidden')) return;
         if (!$('note-editor-modal').classList.contains('hidden')) return;
@@ -3427,29 +3313,23 @@
         showSelectionPopover(info.rect);
       };
 
-      // 桌面：鼠标松开后判断
       document.addEventListener('mouseup', e => {
         const pop = $('selection-popover');
-        if (!pop.classList.contains('hidden') && pop.contains(e.target)) return;  // 点弹窗自身不重算
+        if (!pop.classList.contains('hidden') && pop.contains(e.target)) return;
         setTimeout(handleSelectionEnd, 10);
       });
 
-      // 移动端核心：监听 selectionchange。
-      // 长按选词、拖动蓝色选择手柄都会触发它，且触发时选区已可读。
-      // 用防抖合并连续触发，等选区稳定后再弹。
       let selChangeTimer = null;
       document.addEventListener('selectionchange', () => {
         if ($('reader-view').classList.contains('hidden')) return;
         clearTimeout(selChangeTimer);
         selChangeTimer = setTimeout(() => {
           const sel = window.getSelection();
-          if (!sel || sel.isCollapsed || !sel.toString().trim()) return;   // 选区被取消时不弹
+          if (!sel || sel.isCollapsed || !sel.toString()) return;
           handleSelectionEnd();
         }, 220);
       });
-      // 兜底：手指抬起后也试一次（部分浏览器 selectionchange 触发较晚）
       $('reader-content-viewport').addEventListener('touchend', () => setTimeout(handleSelectionEnd, 350), { passive: true });
-      // 点空白处收起弹窗（但点弹窗本身不收起）
       document.addEventListener('mousedown', e => {
         const pop = $('selection-popover');
         if (pop.classList.contains('hidden')) return;
@@ -3462,6 +3342,7 @@
         if (!pendingSelection) return;
         hideSelectionPopover();
         const book = state.currentBook;
+        const now = Date.now();
         const note = {
           id: newNoteId(),
           bookFile: book ? book.fileName : '',
@@ -3471,8 +3352,9 @@
           content: '',
           color: pendingSelection.color || lastNoteColor(),
           blockIndex: pendingSelection.blockIndex,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
+          createdAt: now,
+          updatedAt: now,
+          contentUpdatedAt: now,
           deletedAt: null,
           conflictOf: null
         };
@@ -3497,13 +3379,14 @@
           blockIndex: pendingSelection.blockIndex,
           createdAt: now,
           updatedAt: now,
+          contentUpdatedAt: now,
           deletedAt: null,
           conflictOf: null
         };
         state.notes.push(note);
         await putNoteDB(note);
         window.getSelection().removeAllRanges();
-        renderReaderPages();      // 立刻把高亮画上去
+        renderReaderPages();
         if (state.currentNav === 'notes') renderNotesBookFilter();
         showToast('已添加摘抄');
       };
@@ -3526,14 +3409,13 @@
       $('note-editor-delete').onclick = () => {
         if (!editingNote) return;
         const existing = state.notes.find(n => n.id === editingNote.id);
-        if (!existing) { closeNoteEditor(); return; }   // 还没落库，直接关掉
+        if (!existing) { closeNoteEditor(); return; }
         removeEditedNote();
       };
       $('note-editor-modal').onclick = e => {
         if (e.target === $('note-editor-modal')) closeNoteEditor();
       };
 
-      // 移动端：点屏幕中央唤出控制条后，6 秒无操作自动收起，避免长期盖住正文
       let mobileCtrlTimer = null;
       const autoHideMobileControls = () => {
         clearTimeout(mobileCtrlTimer);
@@ -3578,10 +3460,8 @@
         $('shelf-items-container').classList.toggle('hidden');
         $('shelf-chevron').classList.toggle('-rotate-90');
       };
+
       // ==================== 书库搜索：显式提交 ====================
-      // 不再监听 input 做即时过滤。浏览器自动填充在"确认"时会触发 input/change，
-      // 一旦把它当搜索指令，点页面任何位置确认填充就等于"搜索了仓库名"，书库被过滤成空。
-      // 现在只有「按回车」或「点放大镜」才真正执行搜索。
       const libSearch = $('library-search-input');
 
       function applyLibrarySearch() {
@@ -3605,10 +3485,8 @@
       }
 
       if (libSearch) {
-        // 输入过程中只做视觉维护，绝不改变书库显示
         libSearch.addEventListener('input', () => {
           const chip = $('library-search-chip');
-          // 用户手动清空输入框时，同时清掉已生效的搜索，避免"框空了还在筛"
           if (libSearch.value.trim() === '' && state.searchQuery) {
             state.searchQuery = '';
             if (chip) chip.classList.add('hidden');
@@ -3620,16 +3498,15 @@
           if (e.key === 'Enter') {
             e.preventDefault();
             applyLibrarySearch();
-            libSearch.blur();          // 收起焦点，避免锁在搜索框
+            libSearch.blur();
           } else if (e.key === 'Escape') {
             libSearch.value = '';
             clearLibrarySearch();
             libSearch.blur();
           }
-          e.stopPropagation();          // 不触发阅读器的方向键/空格逻辑
+          e.stopPropagation();
         });
 
-        // 失焦时丢弃自动填充塞进来的值（不是用户主动搜索，不应用）
         libSearch.addEventListener('blur', () => {
           if (libSearch.value && document.activeElement !== libSearch) {
             if (libSearch.value.trim() !== state.searchQuery) {
@@ -3642,7 +3519,6 @@
       $('library-search-btn').onclick = applyLibrarySearch;
       $('library-search-chip').onclick = clearLibrarySearch;
 
-      // 初始化：一开始没有任何搜索条件
       state.searchQuery = '';
       if (libSearch) libSearch.value = '';
 
@@ -3692,13 +3568,11 @@
       };
       $('purge-all-cache-btn').onclick = purgeAllLocalCache;
 
-      // 导入（仅本地）
       $('hub-import-local-btn').onclick = () => {
         $('cloud-hub-modal').classList.add('hidden');
         pendingUploadToCloud = false;
         $('file-upload-input').click();
       };
-      // 云导入（本地 + 上传到私有仓），仅连接仓库后可用
       $('hub-import-cloud-btn').onclick = () => {
         if (!isCloudConnected()) return showToast('请先连接私有仓');
         $('cloud-hub-modal').classList.add('hidden');
@@ -3720,7 +3594,6 @@
         e.target.value = '';
       };
 
-      // 单书 ••• 菜单
       const closeBookMenu = () => {
         $('book-action-popover').classList.add('hidden');
         $('book-action-backdrop').classList.add('hidden');
@@ -3761,7 +3634,6 @@
         const bk = state.books.find(b => b.id === state.activeMenuBookId);
         if (bk) { bk.pinned = !bk.pinned; saveBookDB(bk); renderLibrary(); }
       };
-      // 释放单本书的本地空间
       $('book-act-purge-one').onclick = async () => {
         closeBookMenu();
         const bk = state.books.find(b => b.id === state.activeMenuBookId);
@@ -3785,7 +3657,6 @@
           showToast(`已删除《${removed.title}》`);
         }
       };
-      // 云删除：同时删除阅读器上的图书与私有仓里的对应文件
       $('book-act-cloud-delete').onclick = async () => {
         closeBookMenu();
         if (!isCloudConnected()) return showToast('请先连接私有仓');
@@ -3804,7 +3675,6 @@
         }
       };
 
-      // 批量栏
       $('batch-add-shelf-btn').onclick = () => openAssignModal(Array.from(state.selectedBookIds));
       $('batch-pin-btn').onclick = () => {
         state.books.forEach(b => { if (state.selectedBookIds.has(b.id)) { b.pinned = true; saveBookDB(b); } });
@@ -3819,9 +3689,7 @@
       };
       $('batch-exit-btn').onclick = () => { state.multiSelectMode = false; state.selectedBookIds.clear(); renderLibrary(); };
 
-      // 返回主页与设置抽屉
       $('reader-home-trigger').onclick = () => {
-        // 返回书库前先退出全屏，避免书库主页停留在放大状态
         exitFullscreenIfAny();
         $('reader-view').classList.add('hidden');
         $('library-view').classList.remove('hidden');
@@ -3834,8 +3702,6 @@
       const closeDrawer = () => {
         $('reader-settings-drawer').classList.add('translate-x-full');
         $('settings-backdrop').classList.add('hidden');
-        // 关闭设置面板时补一次完整分页：拖动过程中手机上只重排了当前页，
-        // 这里把全书页数与章节起始位置重新算准（离开面板后执行，不影响操作手感）
         if (state.currentBook) {
           setTimeout(() => {
             repaginate();
@@ -3846,18 +3712,14 @@
       $('close-settings-drawer-btn').onclick = closeDrawer;
       $('settings-backdrop').onclick = closeDrawer;
 
-      // 目录 / 书签面板
-      // 左侧按钮：点一下打开，再点一下关闭
       $('reader-toc-trigger').onclick = () => {
         if ($('reader-toc-drawer').classList.contains('-translate-x-full')) openTocDrawer();
         else closeTocDrawer();
       };
-      // 面板关闭按钮已按图 1 移除：点遮罩、点目录/书签项（自动关闭）、或再点左侧按钮关闭
       $('toc-backdrop').onclick = closeTocDrawer;
       $('toc-tab-toc').onclick = () => { state.tocTab = 'toc'; updateTocTabs(); renderTocList(); };
       $('toc-tab-bm').onclick = () => { state.tocTab = 'bm'; updateTocTabs(); renderTocList(); };
 
-      // 全书搜索
       $('toc-search-open').onclick = openTocSearch;
       $('toc-search-close').onclick = closeTocSearch;
       $('toc-search-input').oninput = () => runTocSearch();
@@ -3874,13 +3736,10 @@
         if (!book) return;
         book.bookmarks = book.bookmarks || [];
         let page = state.currentPageIndex;
-        // 双页模式下右页只是"配对页"，统一归到左页记录；
-        // 若当前页是对齐用的空页，则挂到上一页，避免书签落在空白页上
         if (state.readerConfig.viewMode === 'dual' && page % 2 === 1) page = page - 1;
         const isEmpty = pg => !pg || pg.length === 0 || !pg.some(b => b.text);
         if (isEmpty(book.pages && book.pages[page]) && page > 0) page = page - 1;
         if (book.bookmarks.some(m => m.page === page)) return showToast('当前页已在书签中');
-        // 用该页首块文字作为书签标签，便于识别
         const pageBlocks = (book.pages && book.pages[page]) || [];
         const first = pageBlocks.find(b => b.text);
         book.bookmarks.push({
@@ -3904,7 +3763,6 @@
         };
       });
 
-      // 颜色增删与清除（0ms 直接作用于 CSS 变量）
       $('native-bg-picker').onchange = e => {
         const hex = e.target.value;
         if (!state.readerConfig.customBgColors.includes(hex)) state.readerConfig.customBgColors.push(hex);
@@ -3935,7 +3793,6 @@
         savePrefs(); applyLayoutStyles(); repaginate(); renderReaderPages();
       };
 
-      // 【修复】本地字体按钮此前完全没有绑定事件，点击无反应
       $('import-local-font-btn').onclick = () => $('font-upload-input').click();
       $('font-upload-input').onchange = async e => {
         const file = e.target.files && e.target.files[0];
@@ -3944,48 +3801,37 @@
       };
 
       // ==================== 全能翻页：键盘、滚轮、触屏滑动 ====================
-      // 两角翻页按钮已移除（键盘/滚轮/滑动/点击两侧已足够）
-
-      // 1. 鼠标滚轮防抖翻页（上滚上一页，下滚下一页）
-      // 卷轴模式下交给浏览器原生滚动，不拦截滚轮
       let lastWheelTime = 0;
       window.addEventListener('wheel', e => {
         if ($('reader-view').classList.contains('hidden')) return;
         if (state.readerConfig.viewMode === 'scroll') return;
         const now = Date.now();
-        if (now - lastWheelTime < 240) return; // 240ms 节流防连跳
+        if (now - lastWheelTime < 240) return;
         if (Math.abs(e.deltaY) > 20) {
           lastWheelTime = now;
           turnPage(e.deltaY > 0 ? 1 : -1);
         }
       }, { passive: true });
 
-      // 2. 键盘全方向键支持（上/左 = 上翻，下/右/空格 = 下翻）
       window.addEventListener('keydown', e => {
         if ($('reader-view').classList.contains('hidden')) return;
         if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) turnPage(-1);
         if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(e.key)) turnPage(1);
       });
 
-      // 3. 手机端触屏滑动适配（左划下翻，右划上翻）
       let touchStartX = 0, touchStartY = 0, touchStartTime = 0;
-      let wasLongPress = false;
       $('reader-content-viewport').addEventListener('touchstart', e => {
         touchStartX = e.touches[0].clientX;
         touchStartY = e.touches[0].clientY;
         touchStartTime = Date.now();
-        wasLongPress = false;
       }, { passive: true });
 
       $('reader-content-viewport').addEventListener('touchend', e => {
-        // 长按（选词）后不要当成点击：否则会误触发翻页/唤出控制条，把选区弄乱
         const held = Date.now() - touchStartTime;
         if (held > 350) return;
-        // 已有选区时也不处理（用户正在选字）
         if (window.getSelection().toString()) return;
         const dx = e.changedTouches[0].clientX - touchStartX;
         const dy = e.changedTouches[0].clientY - touchStartY;
-        // 卷轴模式：竖直滑动交给原生滚动，只有"点一下中央"用来唤出控制条
         if (state.readerConfig.viewMode === 'scroll') {
           if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
             const v = $('reader-view');
@@ -3995,11 +3841,9 @@
           }
           return;
         }
-        // 水平滑动位移显著大于垂直滑动且超过 40px
         if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
-          turnPage(dx < 0 ? 1 : -1); // 左滑(dx<0)下翻，右滑(dx>0)上翻
+          turnPage(dx < 0 ? 1 : -1);
         } else if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
-          // 点击屏幕中央唤出边角控制条，点击左右两侧直接翻页
           const x = e.changedTouches[0].clientX, w = window.innerWidth;
           if (x < w * 0.25) turnPage(-1);
           else if (x > w * 0.75) turnPage(1);
