@@ -1473,25 +1473,73 @@
     }
 
     // ==================== 笔记：选中文字 -> 划线弹窗 ====================
-    // 限制在单个块内：跨块的选区只截取起点所在的块，避免定位不可靠
+    // 规则：选到哪摘到哪，一个字符不多、一个字符不少。
+    //   1) 只要选区起终点都在 #reader-content-viewport（阅读正文区）内就放行，
+    //      单页、双页横跨一律允许，不再做跨页/跨段拦截。
+    //   2) 用 range.cloneContents() 取真实 DOM 片段，只剔除 #dual-page-spine
+    //      分割线；跨段落处补一个换行，段内文字原样保留（不压缩空白）。
+    //   3) 高亮与跳转见 applyNoteHighlights / jumpToNote，均按「整页文本 + 字符映射」处理。
+    const BLOCK_TAGS = ['P', 'H2', 'H3', 'LI'];
+
+    // 把选区克隆出的片段转成纯文本：
+    // - 空行分割线之类的非正文节点整块跳过
+    // - 块级元素之间补 '\n'，块内文字逐字保留
+    function fragmentToQuote(frag) {
+      let out = '';
+      const pushBreak = () => { if (out && !out.endsWith('\n')) out += '\n'; };
+      const walk = node => {
+        if (node.nodeType === 3) {                       // 文本节点：原样追加
+          out += node.nodeValue;
+          return;
+        }
+        if (node.nodeType !== 1) return;
+        const el = node;
+        // 剔除非正文元素：双页分割线、图片、测量盒、隐藏节点
+        if (el.id === 'dual-page-spine') return;
+        if (el.id === 'page-measure-box') return;
+        if (['IMG', 'BR', 'CANVAS', 'SCRIPT', 'STYLE'].includes(el.tagName)) {
+          if (el.tagName === 'BR') pushBreak();
+          return;
+        }
+        const isBlock = BLOCK_TAGS.includes(el.tagName)
+          || ['DIV', 'SECTION', 'ARTICLE', 'BLOCKQUOTE'].includes(el.tagName);
+        if (isBlock) pushBreak();
+        el.childNodes.forEach(walk);
+        if (isBlock) pushBreak();
+      };
+      frag.childNodes.forEach(walk);
+      // 去掉首尾多余的换行，内部换行（段落边界）保留
+      return out.replace(/^\n+/, '').replace(/\n+$/, '');
+    }
+
     function captureSelection() {
       const sel = window.getSelection();
       if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
-      const text = sel.toString().replace(/\s+/g, ' ').trim();
-      if (!text || text.length < 2) return null;
 
       const range = sel.getRangeAt(0);
-      const leafL = $('page-left'), leafR = $('page-right');
-      const inL = leafL && leafL.contains(range.commonAncestorContainer);
-      const inR = leafR && leafR.contains(range.commonAncestorContainer);
-      const leaf = inL ? leafL : (inR ? leafR : null);
-      if (!leaf) return null;
+      const viewport = $('reader-content-viewport');
+      if (!viewport) return null;
 
-      // 找到选区起点所在的最内层块元素（p / h2 / li）
-      let node = range.startContainer;
-      while (node && node !== leaf && !['P', 'H2', 'H3', 'LI'].includes(node.tagName)) node = node.parentElement;
+      // ---- 放行判定：起终点都在阅读正文区内即可（含横跨双页）----
+      const inViewport = node => {
+        if (!node) return false;
+        const el = node.nodeType === 1 ? node : node.parentElement;
+        return Boolean(el && viewport.contains(el));
+      };
+      if (!inViewport(range.startContainer) || !inViewport(range.endContainer)) return null;
 
-      // 取矩形：优先用 range 的外接矩形；某些移动浏览器会返回全零，退化为逐行矩形
+      // ---- 一字不差提取：克隆片段 -> 纯文本（保留段落换行）----
+      let quote = '';
+      try {
+        quote = fragmentToQuote(range.cloneContents());
+      } catch (e) {
+        quote = range.toString();        // 极端情况退回浏览器文本
+      }
+      // 去掉首尾空白判断有效性，但内容本身不做压缩
+      if (!quote.trim() || quote.trim().length < 2) return null;
+
+      // ---- 弹窗定位 ----
+      // 跨页时 range 外接矩形可能横跨两页，取起点所在页的可见位置更稳妥
       let rect = range.getBoundingClientRect();
       if (!rect || (!rect.width && !rect.height)) {
         const rects = range.getClientRects();
@@ -1505,30 +1553,42 @@
           if (isFinite(left)) rect = { left, top, right, bottom, width: right - left, height: bottom - top };
         }
       }
-      if (!rect || (!rect.width && !rect.height)) return null;
-
-      // 限定在起点所在的块内取文字：跨块时只保留本块的那部分，
-      // 这样定位可靠（跨块无法精确还原选区）
-      let quote = text;
-      if (node && node !== leaf) {
-        const startEl = node;
-        // 用 Range 重新截取「起点块内」的文字
-        try {
-          const r2 = document.createRange();
-          r2.setStart(range.startContainer, range.startOffset);
-          // 终点取该块末尾
-          r2.setEndAfter(startEl);
-          const blockPart = r2.toString().replace(/\s+/g, ' ').trim();
-          if (blockPart && blockPart.length >= 2) quote = blockPart;
-        } catch (e) { /* 失败则保留整段 */ }
+      if (!rect || (!rect.width && !rect.height)) {
+        // 兜底：用起点所在页可视区域
+        const el = range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentElement;
+        const pageEl = el && el.closest && el.closest('#page-left, #page-right');
+        const ar = pageEl && pageEl.getBoundingClientRect();
+        if (ar && ar.width) rect = { left: ar.left + 16, top: ar.top + ar.height / 2, right: ar.left + 16, bottom: ar.top + ar.height / 2, width: 0, height: 0 };
+        else return null;
       }
 
+      // ---- 定位块：用于章节推断（取起点所在的块）----
+      let startEl = range.startContainer;
+      while (startEl && startEl !== viewport && !(startEl.nodeType === 1 && BLOCK_TAGS.includes(startEl.tagName))) {
+        startEl = startEl.parentElement;
+      }
+      if (startEl === viewport) startEl = null;
+
+      // ---- blockIndex：跨段/跨页时整串找不到，按首个片段定位 ----
       const book = state.currentBook;
       const norm = s => String(s || '').replace(/\s+/g, ' ').trim();
       let idx = -1;
       if (book) {
-        idx = (book.rawBlocks || []).findIndex(b => b.type !== 'img' && norm(b.text).includes(quote));
-        if (idx < 0) idx = (book.rawBlocks || []).findIndex(b => b.type !== 'img' && norm(b.text).includes(quote.slice(0, 12)));
+        const blocks = book.rawBlocks || [];
+        const flat = norm(quote);
+        idx = blocks.findIndex(b => b.type !== 'img' && norm(b.text).includes(flat));
+        if (idx < 0) {
+          // 按换行切片：取第一个足够长的片段作为锚点
+          const pieces = quote.split('\n').map(norm).filter(p => p.length >= 4);
+          for (const p of pieces) {
+            idx = blocks.findIndex(b => b.type !== 'img' && norm(b.text).includes(p));
+            if (idx >= 0) break;
+          }
+        }
+        if (idx < 0 && startEl) {
+          const head = norm(startEl.textContent).slice(0, 12);
+          if (head) idx = blocks.findIndex(b => b.type !== 'img' && norm(b.text).includes(head));
+        }
       }
 
       return { quote, blockIndex: idx, rect };
@@ -1552,10 +1612,23 @@
         const norm = s => String(s || '').replace(/\s+/g, ' ').trim();
         const target = norm(note.quote);
 
-        // 定位优先级：块文本完全包含 > 前 12 字匹配 > 章节
+        // 定位优先级：整串命中 > 段落切片命中 > 前 12 字 > 章节。
+        // 跨段/跨页摘抄的 quote 含换行，整串不会出现在任何单个 block.text 里，
+        // 所以必须按段落切片逐片尝试，才能精确定位到起点段。
         let blockIdx = -1;
         if (target) {
           blockIdx = blocks.findIndex(b => b.type !== 'img' && norm(b.text).includes(target));
+          if (blockIdx < 0) {
+            // 按换行切片，从第一片开始找（第一片就是摘抄起点所在段）
+            const pieces = String(note.quote || '')
+              .split('\n')
+              .map(norm)
+              .filter(p => p.length >= 4);
+            for (const p of pieces) {
+              blockIdx = blocks.findIndex(b => b.type !== 'img' && norm(b.text).includes(p));
+              if (blockIdx >= 0) break;
+            }
+          }
           if (blockIdx < 0) {
             const head = target.slice(0, 12);
             blockIdx = blocks.findIndex(b => b.type !== 'img' && norm(b.text).includes(head));
@@ -1583,9 +1656,28 @@
 
     // ==================== 笔记：高亮渲染 ====================
     // 打开书 / 翻页后，把这本书的笔记按颜色高亮到对应文字上。
-    // 跳转本身没有任何特效——高亮是常驻的。
-    // 实现要点：每个块先算出所有命中区间，再从后往前统一包裹。
-    // 这样不会出现"包了第一条把文本节点拆断，导致第二条匹配失败或重复包裹"。
+    // 摘抄可能跨段落、跨页，所以不能再用「单块内 indexOf」那套。
+    // 做法：
+    //   1) 把一个渲染叶（page-left / page-right，卷轴模式则整篇）的块级元素
+    //      拼成一段「整页文本」，块之间用 '\n' 连接，并记录每个字符属于哪个块、
+    //      块内偏移是多少（字符映射）。
+    //   2) 把笔记 quote 按 '\n' 切成段落片段，逐片在整页文本里匹配；
+    //      整串匹配优先，失败再逐片段匹配。
+    //   3) 命中区间映射回具体块 + 块内偏移，再逐块从后往前包裹 <mark>。
+    // 这样跨段摘抄会在每段都亮，跨页摘抄在左右两页各自亮各自的部分。
+    function buildLeafTextMap(root) {
+      const blocks = Array.from(root.querySelectorAll('p, h2, h3, li'));
+      const map = [];        // 每个字符: { el, offsetInEl }
+      let text = '';
+      blocks.forEach((el, bi) => {
+        if (bi > 0) { text += '\n'; map.push(null); }   // 块间换行，不映射到具体字符
+        const t = el.textContent;
+        for (let i = 0; i < t.length; i++) map.push({ el, offset: i });
+        text += t;
+      });
+      return { text, map, blocks };
+    }
+
     function applyNoteHighlights(root) {
       if (!root) return;
       const book = state.currentBook;
@@ -1593,37 +1685,86 @@
       const list = notesOfBook(book).filter(n => n.quote);
       if (!list.length) return;
 
-      const blocks = root.querySelectorAll('p, h2, h3, li');
-      const doneNotes = new Set();   // 同一笔记在同一页只高亮一次
-      blocks.forEach(el => {
-        if (el.querySelector('mark[data-note-id]')) return;   // 已处理过，避免重复渲染
-        const raw = el.textContent;
-        if (!raw || raw.length < 2) return;
+      const { text, map } = buildLeafTextMap(root);
+      if (!text) return;
 
-        const taken = [];
-        const hits = [];
-        list.slice()
-          .sort((a, b) => (b.quote || '').length - (a.quote || '').length)
-          .forEach(n => {
-            if (doneNotes.has(n.id)) return;
-            const needle = n.quote.replace(/\s+/g, ' ').trim();
-            if (needle.length < 2) return;
+      // 已占用的字符区间，避免不同笔记重叠包裹
+      const taken = [];
+      // 元素 -> [{ at, end, note }]，最终逐块从后往前包裹
+      const perBlock = new Map();
+
+      // 把一个「整页文本区间」拆成按块分段的块内区间，登记到 perBlock
+      const markRange = (from, end, note) => {
+        let i = from;
+        while (i < end) {
+          const m = map[i];
+          if (!m) { i++; continue; }               // 跳过块间换行
+          const el = m.el;
+          const startOff = m.offset;
+          let j = i;
+          while (j < end && map[j] && map[j].el === el) j++;
+          const endOff = map[j - 1].offset + 1;
+          if (endOff > startOff) {
+            if (!perBlock.has(el)) perBlock.set(el, []);
+            perBlock.get(el).push({ at: startOff, end: endOff, note });
+          }
+          i = j;
+        }
+      };
+
+      list.slice()
+        .sort((a, b) => (b.quote || '').length - (a.quote || '').length)
+        .forEach(n => {
+          // 段落切片：整页文本用 '\n' 连接块，所以 quote 也按 '\n' 切。
+          // 整串（含 '\n'）优先匹配，命中就说明是完整的一段连续选区；
+          // 命中失败再逐片段匹配，让跨段摘抄在每段各自亮起来。
+          const rawQuote = String(n.quote || '');
+          const whole = rawQuote.trim();
+          if (!whole || whole.length < 2) return;
+          const pieces = rawQuote.split('\n')
+            .map(s => s.trim())
+            .filter(s => s.length >= 2);
+
+          let matchedWhole = false;
+          const needles = [whole];
+          // 整串先试一次；成功后不再用片段，避免重复包裹
+          for (const needle of needles) {
+            if (needle.length < 2) continue;
             let from = 0;
-            while (from <= raw.length - needle.length) {
-              const at = raw.indexOf(needle, from);
+            while (from <= text.length - needle.length) {
+              const at = text.indexOf(needle, from);
               if (at < 0) break;
               const end = at + needle.length;
-              if (!taken.some(([s, e]) => at < e && s < end)) {
-                taken.push([at, end]);
-                hits.push({ at, end, note: n });
-                break;              // 同一笔记在同一块内只高亮一次
-              }
+              if (taken.some(([s, e]) => at < e && s < end)) { from = at + 1; continue; }
+              const s0 = map[at];
+              if (!s0) { from = at + 1; continue; }
+              taken.push([at, end]);
+              matchedWhole = true;
+              markRange(at, end, n);
               from = at + 1;
             }
-          });
-        if (!hits.length) return;
+          }
+          if (matchedWhole) return;
 
-        // 从后往前包裹，前面区间的偏移不受影响
+          for (const needle of pieces) {
+            if (needle.length < 2) continue;
+            let from = 0;
+            while (from <= text.length - needle.length) {
+              const at = text.indexOf(needle, from);
+              if (at < 0) break;
+              const end = at + needle.length;
+              if (taken.some(([s, e]) => at < e && s < end)) { from = at + 1; continue; }
+              const s0 = map[at];
+              if (!s0) { from = at + 1; continue; }
+              taken.push([at, end]);
+              markRange(at, end, n);
+              from = at + 1;
+            }
+          }
+        });
+
+      // 逐块从后往前包裹，前面偏移不受影响
+      perBlock.forEach((hits, el) => {
         hits.sort((a, b) => b.at - a.at).forEach(h => {
           try {
             const sp = locateOffset(el, h.at);
@@ -1640,7 +1781,6 @@
             mark.style.cursor = 'pointer';
             mark.onclick = () => openNoteEditor(h.note);
             range.surroundContents(mark);
-            doneNotes.add(h.note.id);
           } catch (e) { /* 极端情况跳过，不影响其它高亮 */ }
         });
       });
