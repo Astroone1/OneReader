@@ -37,6 +37,15 @@
     }
     @keyframes cloudPulse { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
     .cloud-btn-hover:hover svg .cloud-arrow { animation: cloudPulse 1.2s ease-in-out infinite; }
+    /* 云同步进行中：图标缓慢旋转，代替原来的文字状态 */
+    @keyframes noteSyncSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    #notes-sync-btn.is-syncing svg { animation: noteSyncSpin 1.4s linear infinite; }
+    /* 笔记正文描边：叶立群几何体本身偏细，用极轻的描边增加笔画厚度，
+       且不影响字重（不用 bold，避免变成艺术字） */
+    .note-card-text {
+      -webkit-text-stroke: 0.35px currentColor;
+      text-shadow: 0.2px 0 0 currentColor, -0.2px 0 0 currentColor;
+    }
     @media (max-width: 768px) {
       #library-sidebar { position: fixed; inset: 0 auto 0 0; z-index: 45; background: #fff; box-shadow: 4px 0 24px rgba(0,0,0,.14); transition: transform .22s ease; }
       #library-sidebar.mobile-closed { transform: translateX(-100%); }
@@ -90,6 +99,10 @@
               <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10.5L12 3l9 7.5V20a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1v-9.5z"/></svg>
               <span>全部图书</span>
             </button>
+            <button type="button" data-nav="notes" class="nav-item w-full flex items-center gap-4 pl-6 pr-4 py-3 rounded-r-full text-neutral-700 hover:bg-neutral-100 text-[15px] transition cursor-pointer">
+              <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5.5A1.5 1.5 0 015.5 4H9v16H5.5A1.5 1.5 0 014 18.5v-13z"/><path stroke-linecap="round" stroke-linejoin="round" d="M9 4h9.5A1.5 1.5 0 0120 5.5v13a1.5 1.5 0 01-1.5 1.5H9"/><path stroke-linecap="round" stroke-linejoin="round" d="M12.5 9h4M12.5 13h4"/></svg>
+              <span>我的笔记</span>
+            </button>
           </nav>
 
           <div class="pt-4">
@@ -124,6 +137,38 @@
         </div>
         <div id="books-grid-container" class="hidden">
           <div id="books-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-6 gap-y-8"></div>
+        </div>
+
+        <!-- 我的笔记 -->
+        <div id="notes-view" class="hidden">
+          <!-- 这一栏与左侧「全部图书」平高：
+               用负外边距抵消 main 的 pt-6/sm:pt-8，再用固定行高 h-[47px] 与左栏按钮等高，
+               这样右侧控件与左侧导航处在同一条水平线上 -->
+          <div class="flex items-center justify-end gap-2 -mt-6 sm:-mt-8 h-[47px] mb-4">
+            <label class="text-sm text-neutral-500">按图书筛选</label>
+            <select id="notes-book-filter" class="h-9 px-2.5 rounded-lg border border-neutral-300 bg-white text-sm text-neutral-700 focus:outline-none cursor-pointer max-w-[240px]">
+              <option value="">请选择</option>
+            </select>
+            <button id="notes-sync-btn" type="button" title="与私有仓同步笔记" class="w-9 h-9 flex items-center justify-center rounded-lg border border-neutral-300 hover:bg-neutral-100 text-neutral-600 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+              <svg class="w-[19px] h-[19px]" viewBox="0 0 40 32" fill="none">
+                <path d="M11.5 26.5H29.5C33.6421 26.5 37 23.1421 37 19C37 15.203 34.1783 12.065 30.514 11.568C29.389 6.657 25.002 3 19.75 3C13.675 3 8.75 7.925 8.75 14C8.75 14.389 8.77 14.773 8.81 15.151C5.534 15.792 3 18.678 3 22.15C3 24.552 4.948 26.5 7.35 26.5H11.5Z" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="rgba(59,59,59,0.03)"/>
+                <g stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M16.5 19.5V12.5M16.5 12.5L13.8 15.2M16.5 12.5L19.2 15.2"/>
+                  <path d="M23.5 13.5V20.5M23.5 20.5L20.8 17.8M23.5 20.5L26.2 17.8"/>
+                </g>
+              </svg>
+            </button>
+            <button id="notes-export-btn" type="button" title="导出全部笔记为 HTML" class="w-9 h-9 flex items-center justify-center rounded-lg border border-neutral-300 hover:bg-neutral-100 text-neutral-600 transition cursor-pointer">
+              <svg class="w-[19px] h-[19px]" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                <path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/>
+              </svg>
+            </button>
+          </div>
+          <div id="notes-grid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-5 gap-y-5"></div>
+          <div id="notes-empty" class="hidden mt-16 text-center text-[#9e9e9e]">
+            <p class="text-[20px]">还没有笔记</p>
+            <p class="mt-2 text-[15px]">打开一本书，选中文字即可添加笔记</p>
+          </div>
         </div>
       </main>
 
@@ -179,13 +224,13 @@
 
         <div>
           <label class="block text-neutral-700 mb-1">GitHub 用户名 (Owner)</label>
-          <input id="gh-owner-input" type="text" value="" placeholder="输入 GitHub 用户名 (如 Astroone1)" autocomplete="off" class="w-full h-10 px-3.5 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-neutral-700" />
+          <input id="gh-owner-input" type="text" value="" placeholder="GitHub 用户名" autocomplete="off" class="w-full h-10 px-3.5 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-neutral-700" />
         </div>
 
         <div class="grid grid-cols-3 gap-2.5">
           <div class="col-span-2">
             <label class="block text-neutral-700 mb-1">私有仓库名 (Repo)</label>
-            <input id="gh-repo-input" type="text" value="" placeholder="输入仓库名 (如 OneReader-Book)" autocomplete="off" class="w-full h-10 px-3.5 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-neutral-700" />
+            <input id="gh-repo-input" type="text" value="" placeholder="仓库名" autocomplete="off" class="w-full h-10 px-3.5 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-neutral-700" />
           </div>
           <div>
             <label class="block text-neutral-700 mb-1">分支 (Branch)</label>
@@ -196,7 +241,7 @@
         <div>
           <label class="block text-neutral-700 mb-1">细粒度访问令牌 (Fine-grained Token)</label>
           <div class="relative">
-            <input id="gh-token-input" type="password" value="" placeholder="粘贴 github_pat_... 密钥" autocomplete="off" class="w-full h-10 pl-3.5 pr-14 rounded-xl border border-neutral-300 text-sm font-mono focus:outline-none focus:border-neutral-700" />
+            <input id="gh-token-input" type="password" value="" placeholder="粘贴 Token 密钥" autocomplete="off" class="w-full h-10 pl-3.5 pr-14 rounded-xl border border-neutral-300 text-sm font-mono focus:outline-none focus:border-neutral-700" />
             <button id="toggle-token-vis-btn" type="button" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-neutral-500 hover:text-black px-1.5 py-0.5 rounded cursor-pointer">显示</button>
           </div>
         </div>
@@ -297,31 +342,31 @@
     <div class="relative flex-1 w-full h-full p-0 sm:p-[6px] bg-[#dcd7cc] overflow-hidden flex items-center justify-center">
       <div id="book-stage" class="relative w-full h-full border border-[#bfbab0] overflow-hidden flex flex-col transition-colors duration-150" style="background-color: var(--reader-bg); color: var(--reader-text); filter: brightness(var(--reader-brightness));">
         
-        <!-- 顶部正中沉浸全屏切换：与四角按钮同款「靠近才浮现」感应区，平时完全透明不遮挡正文 -->
-        <div id="fs-sense-zone" class="group absolute top-0 left-1/2 -translate-x-1/2 w-36 h-16 z-30 flex items-start justify-center p-2.5">
-          <button id="reader-fullscreen-toggle" type="button" title="切换沉浸全屏" class="corner-float-btn opacity-0 group-hover:opacity-100 transition-all duration-150 px-3 py-1 rounded-full bg-black/[0.06] hover:bg-black/[0.14] active:scale-95 text-[#4a4239] hover:text-black flex items-center gap-1.5 text-xs backdrop-blur-sm cursor-pointer shadow-sm">
-            <svg id="fs-icon-expand" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
-            <svg id="fs-icon-shrink" class="w-3.5 h-3.5 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4l5 5m0 0H5m4 0V5m11-1l-5 5m0 0h4m-4 0V5M4 20l5-5m0 0H5m4 0v4m11 1l-5-5m0 0h4m-4 0v4"/></svg>
-            <span class="font-sans font-medium text-[11px]">全屏</span>
+        <!-- 顶部正中沉浸全屏切换：与两角按钮同款「靠近才浮现」感应区，平时完全透明不遮挡正文 -->
+        <div id="fs-sense-zone" class="group absolute top-0 left-1/2 -translate-x-1/2 w-28 h-14 z-30 flex items-start justify-center pt-2">
+          <button id="reader-fullscreen-toggle" type="button" title="切换沉浸全屏" class="corner-float-btn opacity-0 group-hover:opacity-100 transition-all duration-150 w-9 h-9 rounded-full bg-black/[0.05] hover:bg-black/[0.12] active:scale-95 text-[#59524c] hover:text-[#2f2a25] flex items-center justify-center backdrop-blur-sm cursor-pointer shadow-[0_1px_4px_rgba(0,0,0,0.08)] border border-black/[0.04]">
+            <svg id="fs-icon-expand" class="w-[15px] h-[15px]" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M10 4H6a2 2 0 00-2 2v4"/><path d="M14 20h4a2 2 0 002-2v-4"/><path d="M20 10V6a2 2 0 00-2-2h-4"/><path d="M4 14v4a2 2 0 002 2h4"/></svg>
+            <svg id="fs-icon-shrink" class="w-[15px] h-[15px] hidden" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 4v3a2 2 0 01-2 2H4"/><path d="M15 20v-3a2 2 0 012-2h3"/><path d="M20 9h-3a2 2 0 01-2-2V4"/><path d="M4 15h3a2 2 0 012 2v3"/></svg>
           </button>
         </div>
 
-        <!-- 悬浮四角感应按钮 -->
-        <div class="group absolute top-0 left-0 w-28 h-24 z-30 flex items-start justify-start p-2.5">
-          <button id="reader-home-trigger" type="button" title="返回书库" class="corner-float-btn opacity-0 group-hover:opacity-100 transition w-11 h-11 rounded-full bg-black/[0.06] hover:bg-black/[0.14] flex items-center justify-center text-[#59524c] cursor-pointer">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        <!-- 悬浮两角感应按钮：左上返回、右上设置 -->
+        <div class="group absolute top-0 left-0 w-24 h-[72px] z-30 flex items-start justify-start p-2.5">
+          <button id="reader-home-trigger" type="button" title="返回书库" class="corner-float-btn opacity-0 group-hover:opacity-100 transition w-10 h-10 rounded-full bg-black/[0.05] hover:bg-black/[0.12] flex items-center justify-center text-[#59524c] hover:text-[#2f2a25] shadow-[0_1px_4px_rgba(0,0,0,0.08)] border border-black/[0.04] cursor-pointer">
+            <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
           </button>
         </div>
-        <div class="group absolute top-0 right-0 w-28 h-24 z-30 flex items-start justify-end p-2.5">
-          <button id="reader-settings-trigger" type="button" title="阅读选项" class="corner-float-btn opacity-0 group-hover:opacity-100 transition w-11 h-11 rounded-full bg-black/[0.06] hover:bg-black/[0.14] flex items-center justify-center text-[#59524c] cursor-pointer">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/></svg>
+        <div class="group absolute top-0 right-0 w-24 h-[72px] z-30 flex items-start justify-end p-2.5">
+          <button id="reader-settings-trigger" type="button" title="阅读选项" class="corner-float-btn opacity-0 group-hover:opacity-100 transition w-10 h-10 rounded-full bg-black/[0.05] hover:bg-black/[0.12] flex items-center justify-center text-[#59524c] hover:text-[#2f2a25] shadow-[0_1px_4px_rgba(0,0,0,0.08)] border border-black/[0.04] cursor-pointer">
+            <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/></svg>
           </button>
         </div>
-        <div class="group absolute bottom-0 left-0 w-32 h-28 z-30 flex items-end justify-start p-3">
-          <button id="prev-page-btn" type="button" title="上一页" class="corner-float-btn opacity-0 group-hover:opacity-100 transition w-12 h-12 rounded-full bg-[#4a4845]/70 hover:bg-[#3a3835]/85 text-white shadow-md flex items-center justify-center cursor-pointer">‹</button>
-        </div>
-        <div class="group absolute bottom-0 right-0 w-32 h-28 z-30 flex items-end justify-end p-3">
-          <button id="next-page-btn" type="button" title="下一页" class="corner-float-btn opacity-0 group-hover:opacity-100 transition w-12 h-12 rounded-full bg-[#4a4845]/70 hover:bg-[#3a3835]/85 text-white shadow-md flex items-center justify-center cursor-pointer">›</button>
+
+        <!-- 左侧中心：目录 / 书签（与设置同样式的靠近浮现弹窗） -->
+        <div id="toc-sense-zone" class="group absolute top-1/2 left-0 -translate-y-1/2 w-14 h-28 z-30 flex items-center justify-start pl-2">
+          <button id="reader-toc-trigger" type="button" title="目录与书签" class="corner-float-btn opacity-0 group-hover:opacity-100 transition w-10 h-10 rounded-full bg-black/[0.05] hover:bg-black/[0.12] flex items-center justify-center text-[#59524c] hover:text-[#2f2a25] shadow-[0_1px_4px_rgba(0,0,0,0.08)] border border-black/[0.04] cursor-pointer">
+            <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M4 5.5A1.5 1.5 0 015.5 4H9v16H5.5A1.5 1.5 0 014 18.5v-13z"/><path d="M9 4h9.5A1.5 1.5 0 0120 5.5v13a1.5 1.5 0 01-1.5 1.5H9"/><path d="M12.5 9h4M12.5 13h4"/></svg>
+          </button>
         </div>
 
         <!-- 页面阅读内容容器：正文占满整页，不保留页码栏（EPUB 反转页码无意义，直接去掉） -->
@@ -338,10 +383,49 @@
       </div>
     </div>
 
+    <!-- 左侧目录 / 书签面板（与设置面板同样的侧拉逻辑） -->
+    <div id="toc-backdrop" class="hidden fixed inset-0 z-40 bg-black/10"></div>
+    <aside id="reader-toc-drawer" class="fixed top-0 left-0 bottom-0 max-w-full bg-white border-r border-neutral-200 shadow-2xl z-50 flex flex-col transform -translate-x-full transition-transform duration-200 ease-out" style="font-family: var(--reader-font-family); font-size: calc(var(--reader-font-size) * 0.78); width: clamp(290px, calc(var(--reader-font-size) * 17), 430px);">
+      <!-- 顶部栏：目录 / 书签 / 全书搜索 / ＋（按截图排布） -->
+      <div class="relative h-[68px] flex items-center justify-between gap-2 px-4 shrink-0">
+        <div class="flex items-center gap-6 shrink-0">
+          <button id="toc-tab-toc" type="button" class="py-1 cursor-pointer">目录</button>
+          <button id="toc-tab-bm" type="button" class="py-1 cursor-pointer">书签</button>
+        </div>
+        <!-- 全书搜索入口：点击后展开搜索界面 -->
+        <button id="toc-search-open" type="button" title="全书搜索" class="flex-1 max-w-[190px] h-10 flex items-center justify-between gap-2 px-3.5 rounded-full bg-[#f0f0f0] hover:bg-[#e8e8e8] text-[#4a4a4a] transition cursor-pointer">
+          <span class="text-[14px] truncate">全书搜索</span>
+          <svg class="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M20 20l-3.5-3.5"/></svg>
+        </button>
+        <button id="add-bookmark-btn" type="button" title="把当前页加入书签" class="w-10 h-10 flex items-center justify-center rounded-lg text-neutral-700 hover:bg-neutral-100 leading-none cursor-pointer shrink-0" style="font-size: 1.4em;">＋</button>
+      </div>
+      <!-- 分隔线 -->
+      <div class="h-px bg-neutral-200 shrink-0"></div>
+      <!-- 搜索界面（默认隐藏，点「全书搜索」后覆盖列表区） -->
+      <div id="toc-search-panel" class="hidden flex-1 flex flex-col min-h-0">
+        <div class="flex items-center justify-between px-4 pt-4 pb-3 shrink-0">
+          <span class="text-[17px] font-semibold text-[#2b2b2b]">全书搜索</span>
+          <button id="toc-search-close" type="button" title="关闭搜索" class="w-9 h-9 flex items-center justify-center rounded-lg text-neutral-600 hover:bg-neutral-100 cursor-pointer">
+            <svg class="w-[20px] h-[20px]" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+        <div class="px-4 pb-3 shrink-0">
+          <div class="relative">
+            <input id="toc-search-input" type="text" placeholder="输入关键词…" autocomplete="off"
+                   class="w-full h-11 pl-4 pr-10 rounded-full bg-[#f0f0f0] text-[15px] text-[#3a3a3a] placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-300" />
+            <button id="toc-search-clear" type="button" title="清空" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-200 cursor-pointer">
+              <svg class="w-[16px] h-[16px]" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+          </div>
+        </div>
+        <div id="toc-search-results" class="flex-1 overflow-y-auto px-4 pb-6 min-h-0 text-[#3a3a3a]"></div>
+      </div>
+      <div id="toc-list" class="flex-1 overflow-y-auto py-1 text-[#3a3a3a]"></div>
+    </aside>
+
     <!-- 侧拉设置面板（性能极致优化：颜色0ms直接响应，滑块智能防抖） -->
     <div id="settings-backdrop" class="hidden fixed inset-0 z-40 bg-black/10"></div>
-    <aside id="reader-settings-drawer" class="fixed top-0 right-0 bottom-0 w-[330px] max-w-full bg-[#fafafa] border-l border-neutral-200 shadow-2xl z-50 flex flex-col transform translate-x-full transition-transform duration-200 ease-out">
-      <div class="h-14 px-5 flex items-center justify-between border-b border-neutral-100 shrink-0">
+    <aside id="reader-settings-drawer" class="fixed top-0 right-0 bottom-0 w-[330px] max-w-full bg-[#fafafa] border-l border-neutral-200 shadow-2xl z-50 flex flex-col transform translate-x-full transition-transform duration-200 ease-out">      <div class="h-14 px-5 flex items-center justify-between border-b border-neutral-100 shrink-0">
         <span class="text-[18px] text-[#383838]">阅读选项</span>
         <button id="close-settings-drawer-btn" type="button" class="p-1.5 text-neutral-500 hover:text-black cursor-pointer">✕</button>
       </div>
@@ -391,15 +475,49 @@
             <button id="import-local-font-btn" type="button" class="text-xs text-neutral-500 hover:text-black underline cursor-pointer">+ 本地字体</button>
           </div>
           <select id="select-font-family" class="w-full h-10 px-3 rounded-xl border border-neutral-300 bg-white text-[15px] focus:outline-none">
+            <option value="yeliqun">叶立群几何体测试版</option>
             <option value="system">系统默认 / 黑体</option>
             <option value="songti">宋体 / 思源宋体</option>
             <option value="kaiti">楷体 / 华文楷体</option>
-            <option value="yeliqun">叶立群几何体测试版</option>
           </select>
           <div id="local-font-list" class="flex flex-wrap gap-1.5 pt-0.5"></div>
         </div>
       </div>
     </aside>
+
+    <!-- ==================== 划线弹窗 ==================== -->
+    <!-- 必须放在 #reader-view 内部：全屏时浏览器只渲染全屏元素的子树，
+         放在外面会导致全屏下完全不可见（这正是"全屏不弹窗"的根因） -->
+    <div id="selection-popover" class="hidden fixed z-[60] bg-[#fbfbfb] rounded-2xl shadow-[0_8px_28px_rgba(0,0,0,0.18)] border border-neutral-200/70 px-3 py-2 flex items-center gap-3 select-none">
+      <button id="sel-note-btn" type="button" title="添加笔记（可写备注）" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-neutral-100 cursor-pointer text-[#1f6b4a]">
+        <svg class="w-[19px] h-[19px]" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M4 20l4.5-1.2L20 7.3a2 2 0 000-2.8l-.5-.5a2 2 0 00-2.8 0L5.2 15.5 4 20z"/></svg>
+      </button>
+      <button id="sel-quote-btn" type="button" title="仅摘抄（不写备注）" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-neutral-100 cursor-pointer text-[#2b5fa8]">
+        <svg class="w-[19px] h-[19px]" fill="currentColor" viewBox="0 0 24 24"><rect x="4" y="6" width="12" height="12" rx="2"/><path d="M17 9.5l3.2-1.9a.6.6 0 01.9.5v7.8a.6.6 0 01-.9.5L17 14.5z"/></svg>
+      </button>
+      <button id="sel-copy-btn" type="button" title="复制" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-neutral-100 cursor-pointer text-[#c07419]">
+        <svg class="w-[19px] h-[19px]" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 012-2h8"/></svg>
+      </button>
+      <div class="w-px h-6 bg-neutral-200"></div>
+      <div id="sel-colors" class="flex items-center gap-2"></div>
+    </div>
+
+    <!-- ==================== 笔记编辑弹窗（同样必须在 #reader-view 内） ==================== -->
+    <div id="note-editor-modal" class="hidden fixed inset-0 z-[70] bg-black/35 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl w-full max-w-[560px] shadow-2xl p-6 flex flex-col" style="font-family: var(--reader-font-family);">
+        <div class="flex gap-3">
+          <div id="note-editor-swatch" class="w-[3px] rounded shrink-0" style="background:#86c99a;"></div>
+          <p id="note-editor-quote" class="text-[15px] leading-relaxed text-[#3a3a3a] whitespace-pre-wrap max-h-[38vh] overflow-y-auto"></p>
+        </div>
+        <textarea id="note-editor-content" placeholder="写点想法…（可留空）" class="mt-5 w-full h-[130px] resize-none rounded-xl bg-[#f2f8f5] border border-transparent focus:border-[#cfe5d9] focus:outline-none px-4 py-3 text-[15px] leading-relaxed text-[#2f2f2f]"></textarea>
+        <div id="note-editor-colors" class="mt-4 flex items-center gap-2.5"></div>
+        <div class="mt-5 flex items-center justify-end gap-5 text-[15px]">
+          <button id="note-editor-delete" type="button" class="text-neutral-600 hover:text-red-600 cursor-pointer">删除</button>
+          <button id="note-editor-cancel" type="button" class="text-neutral-600 hover:text-black cursor-pointer">取消</button>
+          <button id="note-editor-confirm" type="button" class="text-[#2f2f2f] font-medium hover:text-black cursor-pointer">确认</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div id="toast-message" class="pointer-events-none fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-full bg-[#333]/95 text-white text-sm shadow-lg opacity-0 transition-opacity duration-200"></div>
@@ -417,12 +535,15 @@
       currentNav: 'all',
       searchQuery: '',
       books: [],
+      notes: [],          // 全部笔记（单一实体，content 空=纯摘抄）
+      notesBookFilter: '',  // 笔记页"按图书筛选"的当前值（空=全部）
       currentBook: null,
       currentPageIndex: 0,
       activeMenuBookId: null,
       multiSelectMode: false,
       selectedBookIds: new Set(),
       modalConfirmCallback: null,
+      tocTab: 'toc',   // 目录面板当前标签：'toc' | 'bm'
       github: { owner: '', repo: '', branch: '', token: '', metaSha: '' },
       fontMap: {
         system: "-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif",
@@ -442,12 +563,14 @@
         letterSpacing: 0,
         paraSpacing: 15,
         brightness: 1,
-        fontFamily: 'system'
+        // 默认就用叶立群几何体测试版：设备装了该字体即生效，没装则按字体栈回落到系统黑体
+        fontFamily: 'yeliqun'
       }
     };
 
     const PREFS_KEY = 'onereader_prefs_v4';
     const GH_KEY = 'onereader_gh_v4';
+    const PREFS_VER = 2;   // 配置结构版本，用于把旧的默认字体迁移到新默认值
     const DB_NAME = 'OneReaderDB_v4';
     const FONT_DB_NAME = 'OneReaderFonts_v1';
     // 解析逻辑版本号：解析规则有破坏性变更时 +1，旧书打开时会自动重新解析
@@ -466,7 +589,7 @@
 
     function savePrefs() {
       try {
-        localStorage.setItem(PREFS_KEY, JSON.stringify({ shelves: state.shelves, readerConfig: state.readerConfig }));
+        localStorage.setItem(PREFS_KEY, JSON.stringify({ shelves: state.shelves, readerConfig: state.readerConfig, prefsVer: PREFS_VER }));
         localStorage.setItem(GH_KEY, JSON.stringify(state.github));
       } catch (e) {}
     }
@@ -476,6 +599,11 @@
         const p = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
         if (Array.isArray(p.shelves) && p.shelves.length) state.shelves = p.shelves;
         if (p.readerConfig) Object.assign(state.readerConfig, p.readerConfig);
+        // 迁移：老配置里 fontFamily 是 'system'（当时的默认值）。
+        // 默认字体已改为叶立群几何体测试版，这里把旧的默认值升级过来。
+        if (p.prefsVer !== PREFS_VER) {
+          if (state.readerConfig.fontFamily === 'system') state.readerConfig.fontFamily = 'yeliqun';
+        }
         const g = JSON.parse(localStorage.getItem(GH_KEY) || '{}');
         if (g && typeof g === 'object') Object.assign(state.github, g);
       } catch (e) {}
@@ -520,6 +648,85 @@
         req.onsuccess = () => res(req.result || []);
         req.onerror = () => res([]);
       });
+    }
+
+    // ==================== 笔记：数据层 ====================
+    // 只有一个实体「笔记」：content 为空 = 纯摘抄，非空 = 带备注。
+    // 不设 type 字段，避免人为制造两种东西。
+    const NOTES_STORE = 'notes';
+    // 高亮色（与阅读背景色无关，只用于标记笔记在书中的高亮）
+    const HIGHLIGHT_COLORS = [
+      { key: 'pink',   label: '粉', bg: '#f6c9c9' },
+      { key: 'yellow', label: '黄', bg: '#f7e7a6' },
+      { key: 'green',  label: '绿', bg: '#C7EDCC' },
+      { key: 'blue',   label: '蓝', bg: '#bcd9f5' }
+    ];
+    const LAST_COLOR_KEY = 'onereader_last_note_color';
+
+    function colorOf(key) {
+      return HIGHLIGHT_COLORS.find(c => c.key === key) || HIGHLIGHT_COLORS[2];
+    }
+    function lastNoteColor() {
+      try {
+        const k = localStorage.getItem(LAST_COLOR_KEY);
+        if (k && HIGHLIGHT_COLORS.some(c => c.key === k)) return k;
+      } catch (e) {}
+      return 'green';
+    }
+    function setLastNoteColor(key) {
+      try { localStorage.setItem(LAST_COLOR_KEY, key); } catch (e) {}
+    }
+    function newNoteId() {
+      return 'n_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    }
+
+    // 笔记库独立于书籍库，避免书籍重解析牵动笔记
+    function openNotesDB() {
+      return new Promise(res => {
+        if (!window.indexedDB) return res(null);
+        const r = indexedDB.open('OneReaderNotes_v1', 1);
+        r.onupgradeneeded = e => {
+          if (!e.target.result.objectStoreNames.contains(NOTES_STORE)) {
+            e.target.result.createObjectStore(NOTES_STORE, { keyPath: 'id' });
+          }
+        };
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => res(null);
+      });
+    }
+
+    async function loadAllNotesDB() {
+      const db = await openNotesDB();
+      if (!db) return [];
+      return new Promise(res => {
+        const req = db.transaction(NOTES_STORE, 'readonly').objectStore(NOTES_STORE).getAll();
+        req.onsuccess = () => res(req.result || []);
+        req.onerror = () => res([]);
+      });
+    }
+
+    async function putNoteDB(note) {
+      const db = await openNotesDB();
+      if (!db) return;
+      db.transaction(NOTES_STORE, 'readwrite').objectStore(NOTES_STORE).put(note);
+    }
+
+    async function deleteNoteDB(id) {
+      const db = await openNotesDB();
+      if (!db) return;
+      db.transaction(NOTES_STORE, 'readwrite').objectStore(NOTES_STORE).delete(id);
+    }
+
+    // 按最后修改时间倒序（新写的 / 刚改过的排前面）
+    function sortedNotes(list) {
+      return list
+        .filter(n => !n.deletedAt)
+        .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    }
+
+    function notesOfBook(book) {
+      if (!book) return [];
+      return state.notes.filter(n => !n.deletedAt && n.bookFile === book.fileName);
     }
 
     // ==================== 本地字体：导入 / 持久化 / 注入 @font-face ====================
@@ -595,7 +802,7 @@
           await deleteLocalFontDB(rec.id);
           state.localFonts = state.localFonts.filter(f => f.id !== rec.id);
           if (state.readerConfig.fontFamily === rec.id) {
-            state.readerConfig.fontFamily = 'system';
+            state.readerConfig.fontFamily = 'yeliqun';
             savePrefs();
             applyLayoutStyles();
             repaginateDebounced();
@@ -674,13 +881,23 @@
     }
 
     // ==================== 全屏沉浸切换 ====================
+    // 只让「阅读器视图」进入全屏，而不是整个文档。
+    // 之前是对 documentElement 请求全屏，导致返回书库后主页也被放大。
     function toggleReaderFullscreen() {
       const doc = document;
       const isFs = doc.fullscreenElement || doc.webkitFullscreenElement;
       if (!isFs) {
-        const el = doc.documentElement;
+        const el = $('reader-view') || doc.documentElement;
         (el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen)?.call(el);
       } else {
+        (doc.exitFullscreen || doc.webkitExitFullscreen || doc.msExitFullscreen)?.call(doc);
+      }
+    }
+
+    // 若当前处于全屏则退出（离开阅读器时调用）
+    function exitFullscreenIfAny() {
+      const doc = document;
+      if (doc.fullscreenElement || doc.webkitFullscreenElement) {
         (doc.exitFullscreen || doc.webkitExitFullscreen || doc.msExitFullscreen)?.call(doc);
       }
     }
@@ -689,9 +906,42 @@
       const isFs = Boolean(document.fullscreenElement || document.webkitFullscreenElement);
       $('fs-icon-expand').classList.toggle('hidden', isFs);
       $('fs-icon-shrink').classList.toggle('hidden', !isFs);
+      // 全屏切换时把笔记编辑弹窗挪到正确的层：
+      // 进入全屏 -> 必须在 #reader-view 内，否则不渲染；退出全屏 -> 可以留在内部
+      const modal = $('note-editor-modal');
+      if (modal) {
+        const readerView = $('reader-view');
+        if (isFs && modal.parentElement !== readerView) {
+          readerView.appendChild(modal);
+        } else if (!isFs && modal.parentElement === readerView) {
+          document.body.appendChild(modal);
+        }
+      }
+      // 进出全屏后可用空间变了，必须重新分页，否则页数/行宽还是旧尺寸，
+      // 多出来的空间会变成大片留白（本次反馈的问题 3）
+      if (state.currentBook) {
+        // 等浏览器完成布局再测量
+        setTimeout(() => {
+          applyLayoutStyles();
+          repaginate();
+          renderReaderPages();
+        }, 120);
+      }
     }
     document.addEventListener('fullscreenchange', updateFullscreenIcons);
     document.addEventListener('webkitfullscreenchange', updateFullscreenIcons);
+
+    // 窗口尺寸变化（含全屏切换、手机横竖屏）也要重新分页
+    let resizeTimer = null;
+    window.addEventListener('resize', () => {
+      if (!state.currentBook) return;
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        applyLayoutStyles();
+        repaginate();
+        renderReaderPages();
+      }, 200);
+    });
 
     // ==================== GitHub REST API 私有仓直连 ====================
     function updateCloudIndicator() {
@@ -893,6 +1143,9 @@
         b.className = `nav-item w-full flex items-center gap-4 pl-6 pr-4 py-3 rounded-r-full text-[15px] transition cursor-pointer ${active ? 'bg-[#4a4a4a] text-white font-medium' : 'text-neutral-700 hover:bg-neutral-100'}`;
       });
       renderShelves();
+      // 笔记视图与书库视图互斥，避免互相覆盖显示状态
+      if (state.currentNav === 'notes') { showNotesView(); return; }
+      hideNotesView();
       renderLibrary();
     }
 
@@ -956,7 +1209,716 @@
     }
 
     // ==================== 书库卡片与 ••• 弹窗 ====================
+    // ==================== 笔记：列表渲染 ====================
+    // 卡片模板固定：时间 / 备注区 / 摘抄区 / 来源 + 图标。
+    // 备注区与摘抄区位置大小固定（透明占位），内容为空时不渲染但位置保留。
+    function fmtNoteTime(ts) {
+      const d = new Date(ts || Date.now());
+      const p = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+    }
+
+    function renderNotes() {
+      const grid = $('notes-grid');
+      if (!grid) return;
+
+      const filterBook = state.notesBookFilter || '';
+      let list = sortedNotes(state.notes);
+
+      if (filterBook) {
+        // 按图书筛选：为了体现书本逻辑流程，同一本书内按创建时间正序（早的在前）
+        list = list
+          .filter(n => n.bookFile === filterBook)
+          .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      } else {
+        // 全部笔记：按最后修改时间倒序（最新在最前）
+        list = list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+      }
+
+      $('notes-empty').classList.toggle('hidden', list.length > 0);
+      grid.innerHTML = '';
+
+      list.forEach(n => {
+        const card = document.createElement('div');
+        // 固定高度 290px：保证网格整齐，摘抄/备注超长都在各自区域内截断
+        card.className = 'relative bg-white rounded-2xl border border-neutral-200/80 shadow-[0_1px_4px_rgba(0,0,0,0.04)] p-4 flex flex-col';
+        card.style.height = '290px';
+        card.style.fontFamily = 'var(--reader-font-family)';
+        card.innerHTML = `
+          <div class="text-[13.5px] text-neutral-500 shrink-0 note-card-text">${fmtNoteTime(n.createdAt)}</div>
+          <!-- 备注区：固定高度，内容为空时保留空白占位 -->
+          <div class="shrink-0 mt-4" style="height:96px;">
+            ${n.content ? `<p class="note-card-text text-[15.5px] leading-relaxed text-[#2f2f2f] overflow-hidden" style="display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;">${esc(n.content)}</p>` : ''}
+          </div>
+          <!-- 摘抄区：固定高度，超出截断加省略号（不显示高亮底色，高亮只在原书里） -->
+          <div class="flex-1 min-h-0">
+            <p class="note-card-text text-[15.5px] leading-relaxed text-[#3a3a3a] overflow-hidden" style="display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;">${esc(n.quote)}</p>
+          </div>
+          <!-- 来源 + 图标 -->
+          <div class="shrink-0 mt-2">
+            <div class="text-[12px] text-neutral-400 truncate text-right">来自《${esc(n.bookTitle || '')}》${esc(n.chapter || '')}</div>
+            <div class="flex items-center justify-end gap-1 mt-1.5">
+              <button type="button" class="note-edit w-7 h-7 flex items-center justify-center rounded-lg hover:bg-neutral-100 text-neutral-600 cursor-pointer" title="编辑备注">
+                <svg class="w-[17px] h-[17px]" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M4 20l4.5-1.2L20 7.3a2 2 0 000-2.8l-.5-.5a2 2 0 00-2.8 0L5.2 15.5 4 20z"/></svg>
+              </button>
+              <button type="button" class="note-jump w-7 h-7 flex items-center justify-center rounded-lg hover:bg-neutral-100 text-neutral-600 cursor-pointer" title="在书中展示">
+                <svg class="w-[17px] h-[17px]" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 00-3.5 10.9c.5.4.8 1 .8 1.6V16h5.4v-.5c0-.6.3-1.2.8-1.6A6 6 0 0012 3z"/></svg>
+              </button>
+            </div>
+          </div>`;
+        card.querySelector('.note-edit').onclick = () => openNoteEditor(n);
+        card.querySelector('.note-jump').onclick = () => jumpToNote(n);
+        grid.appendChild(card);
+      });
+    }
+
+    // 填充「按图书筛选」下拉：只列出有笔记的书
+    function renderNotesBookFilter() {
+      const sel = $('notes-book-filter');
+      if (!sel) return;
+      const current = state.notesBookFilter || '';
+      const books = new Map();
+      sortedNotes(state.notes).forEach(n => {
+        if (n.bookFile) books.set(n.bookFile, n.bookTitle || n.bookFile);
+      });
+      sel.innerHTML = '<option value="">请选择</option>';
+      [...books.entries()]
+        .sort((a, b) => String(a[1]).localeCompare(String(b[1]), 'zh'))
+        .forEach(([file, title]) => {
+          const o = document.createElement('option');
+          o.value = file;
+          o.textContent = title;
+          sel.appendChild(o);
+        });
+      sel.value = books.has(current) ? current : '';
+      state.notesBookFilter = sel.value;
+    }
+
+    // 笔记视图与书库视图互斥
+    function showNotesView() {
+      $('empty-library-state').classList.add('hidden');
+      $('books-grid-container').classList.add('hidden');
+      $('notes-view').classList.remove('hidden');
+      renderNotesBookFilter();
+      renderNotes();
+      updateNotesSyncBtn();
+    }
+    function hideNotesView() {
+      $('notes-view').classList.add('hidden');
+    }
+
+    function updateNotesSyncBtn() {
+      const btn = $('notes-sync-btn');
+      if (!btn) return;
+      btn.disabled = !isCloudConnected();
+      btn.title = isCloudConnected() ? '与私有仓同步笔记' : '连接仓库后可用';
+    }
+
+    // ==================== 笔记：划线弹窗 ====================
+    let pendingSelection = null;   // { quote, blockIndex, chapter }
+
+    function buildColorDots(container, activeKey, onPick) {
+      container.innerHTML = '';
+      HIGHLIGHT_COLORS.forEach(c => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.title = c.label;
+        b.className = 'w-6 h-6 rounded-full cursor-pointer';
+        b.style.background = c.bg;
+        b.style.border = activeKey === c.key ? '2px solid #2f2f2f' : '2px solid transparent';
+        b.style.boxShadow = activeKey === c.key ? '0 0 0 2px #fff inset' : 'none';
+        b.onclick = () => onPick(c.key);
+        container.appendChild(b);
+      });
+    }
+
+    function showSelectionPopover(rect) {
+      const pop = $('selection-popover');
+      pop.classList.remove('hidden');
+      const r = pop.getBoundingClientRect();
+      // 贴在选区下方 8px，避开浏览器自带的选区菜单（通常在上方）
+      let left = rect.left + rect.width / 2 - r.width / 2;
+      let top = rect.bottom + 8;
+      left = Math.max(8, Math.min(window.innerWidth - r.width - 8, left));
+      if (top + r.height > window.innerHeight - 8) top = Math.max(8, rect.top - r.height - 8);
+      pop.style.left = left + 'px';
+      pop.style.top = top + 'px';
+      // 颜色记忆：记录本次选择，下次新建笔记时默认选中；也作为本次笔记的颜色
+      const pick = key => {
+        setLastNoteColor(key);
+        if (pendingSelection) pendingSelection.color = key;
+        buildColorDots($('sel-colors'), key, pick);
+      };
+      if (pendingSelection) pendingSelection.color = lastNoteColor();
+      buildColorDots($('sel-colors'), lastNoteColor(), pick);
+    }
+
+    function hideSelectionPopover() {
+      $('selection-popover').classList.add('hidden');
+    }
+
+    // ==================== 笔记：编辑弹窗 ====================
+    let editingNote = null;
+
+    function openNoteEditor(note) {
+      editingNote = { ...note };
+      $('note-editor-quote').textContent = note.quote || '';
+      $('note-editor-swatch').style.background = colorOf(note.color).bg;
+      $('note-editor-content').value = note.content || '';
+      const pick = key => {
+        editingNote.color = key;
+        $('note-editor-swatch').style.background = colorOf(key).bg;
+        buildColorDots($('note-editor-colors'), key, pick);
+      };
+      buildColorDots($('note-editor-colors'), note.color || lastNoteColor(), pick);
+      // 编辑弹窗位于 #reader-view 内（全屏时需要这样才可见）。
+      // 但从书库/笔记页打开时 #reader-view 是 hidden，会让弹窗也不可见。
+      // 这里按需把它挪到 body 上（非全屏时），全屏时保留在原地。
+      mountNoteEditor();
+      $('note-editor-modal').classList.remove('hidden');
+      setTimeout(() => $('note-editor-content').focus(), 60);
+    }
+
+    // 让编辑弹窗出现在「当前可见的层」：
+    // - 全屏中：必须待在 #reader-view 内，否则浏览器只渲染全屏子树
+    // - 非全屏：挂到 body 上，这样从书库/笔记页打开也可见
+    let editorMountParent = null;
+    function mountNoteEditor() {
+      const modal = $('note-editor-modal');
+      if (!modal) return;
+      const isFs = Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+      const readerView = $('reader-view');
+      if (isFs) {
+        if (modal.parentElement !== readerView) { editorMountParent = modal.parentElement; readerView.appendChild(modal); }
+        return;
+      }
+      if (modal.parentElement === readerView) {
+        // 从 reader-view 里挪出来，挂到 body，避免被父级 hidden 连带隐藏
+        document.body.appendChild(modal);
+      }
+    }
+
+    function closeNoteEditor() {
+      $('note-editor-modal').classList.add('hidden');
+      editingNote = null;
+    }
+
+    async function saveEditedNote() {
+      if (!editingNote) return;
+      const content = $('note-editor-content').value.trim();
+      const now = Date.now();
+      const existing = state.notes.find(n => n.id === editingNote.id);
+      const note = existing || editingNote;
+      note.content = content;                 // 空字符串 = 纯摘抄
+      note.color = editingNote.color;         // 高亮色（非冲突项，直接覆盖）
+      note.updatedAt = now;
+      if (!existing) {
+        note.createdAt = note.createdAt || now;
+        state.notes.push(note);
+      }
+      await putNoteDB(note);
+      closeNoteEditor();
+      renderNotesBookFilter();
+      renderNotes();
+      showToast(content ? '已保存笔记' : '已保存为摘抄');
+    }
+
+    async function removeEditedNote() {
+      if (!editingNote) return;
+      const note = state.notes.find(n => n.id === editingNote.id);
+      if (note) {
+        // 软删除：留下墓碑，避免另一台设备同步时把已删的笔记又推回来
+        note.deletedAt = Date.now();
+        note.updatedAt = note.deletedAt;
+        await putNoteDB(note);
+      }
+      closeNoteEditor();
+      renderNotesBookFilter();
+      renderNotes();
+      showToast('已删除笔记');
+    }
+
+    // 当前页所属章节名：向前找最近的 heading
+    function currentChapterName() {
+      const book = state.currentBook;
+      if (!book) return '';
+      const pages = book.pages || [];
+      const blocks = book.rawBlocks || [];
+      const first = (pages[state.currentPageIndex] || [])[0];
+      let pos = first ? blocks.findIndex(b => b === first || (b.type === first.type && b.text === first.text)) : -1;
+      if (pos < 0) pos = blocks.length - 1;
+      for (let i = pos; i >= 0; i--) {
+        if (blocks[i].type === 'heading' && blocks[i].text) return blocks[i].text.slice(0, 40);
+      }
+      return '';
+    }
+
+    // ==================== 笔记：选中文字 -> 划线弹窗 ====================
+    // 限制在单个块内：跨块的选区只截取起点所在的块，避免定位不可靠
+    function captureSelection() {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+      const text = sel.toString().replace(/\s+/g, ' ').trim();
+      if (!text || text.length < 2) return null;
+
+      const range = sel.getRangeAt(0);
+      const leaf = $('page-left').contains(range.commonAncestorContainer)
+        ? $('page-left')
+        : ($('page-right') && $('page-right').contains(range.commonAncestorContainer) ? $('page-right') : null);
+      if (!leaf) return null;
+
+      // 找到选区起点所在的最内层块元素（p / h2 / div）
+      let node = range.startContainer;
+      while (node && node !== leaf && !['P', 'H2', 'H3', 'LI', 'DIV'].includes(node.tagName)) node = node.parentElement;
+      const rect = range.getBoundingClientRect();
+      if (!rect || (!rect.width && !rect.height)) return null;
+
+      // 单块限制：若选区跨越了块的边界，只保留本块内的文字
+      let quote = text;
+      if (node && node !== leaf) {
+        const blockText = (node.textContent || '').replace(/\s+/g, ' ').trim();
+        if (blockText && !blockText.includes(text)) {
+          // 跨块：退化为起点块的文字前缀
+          quote = text.slice(0, text.length);
+        }
+      }
+
+      const book = state.currentBook;
+      const idx = book ? (book.rawBlocks || []).findIndex(b => (b.text || '').replace(/\s+/g, ' ').trim().startsWith(quote.slice(0, 20))) : -1;
+
+      return { quote, blockIndex: idx, rect };
+    }
+
+    // ==================== 笔记：在书中展示（跳转） ====================
+    async function jumpToNote(note) {
+      const book = state.books.find(b => b.fileName === note.bookFile);
+      if (!book) return showToast('找不到对应的书，可能已被删除');
+      if (!$('reader-view').classList.contains('hidden') && state.currentBook === book) {
+        doJump();
+        return;
+      }
+      await openBook(book);
+      setTimeout(doJump, 600);
+
+      function doJump() {
+        const bk = state.currentBook;
+        const blocks = bk.rawBlocks || [];
+        const pages = bk.pages || [];
+        const norm = s => String(s || '').replace(/\s+/g, ' ').trim();
+        const target = norm(note.quote);
+
+        // 定位优先级：块文本完全包含 > 前 12 字匹配 > 章节
+        let blockIdx = -1;
+        if (target) {
+          blockIdx = blocks.findIndex(b => b.type !== 'img' && norm(b.text).includes(target));
+          if (blockIdx < 0) {
+            const head = target.slice(0, 12);
+            blockIdx = blocks.findIndex(b => b.type !== 'img' && norm(b.text).includes(head));
+          }
+        }
+        if (blockIdx < 0 && note.chapter) {
+          blockIdx = blocks.findIndex(b => b.type === 'heading' && norm(b.text).includes(norm(note.chapter)));
+        }
+        if (blockIdx >= 0) {
+          const blk = blocks[blockIdx];
+          for (let i = 0; i < pages.length; i++) {
+            if (pages[i].some(x => x === blk || (x.type === blk.type && norm(x.text) === norm(blk.text)))) {
+              state.currentPageIndex = i;
+              break;
+            }
+          }
+        }
+        $('reader-view').classList.remove('hidden');
+        $('library-view').classList.add('hidden');
+        applyThemeColors(); applyLayoutStyles();
+        repaginate(); renderReaderPages();
+        if (blockIdx < 0) showToast('未能精确定位，已跳到对应章节');
+      }
+    }
+
+    // ==================== 笔记：高亮渲染 ====================
+    // 打开书 / 翻页后，把这本书的笔记按颜色高亮到对应文字上。
+    // 跳转本身没有任何特效——高亮是常驻的。
+    // 实现要点：每个块先算出所有命中区间，再从后往前统一包裹。
+    // 这样不会出现"包了第一条把文本节点拆断，导致第二条匹配失败或重复包裹"。
+    function applyNoteHighlights(root) {
+      if (!root) return;
+      const book = state.currentBook;
+      if (!book) return;
+      const list = notesOfBook(book).filter(n => n.quote);
+      if (!list.length) return;
+
+      const blocks = root.querySelectorAll('p, h2, h3, li');
+      const doneNotes = new Set();   // 同一笔记在同一页只高亮一次
+      blocks.forEach(el => {
+        if (el.querySelector('mark[data-note-id]')) return;   // 已处理过，避免重复渲染
+        const raw = el.textContent;
+        if (!raw || raw.length < 2) return;
+
+        const taken = [];
+        const hits = [];
+        list.slice()
+          .sort((a, b) => (b.quote || '').length - (a.quote || '').length)
+          .forEach(n => {
+            if (doneNotes.has(n.id)) return;
+            const needle = n.quote.replace(/\s+/g, ' ').trim();
+            if (needle.length < 2) return;
+            let from = 0;
+            while (from <= raw.length - needle.length) {
+              const at = raw.indexOf(needle, from);
+              if (at < 0) break;
+              const end = at + needle.length;
+              if (!taken.some(([s, e]) => at < e && s < end)) {
+                taken.push([at, end]);
+                hits.push({ at, end, note: n });
+                break;              // 同一笔记在同一块内只高亮一次
+              }
+              from = at + 1;
+            }
+          });
+        if (!hits.length) return;
+
+        // 从后往前包裹，前面区间的偏移不受影响
+        hits.sort((a, b) => b.at - a.at).forEach(h => {
+          try {
+            const sp = locateOffset(el, h.at);
+            const ep = locateOffset(el, h.end);
+            if (!sp || !ep) return;
+            const range = document.createRange();
+            range.setStart(sp.node, sp.offset);
+            range.setEnd(ep.node, ep.offset);
+            const mark = document.createElement('mark');
+            mark.dataset.noteId = h.note.id;
+            mark.style.background = colorOf(h.note.color).bg;
+            mark.style.color = 'inherit';
+            mark.style.borderRadius = '2px';
+            mark.style.cursor = 'pointer';
+            mark.onclick = () => openNoteEditor(h.note);
+            range.surroundContents(mark);
+            doneNotes.add(h.note.id);
+          } catch (e) { /* 极端情况跳过，不影响其它高亮 */ }
+        });
+      });
+    }
+
+    // 在元素内按字符偏移定位到具体文本节点
+    function locateOffset(rootEl, offset) {
+      let remain = offset;
+      const walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT, null);
+      let n;
+      while ((n = walker.nextNode())) {
+        const len = n.textContent.length;
+        if (remain <= len) return { node: n, offset: remain };
+        remain -= len;
+      }
+      return null;
+    }
+
+    // ==================== 笔记：云同步（手动触发） ====================
+    // GitHub Contents API 只能整文件替换，所以流程必须是「读 → 合并 → 带 sha 写」。
+    // 安全性来自：写之前一定先读、带 sha 提交、409 时重试。
+    const NOTES_CLOUD_PATH = 'data/notes.json';
+
+    function notePayload() {
+      return {
+        version: 1,
+        updatedAt: Date.now(),
+        notes: state.notes
+      };
+    }
+
+    // 合并两份笔记列表：按 id 并集；同 id 取 updatedAt 新者；时间接近且内容不同 -> 保留双份
+    function mergeNoteLists(localList, remoteList) {
+      const byId = new Map();
+      const pushConflictCopy = (base, other) => {
+        const copy = { ...other, id: newNoteId(), conflictOf: base.id };
+        copy.createdAt = other.createdAt || Date.now();
+        copy.updatedAt = other.updatedAt || Date.now();
+        byId.set(copy.id, copy);
+      };
+      const consider = n => {
+        if (!n || !n.id) return;
+        const cur = byId.get(n.id);
+        if (!cur) { byId.set(n.id, { ...n }); return; }
+        const a = cur.updatedAt || 0, b = n.updatedAt || 0;
+        const sameContent = (cur.content || '') === (n.content || '') && (cur.quote || '') === (n.quote || '');
+        const bothDeleted = Boolean(cur.deletedAt) && Boolean(n.deletedAt);
+        if (sameContent) {
+          // 仅颜色等元信息不同：按时间新者胜，不产生双份
+          if (b > a) byId.set(n.id, { ...n });
+          return;
+        }
+        if (bothDeleted) { if (b > a) byId.set(n.id, { ...n }); return; }
+        // 两边都改过且内容不同
+        const diff = Math.abs(b - a);
+        if (diff > 60 * 1000) {
+          // 时间差明显：新者胜，不产生双份（一端的修改就是过期数据）
+          const winner = b > a ? n : cur;
+          byId.set(winner.id, { ...winner });
+        } else {
+          // 时间接近，无法判断先后 -> 保留双份（删除优先，避免复活）
+          if (cur.deletedAt || n.deletedAt) {
+            const del = cur.deletedAt ? cur : n;
+            byId.set(del.id, { ...del });
+          } else {
+            byId.set(cur.id, { ...cur });
+            pushConflictCopy(cur, n);
+          }
+        }
+      };
+      localList.forEach(consider);
+      remoteList.forEach(consider);
+      return Array.from(byId.values());
+    }
+
+    // 计算笔记数组的稳定签名：按 id 排序后序列化，**不含 updatedAt**。
+    // 原因：updatedAt 是"何时改的"元信息，同一份内容在两端的 updatedAt 可能不同，
+    // 若把它算进签名，就永远判不出"内容没变"，跳过推送也就失效了。
+    function notesSignature(notes) {
+      const rows = (notes || [])
+        .map(n => [
+          n.id,
+          n.bookFile || '',
+          n.bookTitle || '',
+          n.chapter || '',
+          n.quote || '',
+          n.content || '',
+          n.color || '',
+          n.deletedAt ? 1 : 0,
+          n.createdAt || 0,
+          n.conflictOf || ''
+        ].join('\u0001'))
+        .sort();
+      return rows.join('\u0002');
+    }
+
+    async function syncNotesWithCloud() {
+      if (!isCloudConnected()) return showToast('请先连接私有仓');
+      const btn = $('notes-sync-btn');
+      // 注意：这里绝不能写 btn.textContent，否则会把按钮里的 SVG 图标整个替换成文字，
+      // 造成"云同步"三个字时不时冒出来（同步时出现、结束后又变回图标）。
+      // 状态只通过 disabled 和旋转动画表达。
+      btn.disabled = true;
+      btn.classList.add('is-syncing');
+      try {
+        let merged = null;
+        let jsonPushed = false;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const got = await getCloudJSON(NOTES_CLOUD_PATH);
+          const remoteNotes = (got && got.data && Array.isArray(got.data.notes)) ? got.data.notes : [];
+          merged = mergeNoteLists(state.notes, remoteNotes);
+
+          // 内容签名一致 => 云端已是最新，跳过这次 PUT（避免产生无意义的提交）
+          const remoteSig = notesSignature(remoteNotes);
+          const mergedSig = notesSignature(merged);
+          if (got && remoteSig === mergedSig) {
+            jsonPushed = false;
+            break;
+          }
+
+          const payload = { version: 1, updatedAt: Date.now(), notes: merged };
+          const ok = await putCloudJSON(NOTES_CLOUD_PATH, payload, got ? got.sha : null, 'notes: sync');
+          if (ok) { jsonPushed = true; break; }
+          merged = null;   // sha 冲突，重来
+        }
+        if (!merged) throw new Error('多次重试仍冲突，请稍后再试');
+        state.notes = merged;
+        // 落库到本地
+        const db = await openNotesDB();
+        if (db) {
+          const tx = db.transaction(NOTES_STORE, 'readwrite');
+          const store = tx.objectStore(NOTES_STORE);
+          await new Promise(res => { tx.oncomplete = res; tx.onerror = res; store.clear(); merged.forEach(n => store.put(n)); });
+        }
+        renderNotesBookFilter();
+        renderNotes();
+
+        // 同步一份人可直接阅读的 HTML。
+        // 内容与云端完全一致时跳过推送，避免每次同步都产生提交。
+        // 这一步失败不影响 JSON 同步结果，只提示。
+        let htmlNote = '';
+        try {
+          const built = buildNotesHtml(state.notes);
+          if (built) {
+            const htmlPath = 'data/notes.html';
+            const gotHtml = await getCloudJSONRaw(htmlPath);
+            const remoteHtml = gotHtml ? String(gotHtml.text || '') : '';
+            if (gotHtml && remoteHtml === built.html) {
+              htmlNote = jsonPushed ? '，HTML 无变化' : '，云端已是最新';
+            } else {
+              const okHtml = await putCloudText(htmlPath, built.html, gotHtml ? gotHtml.sha : null, 'notes: sync html');
+              htmlNote = okHtml ? '，HTML 已更新' : '，HTML 冲突未更新';
+            }
+          }
+        } catch (e) {
+          htmlNote = '，HTML 更新失败';
+        }
+
+        if (!jsonPushed && htmlNote === '，云端已是最新') {
+          showToast(`云端已是最新，无需推送（${sortedNotes(state.notes).length} 条笔记）`);
+        } else {
+          showToast(`同步完成，共 ${sortedNotes(state.notes).length} 条笔记${htmlNote}`);
+        }
+      } catch (e) {
+        showToast(`同步失败：${e.message || '请检查仓库权限'}`);
+      } finally {
+        btn.disabled = !isCloudConnected();
+        btn.classList.remove('is-syncing');
+      }
+    }
+
+    // 读云端 JSON（404 时返回 null）
+    async function getCloudJSON(path) {
+      const branch = state.github.branch || 'main';
+      const url = `${repoApiBase()}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`;
+      const res = await fetch(url, { headers: ghHeaders() });
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const meta = await res.json();
+      const raw = meta.content ? atob(meta.content.replace(/\s/g, '')) : '';
+      const text = new TextDecoder('utf-8').decode(Uint8Array.from(raw, c => c.charCodeAt(0)));
+      let data = null;
+      try { data = JSON.parse(text); } catch (e) {}
+      return { data, sha: meta.sha };
+    }
+
+    // 写云端 JSON，返回是否成功（false 表示 sha 冲突）
+    async function putCloudJSON(path, obj, sha, message) {
+      return putCloudText(path, JSON.stringify(obj, null, 2), sha, message);
+    }
+
+    // 读云端任意文本文件（只取 sha 与原文），404 返回 null
+    async function getCloudJSONRaw(path) {
+      const branch = state.github.branch || 'main';
+      const url = `${repoApiBase()}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`;
+      const res = await fetch(url, { headers: ghHeaders() });
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const meta = await res.json();
+      const raw = meta.content ? atob(meta.content.replace(/\s/g, '')) : '';
+      return { sha: meta.sha, text: new TextDecoder('utf-8').decode(Uint8Array.from(raw, c => c.charCodeAt(0))) };
+    }
+
+    // 写云端文本（JSON / HTML 共用），返回是否成功（false 表示 sha 冲突）
+    async function putCloudText(path, text, sha, message) {
+      const branch = state.github.branch || 'main';
+      const bytes = new TextEncoder().encode(text);
+      let bin = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+      const body = { message, content: btoa(bin), branch };
+      if (sha) body.sha = sha;
+      const res = await fetch(`${repoApiBase()}/contents/${encodeURIComponent(path)}`, {
+        method: 'PUT',
+        headers: ghHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(body)
+      });
+      if (res.status === 409 || res.status === 422) return false;
+      if (!res.ok) {
+        const t = await res.text().catch(() => '');
+        throw new Error(`HTTP ${res.status} ${t.slice(0, 100)}`);
+      }
+      return true;
+    }
+
+    // 生成笔记的 HTML 全文（导出与云同步共用同一份模板，避免两处样式不一致）。
+    // 结构：按书分组；书与书按「最后修改时间倒序」（最近改动过的书在前）；
+    //       同一本书内按「最后修改时间正序」（越早的越在前，保持阅读顺序）。
+    function buildNotesHtml(notes) {
+      const list = (notes || []).filter(n => !n.deletedAt && (n.bookFile || n.quote));
+      if (!list.length) return '';
+
+      // 按书分组，并记录每本书的最后修改时间
+      const groups = new Map();
+      list.forEach(n => {
+        const key = n.bookFile || '未关联书籍';
+        if (!groups.has(key)) {
+          groups.set(key, { title: n.bookTitle || key, notes: [], lastUpdated: 0 });
+        }
+        const g = groups.get(key);
+        g.notes.push(n);
+        g.lastUpdated = Math.max(g.lastUpdated, n.updatedAt || 0);
+      });
+
+      // 书与书：最后修改时间倒序（最新的书在最前）
+      const books = [...groups.values()].sort((a, b) => b.lastUpdated - a.lastUpdated);
+      // 书内笔记：最后修改时间正序（越久的越靠前）
+      books.forEach(b => b.notes.sort((x, y) => (x.updatedAt || 0) - (y.updatedAt || 0)));
+
+      const fmtDate = ts => {
+        const d = new Date(ts || Date.now());
+        const p = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+      };
+      const escHtml = s => String(s ?? '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+      const body = books.map(b => `
+        <section class="book">
+          <h2>${escHtml(b.title)}</h2>
+          ${b.notes.map(n => `
+            <div class="note">
+              <blockquote>${escHtml(n.quote)}</blockquote>
+              ${n.content ? `<div class="remark"><span class="label">Note:</span> ${escHtml(n.content)}</div>` : ''}
+              <div class="date">Date: ${fmtDate(n.createdAt)}</div>
+            </div>`).join('')}
+        </section>`).join('');
+
+      const html = `<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notes</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0 auto; padding: 56px 40px 96px; max-width: 760px;
+    font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, sans-serif;
+    color: #2f2f2f; background: #fff; line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1 { font-size: 26px; font-weight: 700; margin: 0 0 18px; letter-spacing: .5px; }
+  .rule { height: 2px; background: #2f2f2f; margin-bottom: 44px; }
+  .book { margin-bottom: 44px; }
+  .book h2 { font-size: 19px; font-weight: 600; margin: 0 0 22px; }
+  .note { margin-bottom: 34px; }
+  blockquote {
+    margin: 0; padding: 10px 14px; background: #f2f2f2;
+    border-left: 3px solid #bdbdbd; font-size: 15px; color: #3a3a3a;
+    white-space: pre-wrap;
+  }
+  .remark {
+    margin-top: 8px; padding: 10px 14px; background: #fff8dc;
+    border-left: 3px solid #e8c34a; font-size: 15px; color: #3a3a3a;
+    white-space: pre-wrap;
+  }
+  .remark .label { font-weight: 600; color: #c79a1e; }
+  .date { margin-top: 10px; font-size: 12.5px; color: #9a9a9a; }
+  .note + .note { border-top: 1px solid #ededed; padding-top: 26px; }
+  @media print { body { padding: 0; } .note { break-inside: avoid; } }
+</style></head>
+<body>
+  <h1>Notes</h1>
+  <div class="rule"></div>
+  ${body}
+</body></html>`;
+      return { html, bookCount: books.length, noteCount: list.length };
+    }
+
+    function exportNotesJSON() {
+      const built = buildNotesHtml(state.notes);
+      if (!built) return showToast('还没有笔记可导出');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([built.html], { type: 'text/html;charset=utf-8' }));
+      a.download = `onereader-notes-${new Date().toISOString().slice(0, 10)}.html`;
+      a.click();
+      showToast(`已导出笔记（${built.bookCount} 本书）`);
+    }
+
     function renderLibrary() {
+      // 书库与笔记是互斥视图：这里统一保证「渲染书库时一定收起笔记视图」，
+      // 否则从笔记页触发书架点击/搜索/批量操作等会调到本函数，两套卡片叠在一起
+      $('notes-view').classList.add('hidden');
+
       const list = state.books.filter(b => {
         if (state.currentNav.startsWith('shelf:') && b.shelf !== state.currentNav.slice(6)) return false;
         if (state.searchQuery && !b.title.toLowerCase().includes(state.searchQuery.toLowerCase())) return false;
@@ -1456,6 +2418,251 @@
       return false;
     }
 
+    // ==================== 目录 / 书签 ====================
+    // 目录：从 rawBlocks 里的 heading 生成（解析阶段已标记章节）
+    function buildToc(book) {
+      const toc = [];
+      (book.rawBlocks || []).forEach((b, bi) => {
+        if (b.type === 'heading' && b.text) toc.push({ text: b.text, blockIndex: bi });
+      });
+      return toc;
+    }
+
+    // 根据块索引推算所在页（分页结果里每页存的是块对象引用）
+    function findPageOfBlock(book, blockIndex) {
+      const pages = book.pages || [];
+      const block = (book.rawBlocks || [])[blockIndex];
+      if (!block) return 0;
+      for (let i = 0; i < pages.length; i++) {
+        const hit = pages[i].find(x => x === block || (x.type === block.type && x.text === block.text));
+        if (hit) return i;
+      }
+      return 0;
+    }
+
+    function renderTocList() {
+      const book = state.currentBook;
+      const box = $('toc-list');
+      if (!box) return;
+      box.innerHTML = '';
+      if (!book) return;
+
+      if (state.tocTab === 'bm') {
+        const marks = book.bookmarks || [];
+        if (!marks.length) {
+          box.innerHTML = '<p class="text-sm text-neutral-400 mt-6 text-center">还没有书签，点右上角 ＋ 把当前页加入书签</p>';
+          return;
+        }
+        // 每条书签两行——第一行标题，第二行页码/进度，条目之间用细线分隔
+        marks.forEach((m, i) => {
+          const row = document.createElement('div');
+          row.className = 'group flex items-start gap-2 px-5 py-4 border-b border-neutral-100 hover:bg-neutral-50 cursor-pointer';
+          row.innerHTML = `
+            <div class="flex-1 min-w-0">
+              <div class="leading-relaxed text-[#3a3a3a]">${esc(m.label || '书签')}</div>
+              <div class="flex items-center justify-between mt-2 opacity-70" style="font-size: 0.85em;">
+                <span class="text-neutral-500">第 ${m.page + 1} 页</span>
+                <span class="text-neutral-400">${m.progress || ''}</span>
+              </div>
+            </div>
+            <button type="button" class="del-bm opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-red-500 px-1 leading-none cursor-pointer" style="font-size: 0.85em;">✕</button>`;
+          row.onclick = e => {
+            if (e.target.classList.contains('del-bm')) return;
+            state.currentPageIndex = m.page;
+            renderReaderPages();
+            closeTocDrawer();
+          };
+          row.querySelector('.del-bm').onclick = async ev2 => {
+            ev2.stopPropagation();
+            book.bookmarks.splice(i, 1);
+            await saveBookDB(book);
+            renderTocList();
+          };
+          box.appendChild(row);
+        });
+        return;
+      }
+
+      // 目录
+      const toc = buildToc(book);
+      if (!toc.length) {
+        box.innerHTML = '<p class="text-sm text-neutral-400 mt-6 text-center">这本书没有识别到章节</p>';
+        return;
+      }
+      toc.forEach(item => {
+        const page = findPageOfBlock(book, item.blockIndex);
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'w-full text-left px-5 py-4 border-b border-neutral-100 hover:bg-neutral-50 cursor-pointer flex items-baseline gap-3';
+        row.innerHTML = `
+          <span class="flex-1 min-w-0 leading-relaxed text-[#3a3a3a]">${esc(item.text)}</span>
+          <span class="text-neutral-400 shrink-0 opacity-80 tabular-nums" style="font-size: 0.82em;">${page + 1}</span>`;
+        row.onclick = () => {
+          state.currentPageIndex = page;
+          renderReaderPages();
+          closeTocDrawer();
+        };
+        box.appendChild(row);
+      });
+    }
+
+    function updateTocTabs() {
+      // 按截图：选中为深色加粗，未选中为浅灰；字号继承面板
+      const on = 'py-1 cursor-pointer text-[#2b2b2b] font-semibold';
+      const off = 'py-1 cursor-pointer text-[#b8b8b8] hover:text-[#6b6b6b]';
+      const a = $('toc-tab-toc'), b = $('toc-tab-bm');
+      if (a) a.className = state.tocTab === 'toc' ? on : off;
+      if (b) b.className = state.tocTab === 'bm' ? on : off;
+    }
+
+    // ==================== 全书搜索 ====================
+    // 在 rawBlocks 全文里找关键词，按所属章节分组，命中处标红，点击跳转到该页。
+    function escapeRegExp(s) {
+      return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    // 把命中关键词包成红色 <strong>
+    function highlightKeyword(text, keyword) {
+      if (!keyword) return esc(text);
+      const re = new RegExp(escapeRegExp(keyword), 'gi');
+      let out = '';
+      let last = 0;
+      let m;
+      while ((m = re.exec(text)) !== null) {
+        out += esc(text.slice(last, m.index));
+        out += `<strong class="text-[#e03131] font-semibold">${esc(m[0])}</strong>`;
+        last = m.index + m[0].length;
+        if (m.index === re.lastIndex) re.lastIndex++;   // 防零宽匹配死循环
+      }
+      out += esc(text.slice(last));
+      return out;
+    }
+
+    // 当前关键词在块内首次出现位置附近截一段上下文（供结果显示）
+    function snippetAround(text, keyword, radius = 40) {
+      const flat = String(text || '');
+      const at = flat.toLowerCase().indexOf(String(keyword).toLowerCase());
+      if (at < 0) return flat.slice(0, radius * 2);
+      const start = Math.max(0, at - radius);
+      const end = Math.min(flat.length, at + keyword.length + radius);
+      return (start > 0 ? '…' : '') + flat.slice(start, end) + (end < flat.length ? '…' : '');
+    }
+
+    function runTocSearch() {
+      const input = $('toc-search-input');
+      const box = $('toc-search-results');
+      if (!input || !box) return;
+      const kw = input.value.trim();
+      $('toc-search-clear').classList.toggle('hidden', !kw);
+      box.innerHTML = '';
+
+      const book = state.currentBook;
+      if (!book) {
+        box.innerHTML = '<p class="text-sm text-neutral-400 mt-6 text-center">没有打开的书</p>';
+        return;
+      }
+      if (!kw) {
+        box.innerHTML = '<p class="text-sm text-neutral-400 mt-6 text-center">输入关键词搜索全书</p>';
+        return;
+      }
+
+      const blocks = book.rawBlocks || [];
+      const pages = book.pages || [];
+      const lowerKw = kw.toLowerCase();
+
+      // 先算每个块所在的页（只算一次，避免重复遍历）
+      const pageOfBlock = new Map();
+      pages.forEach((pg, pi) => {
+        pg.forEach(b => { if (!pageOfBlock.has(b)) pageOfBlock.set(b, pi); });
+      });
+
+      // 按章节归组：遍历块，遇到 heading 就开新组
+      const groups = [];
+      let curGroup = null;
+      blocks.forEach((b, bi) => {
+        if (b.type === 'img' || b.dead) return;
+        const text = b.text || '';
+        if (!text) return;
+        if (b.type === 'heading') {
+          curGroup = { title: text, items: [] };
+          groups.push(curGroup);
+          return;
+        }
+        if (!curGroup) {
+          curGroup = { title: '正文开头', items: [] };
+          groups.push(curGroup);
+        }
+        if (text.toLowerCase().includes(lowerKw)) {
+          // 该块所在页：优先用分页映射，找不到就退回按块序号估算
+          let pi = pageOfBlock.has(b) ? pageOfBlock.get(b) : -1;
+          if (pi < 0) pi = Math.min((pages.length || 1) - 1, Math.floor(bi / 3));
+          curGroup.items.push({ block: b, page: pi, snippet: snippetAround(text, kw) });
+        }
+      });
+
+      const hitGroups = groups.filter(g => g.items.length);
+      const total = hitGroups.reduce((n, g) => n + g.items.length, 0);
+
+      if (!total) {
+        box.innerHTML = `<p class="text-sm text-neutral-400 mt-6 text-center">没有找到「${esc(kw)}」</p>`;
+        return;
+      }
+
+      hitGroups.forEach(g => {
+        const sec = document.createElement('div');
+        sec.className = 'mb-5';
+        sec.innerHTML = `
+          <div class="flex items-center justify-between py-2">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <svg class="w-3.5 h-3.5 shrink-0 text-neutral-500" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg>
+              <span class="text-[15px] font-semibold text-[#2b2b2b] truncate">${esc(g.title)}</span>
+            </div>
+            <span class="text-[13px] text-neutral-400 shrink-0">(${g.items.length})</span>
+          </div>`;
+        g.items.forEach(it => {
+          const row = document.createElement('button');
+          row.type = 'button';
+          row.className = 'w-full text-left block px-1 py-3 border-t border-neutral-100 hover:bg-neutral-50 cursor-pointer';
+          row.innerHTML = `<p class="text-[14px] leading-relaxed text-[#4a4a4a]">${highlightKeyword(it.snippet, kw)}</p>`;
+          row.onclick = () => {
+            state.currentPageIndex = Math.max(0, it.page);
+            renderReaderPages();
+            closeTocDrawer();
+          };
+          sec.appendChild(row);
+        });
+        box.appendChild(sec);
+      });
+    }
+
+    function openTocSearch() {
+      $('toc-search-panel').classList.remove('hidden');
+      $('toc-list').classList.add('hidden');
+      runTocSearch();
+      setTimeout(() => $('toc-search-input').focus(), 80);
+    }
+
+    function closeTocSearch() {
+      $('toc-search-panel').classList.add('hidden');
+      $('toc-list').classList.remove('hidden');
+      $('toc-search-input').value = '';
+      $('toc-search-clear').classList.add('hidden');
+      $('toc-search-results').innerHTML = '';
+    }
+
+    function openTocDrawer() {
+      state.tocTab = state.tocTab || 'toc';
+      updateTocTabs();
+      renderTocList();
+      closeTocSearch();   // 每次打开面板都回到目录/书签视图
+      $('reader-toc-drawer').classList.remove('-translate-x-full');
+      $('toc-backdrop').classList.remove('hidden');
+    }
+    function closeTocDrawer() {
+      $('reader-toc-drawer').classList.add('-translate-x-full');
+      $('toc-backdrop').classList.add('hidden');
+    }
+
     async function openBook(book) {
       // 旧版解析结果自动重建：乱码清洗、章节识别、图片 data URL 都是后加的规则，
       // 旧数据里没有这些结果，直接打开会继续看到乱码。这里统一重解析一次。
@@ -1549,7 +2756,30 @@
 
       $('dual-page-spine').classList.toggle('hidden', c.viewMode !== 'dual');
       $('page-right-wrapper').classList.toggle('hidden', c.viewMode !== 'dual');
-      $('page-left').style.overflowY = c.viewMode === 'scroll' ? 'auto' : 'hidden';
+
+      // 卷轴模式：让左页脱离绝对定位、由内容自然撑高，并在 wrapper 上滚动。
+      // 之前只把 overflowY 改成 auto，但页元素是 absolute inset-0（高度被钉死），
+      // 内容再多也撑不开，所以完全滚不动。
+      const isScroll = c.viewMode === 'scroll';
+      const leftLeaf = $('page-left');
+      const leftWrap = $('page-left-wrapper');
+      if (isScroll) {
+        leftWrap.style.overflowY = 'auto';
+        leftWrap.style.overflowX = 'hidden';
+        leftWrap.style.webkitOverflowScrolling = 'touch';
+        leftLeaf.style.position = 'static';
+        leftLeaf.style.inset = 'auto';
+        leftLeaf.style.height = 'auto';
+        leftLeaf.style.overflow = 'visible';
+      } else {
+        leftWrap.style.overflowY = 'hidden';
+        leftWrap.style.overflowX = 'hidden';
+        leftLeaf.style.position = 'absolute';
+        leftLeaf.style.inset = '0';
+        leftLeaf.style.height = '';
+        leftLeaf.style.overflow = 'hidden';
+        leftWrap.scrollTop = 0;
+      }
 
       document.querySelectorAll('.view-mode-btn').forEach(b => {
         const on = b.dataset.mode === c.viewMode;
@@ -1765,6 +2995,55 @@
       book.pages = merged.length ? merged : [[{ type: 'p', text: '暂无内容' }]];
     }
 
+    // 只重排当前页（拖动字号/边距等滑块时的轻量路径）。
+    // 不重新切分全书，只把当前页的内容按新字号等比切成"能放下的部分"，
+    // 使得拖动时立刻能看到效果，且开销与全书大小无关 —— 这是手机上不卡的关键。
+    function repaginateCurrentPageOnly() {
+      const book = state.currentBook;
+      if (!book || book.format === 'PDF' || !book.pages) return;
+      const mode = state.readerConfig.viewMode;
+      if (mode === 'scroll') { renderReaderPages(); return; }  // 卷轴不需要分页
+      const leaf = $('page-left');
+      const measure = $('page-measure-box');
+      if (!leaf) return;
+      const cs = getComputedStyle(leaf);
+      const availW = Math.max(160, leaf.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
+      const availH = Math.max(140, leaf.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 6);
+
+      measure.style.width = availW + 'px';
+      measure.innerHTML = `<div id="m-cur" style="width:100%;font-family:var(--reader-font-family);font-size:var(--reader-font-size);letter-spacing:var(--reader-letter-spacing);line-height:1.72;"></div>`;
+      const col = $('m-cur');
+
+      const idx = state.currentPageIndex;
+      const blocks = (book.pages[idx] || []).slice();
+      // 从当前页往后多取一些块，保证字号变小时能把后续内容补进本页
+      const flat = [];
+      for (let i = idx; i < book.pages.length && flat.length < 60; i++) flat.push(...book.pages[i]);
+
+      const out = [];
+      for (const b of flat) {
+        if (b.type === 'img' && b.dead) continue;
+        const w = document.createElement('div');
+        w.innerHTML = blockHtml(b);
+        const n = w.firstElementChild;
+        if (!n) continue;
+        col.appendChild(n);
+        if (col.scrollHeight <= availH) {
+          out.push(b);
+        } else {
+          col.removeChild(n);
+          break;
+        }
+      }
+      measure.innerHTML = '';
+
+      if (out.length) {
+        book.pages[idx] = out;
+        // 该页原后续内容若被吃掉，暂不重新分配全书（松手后会做完整分页）
+      }
+      renderReaderPages();
+    }
+
     async function renderPdfPage(pdfDoc, num, box) {
       box.innerHTML = '';
       if (num < 1 || num > pdfDoc.numPages) return;
@@ -1799,10 +3078,15 @@
 
       if (mode === 'scroll') {
         pL.innerHTML = `<div style="font-size:var(--reader-font-size);letter-spacing:var(--reader-letter-spacing);line-height:1.72;">${(book.rawBlocks || []).map(blockHtml).join('')}</div>`;
+        applyNoteHighlights(pL);
       } else {
         const renderLeaf = idx => `<div style="font-size:var(--reader-font-size);letter-spacing:var(--reader-letter-spacing);line-height:1.72;">${((book.pages && book.pages[idx]) || []).map(blockHtml).join('')}</div>`;
         pL.innerHTML = renderLeaf(state.currentPageIndex);
-        if (mode === 'dual') pR.innerHTML = renderLeaf(state.currentPageIndex + 1);
+        applyNoteHighlights(pL);
+        if (mode === 'dual') {
+          pR.innerHTML = renderLeaf(state.currentPageIndex + 1);
+          applyNoteHighlights(pR);
+        }
       }
     }
 
@@ -1867,6 +3151,8 @@
     window.addEventListener('DOMContentLoaded', async () => {
       loadPrefs();
       state.books = await loadAllBooksDB();
+      // 笔记独立存储，与书籍数据分开加载
+      state.notes = await loadAllNotesDB();
 
       // 恢复上次导入的本地字体（存在 IndexedDB，刷新后依然可用）
       state.localFonts = await loadAllLocalFonts();
@@ -1874,9 +3160,9 @@
         state.fontMap[rec.id] = `'${rec.family}', 'PingFang SC', 'Microsoft YaHei', sans-serif`;
         registerLocalFontFace(rec);
       });
-      // 自愈：上次选的本地字体已被删除 / 数据丢失时回落到系统字体，避免整段文字变默认衬线
+      // 自愈：上次选的本地字体已被删除 / 数据丢失时回落到默认字体，避免整段文字变默认衬线
       if (state.readerConfig.fontFamily && !state.fontMap[state.readerConfig.fontFamily]) {
-        state.readerConfig.fontFamily = 'system';
+        state.readerConfig.fontFamily = 'yeliqun';
         savePrefs();
       }
 
@@ -1900,7 +3186,8 @@
           <input id="rng-${d.key}" type="range" min="${d.min}" max="${d.max}" step="${d.step}" value="${val}" class="onereader-slider" />`;
         sBox.appendChild(div);
 
-        // 拖动时仅平滑更新数值与快速变量，排版异步防抖，彻底消除手机卡顿
+        // 拖动滑块时只做"轻量重排"：仅重排当前页，避免手机上对全书逐块测量导致卡顿。
+        // 松手(onchange)后再做一次完整分页，保证页数/章节位置准确。
         div.querySelector('input').oninput = e => {
           const v = Number(e.target.value);
           state.readerConfig[d.key] = v;
@@ -1910,7 +3197,19 @@
             applyThemeColors();
           } else {
             applyLayoutStyles();
-            repaginateDebounced(); // 280ms 防抖
+            if (isMobile()) {
+              repaginateCurrentPageOnly();   // 拖动中：只重排当前页
+            } else {
+              repaginateDebounced();
+            }
+          }
+        };
+        // 松手：做一次完整分页，纠正页数与章节起始位置
+        div.querySelector('input').onchange = () => {
+          if (!d.isLayout) return;
+          if (isMobile()) {
+            repaginate();
+            renderReaderPages();
           }
         };
       });
@@ -1926,6 +3225,111 @@
 
       // 全屏切换按钮（顶部正中，与四角按钮一致：靠近才浮现，不再常驻遮挡正文）
       $('reader-fullscreen-toggle').onclick = toggleReaderFullscreen;
+
+      // ==================== 笔记：选中文字 -> 划线弹窗 ====================
+      // 桌面端：只要在阅读器里选中文字就弹（不再要求全屏）。
+      // 移动端：浏览器自带选区菜单会盖住页面，仍建议在全屏下使用，但不再硬性拦截。
+      // 弹窗放在选区下方避让浏览器菜单（浏览器不允许屏蔽它，只能避）。
+      const handleSelectionEnd = () => {
+        if ($('reader-view').classList.contains('hidden')) return;
+        if (!$('note-editor-modal').classList.contains('hidden')) return;
+        if (!$('toc-backdrop') || !$('toc-backdrop').classList.contains('hidden')) return;
+        if (!$('settings-backdrop').classList.contains('hidden')) return;
+        const info = captureSelection();
+        if (!info) { hideSelectionPopover(); return; }
+        pendingSelection = info;
+        showSelectionPopover(info.rect);
+      };
+      // 桌面：鼠标松开后判断；触屏：手指抬起后判断
+      document.addEventListener('mouseup', e => {
+        const pop = $('selection-popover');
+        if (!pop.classList.contains('hidden') && pop.contains(e.target)) return;  // 点弹窗自身不重算
+        setTimeout(handleSelectionEnd, 10);
+      });
+      $('reader-content-viewport').addEventListener('touchend', () => setTimeout(handleSelectionEnd, 80), { passive: true });
+      // 点空白处收起弹窗（但点弹窗本身不收起）
+      document.addEventListener('mousedown', e => {
+        const pop = $('selection-popover');
+        if (pop.classList.contains('hidden')) return;
+        if (pop.contains(e.target)) return;
+        hideSelectionPopover();
+      });
+
+      // 墨绿笔：新建带备注的笔记
+      $('sel-note-btn').onclick = () => {
+        if (!pendingSelection) return;
+        hideSelectionPopover();
+        const book = state.currentBook;
+        const note = {
+          id: newNoteId(),
+          bookFile: book ? book.fileName : '',
+          bookTitle: book ? book.title : '',
+          chapter: currentChapterName(),
+          quote: pendingSelection.quote,
+          content: '',
+          color: pendingSelection.color || lastNoteColor(),
+          blockIndex: pendingSelection.blockIndex,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          deletedAt: null,
+          conflictOf: null
+        };
+        openNoteEditor(note);
+        window.getSelection().removeAllRanges();
+      };
+
+      // 蓝色块：直接存为纯摘抄（content 为空）
+      $('sel-quote-btn').onclick = async () => {
+        if (!pendingSelection) return;
+        hideSelectionPopover();
+        const book = state.currentBook;
+        const now = Date.now();
+        const note = {
+          id: newNoteId(),
+          bookFile: book ? book.fileName : '',
+          bookTitle: book ? book.title : '',
+          chapter: currentChapterName(),
+          quote: pendingSelection.quote,
+          content: '',
+          color: pendingSelection.color || lastNoteColor(),
+          blockIndex: pendingSelection.blockIndex,
+          createdAt: now,
+          updatedAt: now,
+          deletedAt: null,
+          conflictOf: null
+        };
+        state.notes.push(note);
+        await putNoteDB(note);
+        window.getSelection().removeAllRanges();
+        renderReaderPages();      // 立刻把高亮画上去
+        if (state.currentNav === 'notes') renderNotesBookFilter();
+        showToast('已添加摘抄');
+      };
+
+      // 复制
+      $('sel-copy-btn').onclick = async () => {
+        if (!pendingSelection) return;
+        try {
+          await navigator.clipboard.writeText(pendingSelection.quote);
+          showToast('已复制');
+        } catch (e) {
+          showToast('复制失败，请手动复制');
+        }
+        hideSelectionPopover();
+      };
+
+      // 编辑弹窗
+      $('note-editor-confirm').onclick = saveEditedNote;
+      $('note-editor-cancel').onclick = closeNoteEditor;
+      $('note-editor-delete').onclick = () => {
+        if (!editingNote) return;
+        const existing = state.notes.find(n => n.id === editingNote.id);
+        if (!existing) { closeNoteEditor(); return; }   // 还没落库，直接关掉
+        removeEditedNote();
+      };
+      $('note-editor-modal').onclick = e => {
+        if (e.target === $('note-editor-modal')) closeNoteEditor();
+      };
 
       // 移动端：点屏幕中央唤出控制条后，6 秒无操作自动收起，避免长期盖住正文
       let mobileCtrlTimer = null;
@@ -1954,7 +3358,19 @@
 
       document.querySelector('[data-nav="all"]').onclick = () => {
         state.currentNav = 'all';
+        hideNotesView();
         updateNavSelection();
+      };
+      document.querySelector('[data-nav="notes"]').onclick = () => {
+        state.currentNav = 'notes';
+        updateNavSelection();
+        showNotesView();
+      };
+      $('notes-sync-btn').onclick = syncNotesWithCloud;
+      $('notes-export-btn').onclick = exportNotesJSON;
+      $('notes-book-filter').onchange = e => {
+        state.notesBookFilter = e.target.value;
+        renderNotes();
       };
       $('shelf-collapse-btn').onclick = () => {
         $('shelf-items-container').classList.toggle('hidden');
@@ -2140,6 +3556,8 @@
 
       // 返回主页与设置抽屉
       $('reader-home-trigger').onclick = () => {
+        // 返回书库前先退出全屏，避免书库主页停留在放大状态
+        exitFullscreenIfAny();
         $('reader-view').classList.add('hidden');
         $('library-view').classList.remove('hidden');
         renderLibrary();
@@ -2151,9 +3569,68 @@
       const closeDrawer = () => {
         $('reader-settings-drawer').classList.add('translate-x-full');
         $('settings-backdrop').classList.add('hidden');
+        // 关闭设置面板时补一次完整分页：拖动过程中手机上只重排了当前页，
+        // 这里把全书页数与章节起始位置重新算准（离开面板后执行，不影响操作手感）
+        if (state.currentBook) {
+          setTimeout(() => {
+            repaginate();
+            renderReaderPages();
+          }, 60);
+        }
       };
       $('close-settings-drawer-btn').onclick = closeDrawer;
       $('settings-backdrop').onclick = closeDrawer;
+
+      // 目录 / 书签面板
+      // 左侧按钮：点一下打开，再点一下关闭
+      $('reader-toc-trigger').onclick = () => {
+        if ($('reader-toc-drawer').classList.contains('-translate-x-full')) openTocDrawer();
+        else closeTocDrawer();
+      };
+      // 面板关闭按钮已按图 1 移除：点遮罩、点目录/书签项（自动关闭）、或再点左侧按钮关闭
+      $('toc-backdrop').onclick = closeTocDrawer;
+      $('toc-tab-toc').onclick = () => { state.tocTab = 'toc'; updateTocTabs(); renderTocList(); };
+      $('toc-tab-bm').onclick = () => { state.tocTab = 'bm'; updateTocTabs(); renderTocList(); };
+
+      // 全书搜索
+      $('toc-search-open').onclick = openTocSearch;
+      $('toc-search-close').onclick = closeTocSearch;
+      $('toc-search-input').oninput = () => runTocSearch();
+      $('toc-search-clear').onclick = () => {
+        $('toc-search-input').value = '';
+        runTocSearch();
+        $('toc-search-input').focus();
+      };
+      $('toc-search-input').onkeydown = e => {
+        if (e.key === 'Escape') { e.stopPropagation(); closeTocSearch(); }
+      };
+      $('add-bookmark-btn').onclick = async () => {
+        const book = state.currentBook;
+        if (!book) return;
+        book.bookmarks = book.bookmarks || [];
+        let page = state.currentPageIndex;
+        // 双页模式下右页只是"配对页"，统一归到左页记录；
+        // 若当前页是对齐用的空页，则挂到上一页，避免书签落在空白页上
+        if (state.readerConfig.viewMode === 'dual' && page % 2 === 1) page = page - 1;
+        const isEmpty = pg => !pg || pg.length === 0 || !pg.some(b => b.text);
+        if (isEmpty(book.pages && book.pages[page]) && page > 0) page = page - 1;
+        if (book.bookmarks.some(m => m.page === page)) return showToast('当前页已在书签中');
+        // 用该页首块文字作为书签标签，便于识别
+        const pageBlocks = (book.pages && book.pages[page]) || [];
+        const first = pageBlocks.find(b => b.text);
+        book.bookmarks.push({
+          page,
+          label: first ? first.text.slice(0, 40) : `第 ${page + 1} 页`,
+          progress: `${Math.round(((page + 1) / Math.max(1, (book.pages || []).length)) * 100)}%`,
+          createdAt: Date.now()
+        });
+        book.bookmarks.sort((a, b) => a.page - b.page);
+        await saveBookDB(book);
+        state.tocTab = 'bm';
+        updateTocTabs();
+        renderTocList();
+        showToast('已加入书签');
+      };
 
       document.querySelectorAll('.view-mode-btn').forEach(b => {
         b.onclick = () => {
@@ -2202,13 +3679,14 @@
       };
 
       // ==================== 全能翻页：键盘、滚轮、触屏滑动 ====================
-      $('prev-page-btn').onclick = () => turnPage(-1);
-      $('next-page-btn').onclick = () => turnPage(1);
+      // 两角翻页按钮已移除（键盘/滚轮/滑动/点击两侧已足够）
 
       // 1. 鼠标滚轮防抖翻页（上滚上一页，下滚下一页）
+      // 卷轴模式下交给浏览器原生滚动，不拦截滚轮
       let lastWheelTime = 0;
       window.addEventListener('wheel', e => {
         if ($('reader-view').classList.contains('hidden')) return;
+        if (state.readerConfig.viewMode === 'scroll') return;
         const now = Date.now();
         if (now - lastWheelTime < 240) return; // 240ms 节流防连跳
         if (Math.abs(e.deltaY) > 20) {
@@ -2235,6 +3713,16 @@
         if (window.getSelection().toString()) return;
         const dx = e.changedTouches[0].clientX - touchStartX;
         const dy = e.changedTouches[0].clientY - touchStartY;
+        // 卷轴模式：竖直滑动交给原生滚动，只有"点一下中央"用来唤出控制条
+        if (state.readerConfig.viewMode === 'scroll') {
+          if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+            const v = $('reader-view');
+            v.classList.toggle('mobile-controls-active');
+            if (v.classList.contains('mobile-controls-active')) autoHideMobileControls();
+            else clearTimeout(mobileCtrlTimer);
+          }
+          return;
+        }
         // 水平滑动位移显著大于垂直滑动且超过 40px
         if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
           turnPage(dx < 0 ? 1 : -1); // 左滑(dx<0)下翻，右滑(dx>0)上翻
