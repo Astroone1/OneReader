@@ -8,7 +8,6 @@
   <title>OneReader</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     :root {
       --reader-bg: #fdf6e3;
@@ -51,7 +50,7 @@
 <body class="h-screen w-screen overflow-hidden flex flex-col">
 
   <!-- 隐藏文件/字体选择器 -->
-  <input id="file-upload-input" type="file" accept=".pdf,.epub,application/pdf,application/epub+zip" multiple class="hidden" />
+  <input id="file-upload-input" type="file" accept=".epub,application/epub+zip" multiple class="hidden" />
   <input id="font-upload-input" type="file" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" class="hidden" />
 
   <!-- ==================== 1. 书库主页 ==================== -->
@@ -180,7 +179,6 @@
         <span id="multiselect-count" class="text-neutral-200 font-medium">已选 0 本</span>
         <div class="h-4 w-[1px] bg-neutral-600"></div>
         <button id="batch-add-shelf-btn" type="button" class="hover:text-amber-300 transition cursor-pointer">移动书架</button>
-        <button id="batch-pin-btn" type="button" class="hover:text-amber-300 transition cursor-pointer">置顶</button>
         <button id="batch-delete-btn" type="button" class="text-red-300 hover:text-red-400 transition cursor-pointer">删除</button>
         <div class="h-4 w-[1px] bg-neutral-600"></div>
         <button id="batch-exit-btn" type="button" class="px-2.5 py-1 rounded-lg bg-white/15 hover:bg-white/25 transition cursor-pointer">退出</button>
@@ -307,9 +305,12 @@
       <svg class="w-4 h-4 text-neutral-700 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
       <span>多选</span>
     </button>
-    <button id="book-act-pin" type="button" class="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-neutral-100 transition cursor-pointer text-left">
-      <svg class="w-4 h-4 text-neutral-700 shrink-0" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 18V6m0 0L4 9m3-3l3 3M13 7h7M13 12h7M13 17h7"/></svg>
-      <span id="book-act-pin-label">置顶</span>
+    <button id="book-act-cloud-upload" type="button" class="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-neutral-100 transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed">
+      <svg class="w-4 h-4 text-neutral-700 shrink-0" viewBox="0 0 40 32" fill="none">
+        <path d="M11.5 26.5H29.5C33.6421 26.5 37 23.1421 37 19C37 15.203 34.1783 12.065 30.514 11.568C29.389 6.657 25.002 3 19.75 3C13.675 3 8.75 7.925 8.75 14C8.75 14.389 8.77 14.773 8.81 15.151C5.534 15.792 3 18.678 3 22.15C3 24.552 4.948 26.5 7.35 26.5H11.5Z" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M20 21V12M20 12L16.5 15.5M20 12L23.5 15.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span id="book-act-cloud-upload-label">云仓库</span>
     </button>
     <button id="book-act-purge-one" type="button" class="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-neutral-100 transition cursor-pointer text-left">
       <svg class="w-4 h-4 text-neutral-700 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
@@ -544,9 +545,6 @@
   <div id="toast-message" class="pointer-events-none fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-full bg-[#333]/95 text-white text-sm shadow-lg opacity-0 transition-opacity duration-200"></div>
 
   <script>
-    if (window.pdfjsLib) {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    }
     const $ = id => document.getElementById(id);
     const isMobile = () => window.innerWidth <= 768;
     const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -567,7 +565,7 @@
       selectedBookIds: new Set(),
       modalConfirmCallback: null,
       tocTab: 'toc',
-      github: { owner: '', repo: '', branch: '', token: '', metaSha: '' },
+      github: { owner: '', repo: '', branch: '', token: '' },
       fontMap: {
         system: "-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif",
         songti: "'SimSun', 'Songti SC', serif",
@@ -608,6 +606,7 @@
           lastBlockIndex: typeof book.lastBlockIndex === 'number' ? book.lastBlockIndex : undefined,
           progressPercent: book.progressPercent || 0,
           hasBeenRead: Boolean(book.hasBeenRead),
+          lastReadAt: book.lastReadAt || 0,
           updatedAt: Date.now()
         };
         localStorage.setItem(PROGRESS_KEY, JSON.stringify(map));
@@ -624,6 +623,7 @@
             if (typeof p.lastBlockIndex === 'number') b.lastBlockIndex = p.lastBlockIndex;
             b.progressPercent = p.progressPercent ?? b.progressPercent ?? 0;
             b.hasBeenRead = Boolean(p.hasBeenRead || b.hasBeenRead);
+            if (p.lastReadAt && p.lastReadAt > (b.lastReadAt || 0)) b.lastReadAt = p.lastReadAt;
           }
         });
       } catch (e) {}
@@ -677,7 +677,7 @@
     async function saveBookDB(b) {
       const db = await openDB();
       if (!db) return;
-      const copy = { ...b, pdfDoc: undefined, pages: undefined };
+      const copy = { ...b, pages: undefined };
       db.transaction('books', 'readwrite').objectStore('books').put(copy);
       updateStorageUsageDisplay();
     }
@@ -688,7 +688,7 @@
       await new Promise(res => {
         const tx = db.transaction('books', 'readwrite');
         const store = tx.objectStore('books');
-        books.forEach(b => store.put({ ...b, pdfDoc: undefined, pages: undefined }));
+        books.forEach(b => store.put({ ...b, pages: undefined }));
         tx.oncomplete = res;
         tx.onerror = res;
       });
@@ -768,12 +768,6 @@
       const db = await openNotesDB();
       if (!db) return;
       db.transaction(NOTES_STORE, 'readwrite').objectStore(NOTES_STORE).put(note);
-    }
-
-    async function deleteNoteDB(id) {
-      const db = await openNotesDB();
-      if (!db) return;
-      db.transaction(NOTES_STORE, 'readwrite').objectStore(NOTES_STORE).delete(id);
     }
 
     function sortedNotes(list) {
@@ -923,7 +917,6 @@
         if (b.fileBytes && (b.cloudPath || b.cloudSha)) {
           b.fileBytes = null;
           b.rawBlocks = null;
-          b.pdfDoc = null;
           b.isCloudOnly = true;
           changed.push(b);
           freed++;
@@ -1062,7 +1055,7 @@
       if (!isCloudConnected()) throw new Error('未连接私有仓');
       if (!book.fileBytes) throw new Error('本地没有原始文件，无法上传');
       const branch = state.github.branch || 'main';
-      const fileName = book.fileName || `${book.title}.${book.format === 'PDF' ? 'pdf' : 'epub'}`;
+      const fileName = book.fileName || `${book.title}.epub`;
       const targetPath = book.shelf ? `${book.shelf}/${fileName}` : fileName;
       const sha = await getCloudFileSha(targetPath);
       const body = {
@@ -1167,7 +1160,7 @@
           }
         });
 
-        const bookEntries = treeList.filter(item => item.type === 'blob' && /\.(epub|pdf)$/i.test(item.path));
+        const bookEntries = treeList.filter(item => item.type === 'blob' && /\.epub$/i.test(item.path));
         progBar.style.width = '75%';
         progTxt.textContent = `索引 ${bookEntries.length} 本云端图书...`;
 
@@ -1177,8 +1170,7 @@
           const parts = entry.path.split('/');
           const fileName = parts[parts.length - 1];
           const folderShelf = (parts.length >= 2 && parts[0] !== 'data' && !parts[0].startsWith('.')) ? parts[0] : '';
-          const title = fileName.replace(/\.(epub|pdf)$/i, '');
-          const format = fileName.toLowerCase().endsWith('.pdf') ? 'PDF' : 'EPUB';
+          const title = fileName.replace(/\.epub$/i, '');
 
           let exist = state.books.find(b => b.cloudSha === entry.sha || b.fileName === fileName || b.title === title);
           if (!exist) {
@@ -1186,10 +1178,10 @@
               id: 'cloud-' + entry.sha.slice(0, 10) + '-' + i,
               title,
               fileName,
-              format,
+              format: 'EPUB',
               shelf: folderShelf,
-              pinned: false,
               addedAt: Date.now(),
+              lastReadAt: 0,
               coverUrl: '',
               hasBeenRead: false,
               progressPercent: 0,
@@ -1269,7 +1261,7 @@
         const updatedLocalBooks = [];
 
         oldBlobs.forEach(item => {
-          const isBook = /\.(epub|pdf)$/i.test(item.path);
+          const isBook = /\.epub$/i.test(item.path);
           const isGitKeep = item.path.endsWith('/.gitkeep');
           const isShelvesJson = item.path === 'data/shelves.json';
           if (!isBook && !isGitKeep && !isShelvesJson) {
@@ -1284,7 +1276,7 @@
         });
 
         oldBlobs.forEach(item => {
-          if (!/\.(epub|pdf)$/i.test(item.path)) return;
+          if (!/\.epub$/i.test(item.path)) return;
           const fileName = item.path.split('/').pop();
           const localBook = state.books.find(b => b.cloudPath === item.path || b.cloudSha === item.sha || b.fileName === fileName);
           let targetPath = item.path;
@@ -1691,16 +1683,7 @@
     function currentChapterName() {
       const book = state.currentBook;
       if (!book) return '';
-      if (book.format === 'PDF') {
-        const toc = book.toc || [];
-        let cur = '';
-        for (const item of toc) {
-          if ((item.pageIndex || 0) <= state.currentPageIndex) cur = item.text;
-          else break;
-        }
-        return cur ? cur.slice(0, 40) : '';
-      }
-      const bi = getCurrentBlockIndex(book);
+      const bi = getCurrentReadingBlockIndex();
       return getChapterNameForBlock(book, bi).slice(0, 40);
     }
 
@@ -2429,6 +2412,7 @@
       $('notes-view').classList.add('hidden');
 
       const list = state.books.filter(b => {
+        if (b.format === 'PDF') return false;
         const bookShelf = (b.shelf && state.shelves.includes(b.shelf)) ? b.shelf : '';
         if (state.currentNav === 'all') {
           if (bookShelf !== '') return false;
@@ -2437,7 +2421,7 @@
         }
         if (state.searchQuery && !b.title.toLowerCase().includes(state.searchQuery.toLowerCase())) return false;
         return true;
-      }).sort((a, b) => (Boolean(b.pinned) - Boolean(a.pinned)) || ((b.addedAt || 0) - (a.addedAt || 0)));
+      }).sort((a, b) => ((b.lastReadAt || 0) - (a.lastReadAt || 0)) || ((b.addedAt || 0) - (a.addedAt || 0)));
 
       $('multiselect-bar').classList.toggle('hidden', !state.multiSelectMode);
       $('multiselect-count').textContent = `已选 ${state.selectedBookIds.size} 本`;
@@ -2456,22 +2440,33 @@
       list.forEach(book => {
         const selected = state.selectedBookIds.has(book.id);
         const pct = !book.hasBeenRead ? 'New' : (book.progressPercent < 1 ? Math.max(0.05, Number(book.progressPercent || 0)).toFixed(2) + '%' : Math.round(book.progressPercent) + '%');
+        const hasCloud = Boolean(book.cloudPath || book.cloudSha);
+        const isLocalReady = Boolean(book.fileBytes || !book.isCloudOnly);
         const card = document.createElement('div');
         card.className = 'group flex flex-col select-none';
         const coverHtml = book.coverUrl
           ? `<img src="${esc(book.coverUrl)}" class="w-full h-full object-cover" />`
           : `<div class="w-full h-full bg-[#f4f1ea] flex flex-col justify-between p-4 border border-neutral-200/80">
-               <div class="text-[10px] tracking-widest text-neutral-400 font-medium">${esc(book.format || 'EPUB')}</div>
+               <div class="text-[10px] tracking-widest text-neutral-400 font-medium">EPUB</div>
                <div class="text-[15px] font-semibold text-[#2b2b2b] line-clamp-3 leading-snug">${esc(book.title)}</div>
                <div class="text-[11px] text-neutral-400 truncate">${esc(book.shelf || '本地图书')}</div>
              </div>`;
+        const cloudBadgeHtml = (!state.multiSelectMode && hasCloud)
+          ? `<div class="absolute top-2 right-2 w-7 h-7 rounded-xl bg-white/90 backdrop-blur-sm shadow-[0_2px_6px_rgba(0,0,0,0.12)] flex items-center justify-center pointer-events-none" title="${isLocalReady ? '已同步云端（已下载到本地）' : '云端图书（点击下载阅读）'}">
+               <svg class="w-5 h-5 text-[#3b3b3b]" viewBox="0 0 40 32" fill="none">
+                 <path d="M11.5 26.5H29.5C33.6421 26.5 37 23.1421 37 19C37 15.203 34.1783 12.065 30.514 11.568C29.389 6.657 25.002 3 19.75 3C13.675 3 8.75 7.925 8.75 14C8.75 14.389 8.77 14.773 8.81 15.151C5.534 15.792 3 18.678 3 22.15C3 24.552 4.948 26.5 7.35 26.5H11.5Z" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" fill="rgba(59,59,59,0.04)"/>
+                 <g stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+                   <path d="M16.5 19.5V12.5M16.5 12.5L13.8 15.2M16.5 12.5L19.2 15.2"/>
+                   <path d="M23.5 13.5V20.5M23.5 20.5L20.8 17.8M23.5 20.5L26.2 17.8"/>
+                 </g>
+               </svg>
+               ${isLocalReady ? `<span class="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-white"></span>` : ''}
+             </div>`
+          : '';
         card.innerHTML = `
           <div class="cover-box relative aspect-[3/4.15] w-full rounded-lg shadow-[0_2px_10px_rgba(0,0,0,0.08)] group-hover:shadow-lg transition overflow-hidden cursor-pointer bg-[#f5f3ef]">
             ${coverHtml}
-            <div class="absolute top-2 left-2 flex gap-1">
-              ${book.pinned ? `<span class="px-1.5 py-0.5 rounded bg-black/70 text-white text-[10px]">置顶</span>` : ''}
-              ${book.isCloudOnly ? `<span class="px-1.5 py-0.5 rounded bg-sky-600/90 text-white text-[10px]">☁️ 云端</span>` : ''}
-            </div>
+            ${cloudBadgeHtml}
             ${state.multiSelectMode ? `<div class="absolute top-2.5 right-2.5 w-6 h-6 rounded-full border-2 flex items-center justify-center ${selected ? 'bg-[#3b3b3b] border-[#3b3b3b] text-white' : 'bg-white/85 border-neutral-400 text-transparent'}">✓</div>` : ''}
           </div>
           <div class="title-box mt-2.5 text-[15px] text-[#3a3a3a] truncate cursor-pointer">${esc(book.title)}</div>
@@ -2493,8 +2488,24 @@
         card.querySelector('.more-btn').onclick = e => {
           e.stopPropagation();
           state.activeMenuBookId = book.id;
-          $('book-act-pin-label').textContent = book.pinned ? '取消置顶' : '置顶';
           updateCloudIndicator();
+          const uploadBtn = $('book-act-cloud-upload');
+          const uploadLabel = $('book-act-cloud-upload-label');
+          const inShelfView = state.currentNav.startsWith('shelf:') && Boolean(book.shelf && state.shelves.includes(book.shelf));
+          const alreadyCloud = Boolean(book.cloudPath || book.cloudSha);
+          if (uploadBtn && uploadLabel) {
+            uploadLabel.textContent = alreadyCloud ? '已存云仓库' : '云仓库';
+            uploadBtn.disabled = !isCloudConnected() || !inShelfView || alreadyCloud || !book.fileBytes;
+            if (!isCloudConnected()) {
+              uploadBtn.title = '请先连接私有仓';
+            } else if (!inShelfView) {
+              uploadBtn.title = '仅可在具体书架中使用（本地图书不可直接上传）';
+            } else if (alreadyCloud) {
+              uploadBtn.title = '该书已在云仓库中';
+            } else {
+              uploadBtn.title = `上传到云端书架「${book.shelf}」`;
+            }
+          }
           const pop = $('book-action-popover');
           pop.classList.remove('hidden');
           $('book-action-backdrop').classList.remove('hidden');
@@ -3066,105 +3077,53 @@
       return { rawBlocks, toc: finalToc, coverDataUrl, parseVer: PARSE_VERSION };
     }
 
-    async function extractPdfOutline(pdfDoc) {
-      if (!pdfDoc || typeof pdfDoc.getOutline !== 'function') return [];
-      try {
-        const outline = await pdfDoc.getOutline();
-        if (!Array.isArray(outline) || !outline.length) return [];
-        const toc = [];
-        const resolveDestPage = async dest => {
-          try {
-            let explicit = dest;
-            if (typeof dest === 'string') {
-              explicit = await pdfDoc.getDestination(dest);
-            }
-            if (Array.isArray(explicit) && explicit[0]) {
-              const pageIdx = await pdfDoc.getPageIndex(explicit[0]);
-              if (typeof pageIdx === 'number' && pageIdx >= 0) return pageIdx;
-            }
-          } catch (e) {}
-          return 0;
-        };
-        const walk = async (items, level) => {
-          for (const it of items) {
-            const title = String(it.title || '').replace(/\s+/g, ' ').trim();
-            if (title) {
-              const pageIndex = await resolveDestPage(it.dest);
-              toc.push({ text: title, pageIndex, level: Math.min(3, level) });
-            }
-            if (Array.isArray(it.items) && it.items.length) {
-              await walk(it.items, level + 1);
-            }
-          }
-        };
-        await walk(outline, 0);
-        return toc;
-      } catch (e) {
-        return [];
-      }
-    }
-
     async function handleFilesImport(files, uploadToCloud = false) {
       for (const file of Array.from(files || [])) {
         const ext = file.name.split('.').pop().toLowerCase();
-        const title = file.name.replace(/\.(epub|pdf)$/i, '');
+        if (ext !== 'epub') {
+          showToast('仅支持导入 EPUB 格式图书');
+          continue;
+        }
+        const title = file.name.replace(/\.epub$/i, '');
         const buf = await file.arrayBuffer();
         const defaultShelf = state.currentNav.startsWith('shelf:') ? state.currentNav.slice(6) : '';
-        let created = null;
 
-        if (ext === 'epub') {
-          showToast(`正在解析《${title}》...`);
-          const parsed = await parseEpubBuffer(buf, title);
-          const { rawBlocks, toc, coverDataUrl } = parsed;
-          const newBook = {
-            id: 'book-' + Date.now() + Math.random().toString(36).slice(2, 6),
-            title, fileName: file.name, format: 'EPUB', shelf: defaultShelf,
-            pinned: false, addedAt: Date.now(), coverUrl: coverDataUrl,
-            hasBeenRead: false, progressPercent: 0, lastPageIndex: 0,
-            rawBlocks, toc, fileBytes: buf, isCloudOnly: false, parseVer: parsed.parseVer
-          };
-          state.books.unshift(newBook);
-          await saveBookDB(newBook);
-          renderLibrary();
-          created = newBook;
-        } else if (ext === 'pdf') {
-          showToast(`正在载入 PDF《${title}》...`);
-          const pdfDoc = await window.pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
-          const toc = await extractPdfOutline(pdfDoc);
-          const newBook = {
-            id: 'book-' + Date.now() + Math.random().toString(36).slice(2, 6),
-            title, fileName: file.name, format: 'PDF', shelf: defaultShelf,
-            pinned: false, addedAt: Date.now(), coverUrl: '',
-            hasBeenRead: false, progressPercent: 0, lastPageIndex: 0,
-            pdfDoc, toc, numPages: pdfDoc.numPages, fileBytes: buf, isCloudOnly: false
-          };
-          state.books.unshift(newBook);
-          await saveBookDB(newBook);
-          renderLibrary();
-          created = newBook;
-        }
+        showToast(`正在解析《${title}》...`);
+        const parsed = await parseEpubBuffer(buf, title);
+        const { rawBlocks, toc, coverDataUrl } = parsed;
+        const newBook = {
+          id: 'book-' + Date.now() + Math.random().toString(36).slice(2, 6),
+          title, fileName: file.name, format: 'EPUB', shelf: defaultShelf,
+          addedAt: Date.now(), lastReadAt: Date.now(), coverUrl: coverDataUrl,
+          hasBeenRead: false, progressPercent: 0, lastPageIndex: 0,
+          rawBlocks, toc, fileBytes: buf, isCloudOnly: false, parseVer: parsed.parseVer
+        };
+        state.books.unshift(newBook);
+        await saveBookDB(newBook);
+        renderLibrary();
 
-        if (created && uploadToCloud) {
+        if (uploadToCloud) {
           if (!isCloudConnected()) {
             showToast('未连接私有仓，已仅导入本地');
           } else {
             try {
-              showToast(`正在上传《${created.title}》到书架「${created.shelf}」...`);
-              await uploadBookToCloud(created);
-              await saveBookDB(created);
-              showToast(`已导入并上传《${created.title}》到云端「${created.shelf}」`);
+              showToast(`正在上传《${newBook.title}》到书架「${newBook.shelf}」...`);
+              await uploadBookToCloud(newBook);
+              await saveBookDB(newBook);
+              renderLibrary();
+              showToast(`已导入并上传《${newBook.title}》到云端「${newBook.shelf}」`);
             } catch (e) {
               showToast(`上传失败：${e.message || '请检查仓库权限'}`);
             }
           }
         }
 
-        if (created) openBook(created);
+        openBook(newBook);
       }
     }
 
     function hasStaleImageBlock(book) {
-      if (!book || book.format !== 'EPUB') return false;
+      if (!book) return false;
       const blocks = book.rawBlocks || [];
       return blocks.some(b => {
         if (!b || b.type !== 'img') return false;
@@ -3214,9 +3173,6 @@
 
     function buildToc(book) {
       if (!book) return [];
-      if (book.format === 'PDF') {
-        return Array.isArray(book.toc) ? book.toc : [];
-      }
       ensureBlockIndices(book);
       if (Array.isArray(book.toc) && book.toc.length > 0) {
         return book.toc;
@@ -3232,7 +3188,7 @@
     }
 
     function findPageOfBlock(book, blockIndex) {
-      if (!book || book.format === 'PDF') return Math.max(0, Number(blockIndex) || 0);
+      if (!book) return 0;
       const pages = book.pages || [];
       if (!pages.length) return 0;
       const targetBi = Number(blockIndex);
@@ -3274,7 +3230,7 @@
 
     function getCurrentReadingBlockIndex() {
       const book = state.currentBook;
-      if (!book || book.format === 'PDF') return -1;
+      if (!book) return -1;
       ensureBlockIndices(book);
 
       if (state.readerConfig.viewMode === 'scroll') {
@@ -3306,10 +3262,6 @@
       return book.lastBlockIndex || 0;
     }
 
-    function getCurrentBlockIndex(book) {
-      return getCurrentReadingBlockIndex();
-    }
-
     function getChapterNameForBlock(book, blockIndex) {
       if (!book) return '';
       const toc = buildToc(book);
@@ -3334,13 +3286,6 @@
     async function jumpToBookLocation(target = {}) {
       const book = state.currentBook;
       if (!book) return;
-
-      if (book.format === 'PDF') {
-        const rawPage = typeof target.pageIndex === 'number' ? target.pageIndex : 0;
-        state.currentPageIndex = alignPageForMode(rawPage);
-        await renderReaderPages();
-        return;
-      }
 
       ensureBlockIndices(book);
       let blockIdx = typeof target.blockIndex === 'number' ? target.blockIndex : -1;
@@ -3376,15 +3321,6 @@
 
     function getActiveTocIndex(book, toc) {
       if (!book || !toc || !toc.length) return -1;
-      if (book.format === 'PDF') {
-        const curPage = state.currentPageIndex + (state.readerConfig.viewMode === 'dual' ? 1 : 0);
-        let activeIdx = 0;
-        for (let i = 0; i < toc.length; i++) {
-          if ((toc[i].pageIndex || 0) <= curPage) activeIdx = i;
-          else break;
-        }
-        return activeIdx;
-      }
 
       let maxBiInView = getCurrentReadingBlockIndex();
       if (state.readerConfig.viewMode !== 'scroll') {
@@ -3422,14 +3358,10 @@
           box.innerHTML = '<p class="text-sm text-neutral-400 mt-6 text-center">还没有书签，点右上角 ＋ 把当前位置加入书签</p>';
           return;
         }
-        const totalPages = book.format === 'PDF'
-          ? Math.max(1, book.numPages || 1)
-          : Math.max(1, (book.pages && book.pages.length) || 1);
+        const totalPages = Math.max(1, (book.pages && book.pages.length) || 1);
 
         marks.forEach((m, i) => {
-          const dynamicPage = book.format === 'PDF'
-            ? (m.pageIndex ?? m.page ?? 0)
-            : (typeof m.blockIndex === 'number' ? findPageOfBlock(book, m.blockIndex) : (m.page || 0));
+          const dynamicPage = typeof m.blockIndex === 'number' ? findPageOfBlock(book, m.blockIndex) : (m.page || 0);
           const pctStr = `${Math.min(100, Math.max(1, Math.round(((dynamicPage + 1) / totalPages) * 100)))}%`;
 
           const row = document.createElement('div');
@@ -3447,9 +3379,7 @@
           row.onclick = async e => {
             if (e.target.classList.contains('del-bm')) return;
             closeTocDrawer();
-            if (book.format === 'PDF') {
-              await jumpToBookLocation({ pageIndex: m.pageIndex ?? m.page ?? 0 });
-            } else if (typeof m.blockIndex === 'number') {
+            if (typeof m.blockIndex === 'number') {
               await jumpToBookLocation({ blockIndex: m.blockIndex });
             } else {
               await jumpToBookLocation({ pageIndex: m.page || 0 });
@@ -3476,9 +3406,7 @@
       let activeRowEl = null;
 
       toc.forEach((item, idx) => {
-        const page = book.format === 'PDF'
-          ? (item.pageIndex || 0)
-          : findPageOfBlock(book, item.blockIndex);
+        const page = findPageOfBlock(book, item.blockIndex);
         const isCurrent = idx === activeIdx;
         const level = Math.min(3, Math.max(0, Number(item.level) || 0));
         const indentPx = 20 + level * 16;
@@ -3492,11 +3420,7 @@
           <span class="text-neutral-400 shrink-0 opacity-80 tabular-nums" style="font-size: 0.82em;">${page + 1}</span>`;
         row.onclick = async () => {
           closeTocDrawer();
-          if (book.format === 'PDF') {
-            await jumpToBookLocation({ pageIndex: item.pageIndex || 0 });
-          } else {
-            await jumpToBookLocation({ blockIndex: item.blockIndex });
-          }
+          await jumpToBookLocation({ blockIndex: item.blockIndex });
         };
         if (isCurrent) activeRowEl = row;
         box.appendChild(row);
@@ -3557,10 +3481,6 @@
       const book = state.currentBook;
       if (!book) {
         box.innerHTML = '<p class="text-sm text-neutral-400 mt-6 text-center">没有打开的书</p>';
-        return;
-      }
-      if (book.format === 'PDF') {
-        box.innerHTML = '<p class="text-sm text-neutral-400 mt-6 text-center">PDF 暂不支持全文检索，请使用目录跳转</p>';
         return;
       }
       if (!kw) {
@@ -3658,7 +3578,7 @@
     }
 
     async function openBook(book) {
-      if (book.format === 'EPUB' && book.fileBytes && ((book.parseVer || 0) < PARSE_VERSION || !Array.isArray(book.toc))) {
+      if (book.fileBytes && ((book.parseVer || 0) < PARSE_VERSION || !Array.isArray(book.toc))) {
         try {
           const parsed = await parseEpubBuffer(book.fileBytes.slice(0), book.title);
           book.rawBlocks = parsed.rawBlocks;
@@ -3686,27 +3606,15 @@
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const buf = await res.arrayBuffer();
           book.fileBytes = buf;
-          if (book.format === 'EPUB') {
-            const parsed = await parseEpubBuffer(buf, book.title);
-            book.rawBlocks = parsed.rawBlocks;
-            book.toc = parsed.toc;
-            book.parseVer = parsed.parseVer;
-            if (parsed.coverDataUrl) book.coverUrl = parsed.coverDataUrl;
-          } else {
-            book.pdfDoc = await window.pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
-            book.numPages = book.pdfDoc.numPages;
-            book.toc = await extractPdfOutline(book.pdfDoc);
-          }
+          const parsed = await parseEpubBuffer(buf, book.title);
+          book.rawBlocks = parsed.rawBlocks;
+          book.toc = parsed.toc;
+          book.parseVer = parsed.parseVer;
+          if (parsed.coverDataUrl) book.coverUrl = parsed.coverDataUrl;
           book.isCloudOnly = false;
           await saveBookDB(book);
         } catch (e) {
           return showToast('云端图书下载失败');
-        }
-      } else if (book.format === 'PDF' && !book.pdfDoc && book.fileBytes) {
-        book.pdfDoc = await window.pdfjsLib.getDocument({ data: book.fileBytes.slice(0) }).promise;
-        book.numPages = book.pdfDoc.numPages;
-        if (!Array.isArray(book.toc) || !book.toc.length) {
-          book.toc = await extractPdfOutline(book.pdfDoc);
         }
       }
 
@@ -3714,6 +3622,8 @@
       state.currentBook = book;
       state.currentPageIndex = alignPageForMode(book.lastPageIndex || 0);
       book.hasBeenRead = true;
+      book.lastReadAt = Date.now();
+      saveQuickProgress(book);
 
       $('library-view').classList.add('hidden');
       $('reader-view').classList.remove('hidden');
@@ -3722,7 +3632,7 @@
       applyLayoutStyles();
       requestAnimationFrame(() => {
         repaginate();
-        if (book.format === 'EPUB' && typeof book.lastBlockIndex === 'number' && book.lastBlockIndex > 0) {
+        if (typeof book.lastBlockIndex === 'number' && book.lastBlockIndex > 0) {
           if (state.readerConfig.viewMode === 'scroll') {
             jumpToBookLocation({ blockIndex: book.lastBlockIndex });
             return;
@@ -3890,7 +3800,7 @@
 
     function repaginate() {
       const book = state.currentBook;
-      if (!book || book.format === 'PDF') return;
+      if (!book) return;
       ensureBlockIndices(book);
       const blocks = book.rawBlocks || [];
       const pageLeft = $('page-left');
@@ -4024,32 +3934,18 @@
       }, 60);
     }
 
-    async function renderPdfPage(pdfDoc, num, box) {
-      box.innerHTML = '';
-      if (num < 1 || num > pdfDoc.numPages) return;
-      const page = await pdfDoc.getPage(num);
-      const vp0 = page.getViewport({ scale: 1 });
-      const scale = Math.min((box.clientWidth - 20) / vp0.width, (box.clientHeight - 20) / vp0.height);
-      const vp = page.getViewport({ scale: Math.max(0.4, scale) });
-      const canvas = document.createElement('canvas');
-      canvas.className = 'mx-auto my-auto shadow-sm rounded max-w-full max-h-full object-contain';
-      canvas.width = vp.width; canvas.height = vp.height;
-      box.appendChild(canvas);
-      await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
-    }
-
     async function renderReaderPages(opts = {}) {
       const book = state.currentBook;
       if (!book) return;
       const mode = state.readerConfig.viewMode;
       const pL = $('page-left'), pR = $('page-right');
 
-      const total = book.format === 'PDF' ? (book.numPages || 1) : ((book.pages && book.pages.length) || 1);
+      const total = (book.pages && book.pages.length) || 1;
       state.currentPageIndex = Math.max(0, Math.min(state.currentPageIndex, total - 1));
       if (mode === 'dual') state.currentPageIndex = alignPageForMode(state.currentPageIndex);
 
       book.lastPageIndex = state.currentPageIndex;
-      if (book.format === 'EPUB' && mode !== 'scroll') {
+      if (mode !== 'scroll') {
         const curPg = (book.pages && book.pages[state.currentPageIndex]) || [];
         const firstBlk = curPg.find(b => b && typeof b._bi === 'number');
         if (firstBlk) book.lastBlockIndex = firstBlk._bi;
@@ -4061,12 +3957,6 @@
         saveQuickProgress(book);
       } else {
         saveBookProgressDebounced(book);
-      }
-
-      if (book.format === 'PDF' && book.pdfDoc) {
-        await renderPdfPage(book.pdfDoc, state.currentPageIndex + 1, pL);
-        if (mode === 'dual') await renderPdfPage(book.pdfDoc, state.currentPageIndex + 2, pR);
-        return;
       }
 
       if (mode === 'scroll') {
@@ -4089,7 +3979,7 @@
     function turnPage(dir) {
       if (!state.currentBook || state.readerConfig.viewMode === 'scroll') return;
       const step = state.readerConfig.viewMode === 'dual' ? 2 : 1;
-      const total = state.currentBook.format === 'PDF' ? state.currentBook.numPages : state.currentBook.pages.length;
+      const total = state.currentBook.pages.length;
       const next = state.currentPageIndex + dir * step;
       if (next < 0) return showToast('已经是第一页');
       if (next >= total) return showToast('已经是最后一页');
@@ -4226,7 +4116,7 @@
         clearTimeout(scrollProgressTimer);
         scrollProgressTimer = setTimeout(() => {
           const book = state.currentBook;
-          if (!book || book.format === 'PDF') return;
+          if (!book) return;
           const bi = getCurrentReadingBlockIndex();
           if (bi >= 0) {
             book.lastBlockIndex = bi;
@@ -4496,7 +4386,7 @@
       };
       $('gh-connect-pull-btn').onclick = pullFromGitHubPrivateRepo;
       $('gh-clear-config-btn').onclick = () => {
-        state.github = { owner: '', repo: '', branch: '', token: '', metaSha: '' };
+        state.github = { owner: '', repo: '', branch: '', token: '' };
         state.notesPulledReady = false;
         state.lastPulledNotesSha = null;
         $('gh-owner-input').value = ''; $('gh-repo-input').value = ''; $('gh-branch-input').value = ''; $('gh-token-input').value = '';
@@ -4591,10 +4481,29 @@
         if (state.activeMenuBookId) state.selectedBookIds.add(state.activeMenuBookId);
         renderLibrary();
       };
-      $('book-act-pin').onclick = () => {
+      $('book-act-cloud-upload').onclick = async () => {
         closeBookMenu();
+        if (!isCloudConnected()) return showToast('请先连接私有仓');
         const bk = state.books.find(b => b.id === state.activeMenuBookId);
-        if (bk) { bk.pinned = !bk.pinned; saveBookDB(bk); renderLibrary(); }
+        if (!bk) return;
+        if (!state.currentNav.startsWith('shelf:') || !bk.shelf || !state.shelves.includes(bk.shelf)) {
+          return showToast('请先进入对应书架后再上传到云仓库');
+        }
+        if (bk.cloudPath || bk.cloudSha) {
+          return showToast('该书已在云仓库中');
+        }
+        if (!bk.fileBytes) {
+          return showToast('本地无原始文件，无法上传');
+        }
+        try {
+          showToast(`正在上传《${bk.title}》到云仓库「${bk.shelf}」...`);
+          await uploadBookToCloud(bk);
+          await saveBookDB(bk);
+          renderLibrary();
+          showToast(`已上传《${bk.title}》到云端「${bk.shelf}」`);
+        } catch (e) {
+          showToast(`上传失败：${e.message || '请检查仓库权限'}`);
+        }
       };
       $('book-act-purge-one').onclick = async () => {
         closeBookMenu();
@@ -4605,7 +4514,6 @@
           }
           bk.fileBytes = null;
           bk.rawBlocks = null;
-          bk.pdfDoc = null;
           bk.isCloudOnly = true;
           await saveBookDB(bk);
           renderLibrary();
@@ -4641,17 +4549,6 @@
       };
 
       $('batch-add-shelf-btn').onclick = () => openAssignModal(Array.from(state.selectedBookIds));
-      $('batch-pin-btn').onclick = async () => {
-        const changed = [];
-        state.books.forEach(b => {
-          if (state.selectedBookIds.has(b.id)) {
-            b.pinned = true;
-            changed.push(b);
-          }
-        });
-        if (changed.length) await saveBooksBatchDB(changed);
-        state.multiSelectMode = false; state.selectedBookIds.clear(); renderLibrary();
-      };
       $('batch-delete-btn').onclick = async () => {
         for (const id of state.selectedBookIds) {
           const i = state.books.findIndex(b => b.id === id);
@@ -4709,45 +4606,29 @@
         if (!book) return;
         book.bookmarks = book.bookmarks || [];
 
-        if (book.format === 'PDF') {
-          const pageIndex = alignPageForMode(state.currentPageIndex);
-          if (book.bookmarks.some(m => (m.pageIndex ?? m.page) === pageIndex)) {
-            return showToast('当前页已在书签中');
-          }
-          const chap = currentChapterName();
-          book.bookmarks.push({
-            pageIndex,
-            page: pageIndex,
-            chapter: chap,
-            label: chap ? `${chap} · 第 ${pageIndex + 1} 页` : `第 ${pageIndex + 1} 页`,
-            createdAt: Date.now()
-          });
-          book.bookmarks.sort((a, b) => (a.pageIndex ?? a.page ?? 0) - (b.pageIndex ?? b.page ?? 0));
-        } else {
-          ensureBlockIndices(book);
-          const bi = getCurrentReadingBlockIndex();
-          const curPage = findPageOfBlock(book, bi);
-          if (book.bookmarks.some(m => (typeof m.blockIndex === 'number' ? findPageOfBlock(book, m.blockIndex) : m.page) === curPage)) {
-            return showToast('当前位置已在书签中');
-          }
-          const blocks = book.rawBlocks || [];
-          let snippet = '';
-          for (let i = Math.max(0, bi); i < Math.min(blocks.length, bi + 6); i++) {
-            if (blocks[i] && blocks[i].text) {
-              snippet = blocks[i].text.slice(0, 48);
-              break;
-            }
-          }
-          const chap = getChapterNameForBlock(book, bi);
-          book.bookmarks.push({
-            blockIndex: Math.max(0, bi),
-            page: curPage,
-            chapter: chap,
-            label: snippet || chap || `第 ${curPage + 1} 页`,
-            createdAt: Date.now()
-          });
-          book.bookmarks.sort((a, b) => (a.blockIndex ?? 0) - (b.blockIndex ?? 0));
+        ensureBlockIndices(book);
+        const bi = getCurrentReadingBlockIndex();
+        const curPage = findPageOfBlock(book, bi);
+        if (book.bookmarks.some(m => (typeof m.blockIndex === 'number' ? findPageOfBlock(book, m.blockIndex) : m.page) === curPage)) {
+          return showToast('当前位置已在书签中');
         }
+        const blocks = book.rawBlocks || [];
+        let snippet = '';
+        for (let i = Math.max(0, bi); i < Math.min(blocks.length, bi + 6); i++) {
+          if (blocks[i] && blocks[i].text) {
+            snippet = blocks[i].text.slice(0, 48);
+            break;
+          }
+        }
+        const chap = getChapterNameForBlock(book, bi);
+        book.bookmarks.push({
+          blockIndex: Math.max(0, bi),
+          page: curPage,
+          chapter: chap,
+          label: snippet || chap || `第 ${curPage + 1} 页`,
+          createdAt: Date.now()
+        });
+        book.bookmarks.sort((a, b) => (a.blockIndex ?? 0) - (b.blockIndex ?? 0));
 
         await saveBookDB(book);
         state.tocTab = 'bm';
@@ -4764,7 +4645,7 @@
           savePrefs();
           applyLayoutStyles();
           repaginate();
-          if (book && book.format === 'EPUB' && anchorBi >= 0) {
+          if (book && anchorBi >= 0) {
             await jumpToBookLocation({ blockIndex: anchorBi });
           } else {
             await renderReaderPages();
