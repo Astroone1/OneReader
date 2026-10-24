@@ -152,7 +152,6 @@
             <select id="notes-book-filter" class="h-9 px-2.5 rounded-lg border border-neutral-300 bg-white text-sm text-neutral-700 focus:outline-none cursor-pointer max-w-[240px]">
               <option value="">请选择</option>
             </select>
-            <!-- 笔记栏云笔记图标保持不变，点击弹出下行/上行面板 -->
             <button id="notes-sync-btn" type="button" title="与私有仓同步笔记" class="w-9 h-9 flex items-center justify-center rounded-lg border border-neutral-300 hover:bg-neutral-100 text-neutral-600 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
               <svg class="w-[19px] h-[19px]" viewBox="0 0 40 32" fill="none">
                 <path d="M11.5 26.5H29.5C33.6421 26.5 37 23.1421 37 19C37 15.203 34.1783 12.065 30.514 11.568C29.389 6.657 25.002 3 19.75 3C13.675 3 8.75 7.925 8.75 14C8.75 14.389 8.77 14.773 8.81 15.151C5.534 15.792 3 18.678 3 22.15C3 24.552 4.948 26.5 7.35 26.5H11.5Z" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="rgba(59,59,59,0.03)"/>
@@ -212,7 +211,7 @@
     </div>
   </div>
 
-  <!-- ==================== 2. 云端弹窗（全空配置 + 本地缓存管理清理） ==================== -->
+  <!-- ==================== 2. 云端弹窗 ==================== -->
   <div id="cloud-hub-modal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl max-w-[470px] w-full p-6 shadow-2xl border border-neutral-100 flex flex-col max-h-[90vh] overflow-y-auto">
       <div class="relative flex items-center justify-center pb-4 border-b border-neutral-100">
@@ -297,7 +296,7 @@
     </div>
   </div>
 
-  <!-- ==================== 3. 单本书 ••• 菜单（带释放缓存） ==================== -->
+  <!-- ==================== 3. 单本书 ••• 菜单 ==================== -->
   <div id="book-action-backdrop" class="hidden fixed inset-0 z-50"></div>
   <div id="book-action-popover" class="hidden fixed z-50 w-48 bg-white rounded-2xl shadow-[0_10px_32px_rgba(0,0,0,0.16)] border border-neutral-100 py-1.5 px-1.5 text-[15px] text-[#3a3a3a] select-none">
     <button id="book-act-shelf" type="button" class="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-neutral-100 transition cursor-pointer text-left">
@@ -364,7 +363,7 @@
     </div>
   </div>
 
-  <!-- ==================== 5. 阅读器视图（顶部正中全屏按钮，靠近才浮现） ==================== -->
+  <!-- ==================== 5. 阅读器视图 ==================== -->
   <div id="reader-view" class="hidden fixed inset-0 z-30 flex flex-col bg-[#e9e4d8]">
     <div class="relative flex-1 w-full h-full p-0 sm:p-[6px] bg-[#dcd7cc] overflow-hidden flex items-center justify-center">
       <div id="book-stage" class="relative w-full h-full border border-[#bfbab0] overflow-hidden flex flex-col transition-colors duration-150" style="background-color: var(--reader-bg); color: var(--reader-text); filter: brightness(var(--reader-brightness));">
@@ -533,7 +532,7 @@
         </div>
         <textarea id="note-editor-content" placeholder="写点想法…（可留空）" class="mt-5 w-full h-[130px] resize-none rounded-xl bg-[#f2f8f5] border border-transparent focus:border-[#cfe5d9] focus:outline-none px-4 py-3 text-[15px] leading-relaxed text-[#2f2f2f]"></textarea>
         <div id="note-editor-colors" class="mt-4 flex items-center gap-2.5"></div>
-        <div class="mt-5 flex items-center justify-end gap-5 text-[15px]">
+        <div id="note-editor-actions" class="mt-5 flex items-center justify-end gap-5 text-[15px]">
           <button id="note-editor-delete" type="button" class="text-neutral-600 hover:text-red-600 cursor-pointer">删除</button>
           <button id="note-editor-cancel" type="button" class="text-neutral-600 hover:text-black cursor-pointer">取消</button>
           <button id="note-editor-confirm" type="button" class="text-[#2f2f2f] font-medium hover:text-black cursor-pointer">确认</button>
@@ -554,20 +553,20 @@
 
     const state = {
       shelves: ['交易', '世界', '小说', '技能'],
-      currentNav: 'all', // 'all' 代表「本地图书」（未分类 / 失去书架的书）
+      currentNav: 'all',
       searchQuery: '',
       books: [],
-      notes: [],          // 全部笔记（单一实体，content 空=纯摘抄）
-      notesBookFilter: '',  // 笔记页"按图书筛选"的当前值（空=全部）
-      notesPulledReady: false, // 是否已执行下行拉取合并（未下行前锁住上行）
-      lastPulledNotesSha: null, // 最近一次拉取到的云端 notes.json sha（null 表示云端尚无该文件）
+      notes: [],
+      notesBookFilter: '',
+      notesPulledReady: false,
+      lastPulledNotesSha: null,
       currentBook: null,
       currentPageIndex: 0,
       activeMenuBookId: null,
       multiSelectMode: false,
       selectedBookIds: new Set(),
       modalConfirmCallback: null,
-      tocTab: 'toc',   // 目录面板当前标签：'toc' | 'bm'
+      tocTab: 'toc',
       github: { owner: '', repo: '', branch: '', token: '', metaSha: '' },
       fontMap: {
         system: "-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif",
@@ -597,7 +596,7 @@
     const PREFS_VER = 2;
     const DB_NAME = 'OneReaderDB_v4';
     const FONT_DB_NAME = 'OneReaderFonts_v1';
-    const PARSE_VERSION = 3;
+    const PARSE_VERSION = 4;
 
     // 极轻量进度表（避免每次翻页或改设置都把整本几十 MB 的书重写进 IndexedDB）
     function saveQuickProgress(book) {
@@ -606,6 +605,7 @@
         const map = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
         map[book.id] = {
           lastPageIndex: book.lastPageIndex || 0,
+          lastBlockIndex: typeof book.lastBlockIndex === 'number' ? book.lastBlockIndex : undefined,
           progressPercent: book.progressPercent || 0,
           hasBeenRead: Boolean(book.hasBeenRead),
           updatedAt: Date.now()
@@ -621,6 +621,7 @@
           const p = map[b.id];
           if (p) {
             b.lastPageIndex = p.lastPageIndex ?? b.lastPageIndex ?? 0;
+            if (typeof p.lastBlockIndex === 'number') b.lastBlockIndex = p.lastBlockIndex;
             b.progressPercent = p.progressPercent ?? b.progressPercent ?? 0;
             b.hasBeenRead = Boolean(p.hasBeenRead || b.hasBeenRead);
           }
@@ -681,7 +682,6 @@
       updateStorageUsageDisplay();
     }
 
-    // 批量写入图书（避免上千本书连接时逐本开事务造成卡顿）
     async function saveBooksBatchDB(books) {
       const db = await openDB();
       if (!db || !books || !books.length) return;
@@ -787,7 +787,7 @@
       return state.notes.filter(n => !n.deletedAt && n.bookFile === book.fileName);
     }
 
-    // ==================== 本地字体：导入 / 持久化 / 注入 @font-face ====================
+    // ==================== 本地字体 ====================
     function openFontDB() {
       return new Promise(res => {
         if (!window.indexedDB) return res(null);
@@ -969,9 +969,13 @@
       }
       if (state.currentBook) {
         setTimeout(() => {
+          const anchor = getCurrentReadingBlockIndex();
           applyLayoutStyles();
           repaginate();
-          renderReaderPages();
+          if (anchor >= 0 && state.readerConfig.viewMode !== 'scroll') {
+            state.currentPageIndex = alignPageForMode(findPageOfBlock(state.currentBook, anchor));
+          }
+          renderReaderPages({ skipDbSave: true });
         }, 120);
       }
     }
@@ -983,9 +987,13 @@
       if (!state.currentBook) return;
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
+        const anchor = getCurrentReadingBlockIndex();
         applyLayoutStyles();
         repaginate();
-        renderReaderPages();
+        if (anchor >= 0 && state.readerConfig.viewMode !== 'scroll') {
+          state.currentPageIndex = alignPageForMode(findPageOfBlock(state.currentBook, anchor));
+        }
+        renderReaderPages({ skipDbSave: true });
       }, 200);
     });
 
@@ -1573,7 +1581,7 @@
     }
 
     // ==================== 笔记：划线弹窗 ====================
-    let pendingSelection = null;   // { quote, blockIndex, rect, color }
+    let pendingSelection = null;
 
     function buildColorDots(container, activeKey, onPick) {
       container.innerHTML = '';
@@ -1680,34 +1688,20 @@
       renderNotes();
       showToast(content ? '已保存笔记' : '已保存为摘抄');
     }
-
-    async function removeEditedNote() {
-      if (!editingNote) return;
-      const note = state.notes.find(n => n.id === editingNote.id);
-      if (note) {
-        note.deletedAt = Date.now();
-        note.updatedAt = note.deletedAt;
-        await putNoteDB(note);
-      }
-      closeNoteEditor();
-      if (!$('reader-view').classList.contains('hidden')) renderReaderPages();
-      renderNotesBookFilter();
-      renderNotes();
-      showToast('已删除笔记');
-    }
-
     function currentChapterName() {
       const book = state.currentBook;
       if (!book) return '';
-      const pages = book.pages || [];
-      const blocks = book.rawBlocks || [];
-      const first = (pages[state.currentPageIndex] || [])[0];
-      let pos = first ? blocks.findIndex(b => b === first || (b.type === first.type && b.text === first.text)) : -1;
-      if (pos < 0) pos = blocks.length - 1;
-      for (let i = pos; i >= 0; i--) {
-        if (blocks[i].type === 'heading' && blocks[i].text) return blocks[i].text.slice(0, 40);
+      if (book.format === 'PDF') {
+        const toc = book.toc || [];
+        let cur = '';
+        for (const item of toc) {
+          if ((item.pageIndex || 0) <= state.currentPageIndex) cur = item.text;
+          else break;
+        }
+        return cur ? cur.slice(0, 40) : '';
       }
-      return '';
+      const bi = getCurrentBlockIndex(book);
+      return getChapterNameForBlock(book, bi).slice(0, 40);
     }
 
     function extractExactRangeText(range) {
@@ -1848,11 +1842,19 @@
       }
       if (!rect || (!rect.width && !rect.height)) return null;
 
+      // 优先直接从选中节点所属的 DOM [data-bi] 获取精确 blockIndex
+      let idx = -1;
+      const startEl = range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentElement;
+      const biHost = startEl && startEl.closest ? startEl.closest('[data-bi]') : null;
+      if (biHost && biHost.dataset.bi !== undefined) {
+        const parsedBi = parseInt(biHost.dataset.bi, 10);
+        if (!isNaN(parsedBi) && parsedBi >= 0) idx = parsedBi;
+      }
+
       const book = state.currentBook;
       const norm = s => String(s || '').replace(/\s+/g, '');
       const firstLine = norm(quote.split('\n')[0] || quote);
-      let idx = -1;
-      if (book && firstLine) {
+      if (idx < 0 && book && firstLine) {
         idx = (book.rawBlocks || []).findIndex(b => b.type !== 'img' && norm(b.text).includes(firstLine));
         if (idx < 0) {
           const head = firstLine.slice(0, 12);
@@ -1866,46 +1868,57 @@
     async function jumpToNote(note) {
       const book = state.books.find(b => b.fileName === note.bookFile);
       if (!book) return;
-      if (!$('reader-view').classList.contains('hidden') && state.currentBook === book) {
-        doJump();
-        return;
+      if ($('reader-view').classList.contains('hidden') || state.currentBook !== book) {
+        await openBook(book);
       }
-      await openBook(book);
-      setTimeout(doJump, 600);
 
-      function doJump() {
-        const bk = state.currentBook;
-        const blocks = bk.rawBlocks || [];
-        const pages = bk.pages || [];
-        const norm = s => String(s || '').replace(/\s+/g, '');
-        const firstPara = String(note.quote || '').split('\n').map(s => s.trim()).find(Boolean) || '';
-        const target = norm(firstPara);
+      const bk = state.currentBook;
+      if (!bk) return;
+      ensureBlockIndices(bk);
+      const blocks = bk.rawBlocks || [];
+      const norm = s => String(s || '').replace(/\s+/g, '');
+      const firstPara = String(note.quote || '').split('\n').map(s => s.trim()).find(Boolean) || '';
+      const target = norm(firstPara);
 
-        let blockIdx = typeof note.blockIndex === 'number' && note.blockIndex >= 0 ? note.blockIndex : -1;
-        if (blockIdx < 0 && target) {
-          blockIdx = blocks.findIndex(b => b.type !== 'img' && norm(b.text).includes(target));
-          if (blockIdx < 0) {
-            const head = target.slice(0, 12);
-            if (head) blockIdx = blocks.findIndex(b => b.type !== 'img' && norm(b.text).includes(head));
-          }
+      let blockIdx = (typeof note.blockIndex === 'number' && note.blockIndex >= 0 && note.blockIndex < blocks.length)
+        ? note.blockIndex
+        : -1;
+
+      if (blockIdx >= 0 && target) {
+        const candidate = blocks[blockIdx];
+        if (!candidate || candidate.type === 'img' || !norm(candidate.text).includes(target.slice(0, 8))) {
+          blockIdx = -1;
         }
-        if (blockIdx < 0 && note.chapter) {
-          blockIdx = blocks.findIndex(b => b.type === 'heading' && norm(b.text).includes(norm(note.chapter)));
+      }
+
+      if (blockIdx < 0 && target) {
+        blockIdx = blocks.findIndex(b => b.type !== 'img' && norm(b.text).includes(target));
+        if (blockIdx < 0) {
+          const head = target.slice(0, 12);
+          if (head) blockIdx = blocks.findIndex(b => b.type !== 'img' && norm(b.text).includes(head));
         }
-        if (blockIdx >= 0) {
-          const blk = blocks[blockIdx];
-          for (let i = 0; i < pages.length; i++) {
-            if (pages[i].some(x => x === blk || (x.type === blk.type && norm(x.text).includes(target.slice(0, 12))))) {
-              state.currentPageIndex = state.readerConfig.viewMode === 'dual' ? (i - (i % 2)) : i;
-              break;
-            }
-          }
+      }
+      if (blockIdx < 0 && note.chapter) {
+        const normChap = norm(note.chapter);
+        const tocHit = (bk.toc || []).find(t => norm(t.text).includes(normChap));
+        if (tocHit && typeof tocHit.blockIndex === 'number') {
+          blockIdx = tocHit.blockIndex;
+        } else {
+          blockIdx = blocks.findIndex(b => b.type === 'heading' && norm(b.text).includes(normChap));
         }
-        $('reader-view').classList.remove('hidden');
-        $('library-view').classList.add('hidden');
-        applyThemeColors(); applyLayoutStyles();
-        repaginate(); renderReaderPages();
-        if (blockIdx < 0) showToast('未能精确定位，已跳到对应章节');
+      }
+
+      $('reader-view').classList.remove('hidden');
+      $('library-view').classList.add('hidden');
+      applyThemeColors();
+      applyLayoutStyles();
+      repaginate();
+
+      if (blockIdx >= 0) {
+        await jumpToBookLocation({ blockIndex: blockIdx });
+      } else {
+        await renderReaderPages();
+        showToast('未能精确定位，已打开当前位置');
       }
     }
 
@@ -2039,6 +2052,21 @@
         ops.sort((a, b) => b.start - a.start);
         ops.forEach(op => wrapTextNodeSlice(textNode, op.start, op.end, op.note));
       });
+    }
+
+    async function removeEditedNote() {
+      if (!editingNote) return;
+      const note = state.notes.find(n => n.id === editingNote.id);
+      if (note) {
+        note.deletedAt = Date.now();
+        note.updatedAt = note.deletedAt;
+        await putNoteDB(note);
+      }
+      closeNoteEditor();
+      if (!$('reader-view').classList.contains('hidden')) renderReaderPages();
+      renderNotesBookFilter();
+      renderNotes();
+      showToast('已删除笔记');
     }
 
     const NOTES_CLOUD_PATH = 'data/notes.json';
@@ -2517,6 +2545,18 @@
       return out.join('/');
     }
 
+    function splitHrefAndHash(baseFile, rawHref) {
+      const str = String(rawHref || '').trim();
+      if (!str) return { filePath: '', hash: '' };
+      const hashIdx = str.indexOf('#');
+      const rawHash = hashIdx >= 0 ? str.slice(hashIdx + 1) : '';
+      let hash = rawHash;
+      try { hash = decodeURIComponent(rawHash); } catch (e) {}
+      const pathPart = hashIdx >= 0 ? str.slice(0, hashIdx) : str;
+      const resolved = pathPart ? resolveRelativePath(baseFile, pathPart) : baseFile;
+      return { filePath: normalizeResPath(resolved), hash: hash.trim() };
+    }
+
     async function parseEpubBuffer(arrayBuffer, fallbackTitle) {
       const zip = await window.JSZip.loadAsync(arrayBuffer);
       const parser = new DOMParser();
@@ -2580,53 +2620,160 @@
         return Object.keys(zip.files).find(n => /\.opf$/i.test(n)) || '';
       };
 
-      const parseSpine = async opfPath => {
-        if (!opfPath || !zip.file(opfPath)) return null;
+      const parseNavXhtmlEntries = (xmlStr, navFilePath) => {
+        const entries = [];
+        const doc = parser.parseFromString(xmlStr, 'text/html');
+        let navRoot = doc.querySelector('nav[*|type="toc"], nav[epub\\:type="toc"], nav#toc, nav.toc') || doc.querySelector('nav');
+        if (!navRoot) navRoot = doc.body;
+        if (!navRoot) return entries;
+
+        const walkList = (olEl, level) => {
+          if (!olEl) return;
+          Array.from(olEl.children).forEach(li => {
+            if (!li || li.tagName.toLowerCase() !== 'li') return;
+            const a = li.querySelector(':scope > a, :scope > span > a');
+            if (a) {
+              const text = (a.textContent || '').replace(/\s+/g, ' ').trim();
+              const href = a.getAttribute('href') || '';
+              if (text && href) {
+                const { filePath, hash } = splitHrefAndHash(navFilePath, href);
+                entries.push({ text, filePath, hash, level });
+              }
+            }
+            const subOl = li.querySelector(':scope > ol, :scope > ul');
+            if (subOl) walkList(subOl, Math.min(3, level + 1));
+          });
+        };
+
+        const rootList = navRoot.querySelector('ol, ul');
+        if (rootList) {
+          walkList(rootList, 0);
+        } else {
+          navRoot.querySelectorAll('a[href]').forEach(a => {
+            const text = (a.textContent || '').replace(/\s+/g, ' ').trim();
+            const href = a.getAttribute('href') || '';
+            if (text && href) {
+              const { filePath, hash } = splitHrefAndHash(navFilePath, href);
+              entries.push({ text, filePath, hash, level: 0 });
+            }
+          });
+        }
+        return entries;
+      };
+
+      const parseNcxEntries = (xmlStr, ncxFilePath) => {
+        const entries = [];
+        const doc = parser.parseFromString(xmlStr, 'application/xml');
+        const navMap = doc.querySelector('navMap');
+        if (!navMap) return entries;
+
+        const walkNavPoints = (parentEl, level) => {
+          Array.from(parentEl.children).forEach(node => {
+            if (!node || !/navpoint$/i.test(node.tagName)) return;
+            let labelText = '';
+            const navLabel = Array.from(node.children).find(c => /navlabel$/i.test(c.tagName));
+            if (navLabel) {
+              const tNode = navLabel.querySelector('text');
+              labelText = ((tNode ? tNode.textContent : navLabel.textContent) || '').replace(/\s+/g, ' ').trim();
+            }
+            const contentEl = Array.from(node.children).find(c => /content$/i.test(c.tagName));
+            const src = contentEl ? (contentEl.getAttribute('src') || '') : '';
+            if (labelText && src) {
+              const { filePath, hash } = splitHrefAndHash(ncxFilePath, src);
+              entries.push({ text: labelText, filePath, hash, level });
+            }
+            walkNavPoints(node, Math.min(3, level + 1));
+          });
+        };
+
+        walkNavPoints(navMap, 0);
+        return entries;
+      };
+
+      const parseSpineAndOfficialToc = async opfPath => {
+        if (!opfPath || !zip.file(opfPath)) return { spinePaths: [], tocEntries: [], guideTocFiles: new Set() };
         let xml = '';
-        try { xml = await zip.file(opfPath).async('string'); } catch (e) { return null; }
-        const doc = new DOMParser().parseFromString(xml, 'application/xml');
+        try { xml = await zip.file(opfPath).async('string'); } catch (e) { return { spinePaths: [], tocEntries: [], guideTocFiles: new Set() }; }
+        const doc = parser.parseFromString(xml, 'application/xml');
         const baseDir = opfPath.includes('/') ? opfPath.slice(0, opfPath.lastIndexOf('/') + 1) : '';
         const idToPath = {};
+        const navFiles = [];
+        const ncxFiles = [];
+        const guideTocFiles = new Set();
+
         doc.querySelectorAll('manifest > item').forEach(it => {
-          const id = it.getAttribute('id');
-          const href = it.getAttribute('href');
+          const id = it.getAttribute('id') || '';
+          const href = it.getAttribute('href') || '';
+          const props = (it.getAttribute('properties') || '').toLowerCase();
+          const mediaType = (it.getAttribute('media-type') || '').toLowerCase();
           if (!id || !href) return;
-          idToPath[id] = resolveRelativePath(opfPath, href) || (baseDir + href);
+          const full = resolveRelativePath(opfPath, href) || (baseDir + href);
+          idToPath[id] = full;
+          if (props.split(/\s+/).includes('nav') || /nav\.x?html?$/i.test(full)) {
+            navFiles.push(full);
+          }
+          if (mediaType.includes('dtbncx') || /\.ncx$/i.test(full)) {
+            ncxFiles.push(full);
+          }
         });
+
+        doc.querySelectorAll('guide > reference').forEach(ref => {
+          const type = (ref.getAttribute('type') || '').toLowerCase();
+          const href = ref.getAttribute('href') || '';
+          if (type === 'toc' && href) {
+            const { filePath } = splitHrefAndHash(opfPath, href);
+            if (filePath) guideTocFiles.add(filePath);
+          }
+        });
+
         const spinePaths = [];
         doc.querySelectorAll('spine > itemref').forEach(ir => {
           const idref = ir.getAttribute('idref');
           const p = idref && idToPath[idref];
           if (p && /\.(xhtml|html|htm)$/i.test(p)) spinePaths.push(p);
         });
-        if (!spinePaths.length) return null;
 
-        const navTitles = [];
-        for (const pid of Object.keys(idToPath)) {
-          const p = idToPath[pid];
-          if (!/\.(ncx)$/i.test(p) && !/nav\.x?html?$/i.test(p)) continue;
+        Object.keys(zip.files).forEach(k => {
+          if (/\.ncx$/i.test(k) && !ncxFiles.includes(k)) ncxFiles.push(k);
+          if (/nav\.x?html?$/i.test(k) && !navFiles.includes(k)) navFiles.push(k);
+        });
+
+        let tocEntries = [];
+        for (const nf of navFiles) {
+          const zEntry = zip.file(nf) || zip.file( Object.keys(zip.files).find(k => normalizeResPath(k) === normalizeResPath(nf)) || '' );
+          if (!zEntry) continue;
           try {
-            const nx = await zip.file(p).async('string');
-            const nd = new DOMParser().parseFromString(nx, 'text/html');
-            nd.querySelectorAll('a, navPoint > navLabel > text, navLabel text').forEach(a => {
-              const tt = (a.textContent || '').replace(/\s+/g, ' ').trim();
-              if (tt && tt.length <= 120) navTitles.push(tt);
-            });
+            const raw = await zEntry.async('string');
+            const parsed = parseNavXhtmlEntries(raw, nf);
+            if (parsed.length > tocEntries.length) tocEntries = parsed;
           } catch (e) {}
         }
-        return { spinePaths, navTitles };
+
+        if (!tocEntries.length) {
+          for (const cf of ncxFiles) {
+            const zEntry = zip.file(cf) || zip.file( Object.keys(zip.files).find(k => normalizeResPath(k) === normalizeResPath(cf)) || '' );
+            if (!zEntry) continue;
+            try {
+              const raw = await zEntry.async('string');
+              const parsed = parseNcxEntries(raw, cf);
+              if (parsed.length > tocEntries.length) tocEntries = parsed;
+            } catch (e) {}
+          }
+        }
+
+        return { spinePaths, tocEntries, guideTocFiles };
       };
 
       const opfPath = await findOpfPath();
-      const spineInfo = await parseSpine(opfPath);
+      const { spinePaths, tocEntries, guideTocFiles } = await parseSpineAndOfficialToc(opfPath);
       const allHtml = Object.keys(zip.files)
         .filter(n => !zip.files[n].dir && /\.(xhtml|html|htm)$/i.test(n));
 
       let htmlFiles;
-      if (spineInfo) {
+      if (spinePaths.length) {
         const ordered = [];
         const used = new Set();
-        for (const p of spineInfo.spinePaths) {
+        for (const p of spinePaths) {
           const hit = allHtml.find(n => normalizeResPath(n) === normalizeResPath(p));
           if (hit && !used.has(hit)) { ordered.push(hit); used.add(hit); }
         }
@@ -2638,15 +2785,30 @@
       } else {
         htmlFiles = allHtml.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
       }
-      const spineFileSet = new Set((spineInfo ? spineInfo.spinePaths : [])
-        .map(p => {
-          const hit = allHtml.find(n => normalizeResPath(n) === normalizeResPath(p));
-          return hit ? normalizeResPath(hit) : '';
-        }).filter(Boolean));
 
-      const navTitleSet = new Set((spineInfo && spineInfo.navTitles || []).map(t => String(t).replace(/\s+/g, ' ').trim()));
+      const spineFileSet = new Set(spinePaths.map(p => {
+        const hit = allHtml.find(n => normalizeResPath(n) === normalizeResPath(p));
+        return hit ? normalizeResPath(hit) : normalizeResPath(p);
+      }).filter(Boolean));
+
+      const normTitle = s => String(s || '').replace(/[\s\u3000]+/g, '').trim();
+      const tocTargetFileHashSet = new Set();
+      const tocTargetFileFirstSet = new Set();
+      const tocNormTitleSet = new Set();
+
+      tocEntries.forEach(item => {
+        if (item.filePath && item.hash) {
+          tocTargetFileHashSet.add(`${item.filePath}#${item.hash}`);
+        } else if (item.filePath) {
+          tocTargetFileFirstSet.add(item.filePath);
+        }
+        if (item.text) tocNormTitleSet.add(normTitle(item.text));
+      });
 
       const rawBlocks = [];
+      const fileFirstBlockMap = new Map();
+      const fileHashBlockMap = new Map();
+
       const cleanText = s => {
         let t = String(s || '');
         if (!t) return '';
@@ -2670,12 +2832,21 @@
       const isUsableText = s => {
         const t = cleanText(s);
         if (!t) return false;
-        if (t.length < 2) return false;
-        return true;
+        return t.length >= 1;
       };
+
+      const BLOCK_TAGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'div', 'blockquote', 'li', 'figure']);
 
       let firstSpineFile = true;
       for (const f of htmlFiles) {
+        const normF = normalizeResPath(f);
+        if (/^(.*\/)?(nav|toc|contents)\.x?html?$/i.test(normF) && tocEntries.length > 0 && !tocTargetFileFirstSet.has(normF)) {
+          continue;
+        }
+        if (guideTocFiles.has(normF) && tocEntries.length > 0 && !tocTargetFileFirstSet.has(normF)) {
+          continue;
+        }
+
         const u8 = await zip.file(f).async('uint8array');
         const txt = new TextDecoder('utf-8').decode(u8);
         const doc = parser.parseFromString(txt, 'text/html');
@@ -2684,11 +2855,23 @@
           const st = el.getAttribute('style') || '';
           if (/base64,/i.test(st) || st.length > 600) el.removeAttribute('style');
         });
-        const els = doc.body ? doc.body.querySelectorAll('h1,h2,h3,h4,p,div,blockquote,img,li,figure,svg,image') : [];
-        let addedInChapter = 0;
 
-        const isSpineFile = spineFileSet.has(normalizeResPath(f));
+        if (!doc.body) continue;
+
+        const aLinks = doc.body.querySelectorAll('a[href]');
+        const allTextLen = (doc.body.textContent || '').replace(/\s+/g, '').length;
+        if (tocEntries.length > 3 && aLinks.length >= 8) {
+          let linkTextLen = 0;
+          aLinks.forEach(a => { linkTextLen += (a.textContent || '').replace(/\s+/g, '').length; });
+          if (allTextLen > 0 && linkTextLen / allTextLen > 0.7 && !tocTargetFileFirstSet.has(normF)) {
+            continue;
+          }
+        }
+
+        const isSpineFile = spineFileSet.has(normF);
         let chapterStartMarked = false;
+        let firstTextInFileHandled = false;
+
         const markChapterStart = () => {
           if (chapterStartMarked) return false;
           chapterStartMarked = true;
@@ -2697,47 +2880,100 @@
           return true;
         };
 
+        let pendingIds = [];
+        const recordId = idStr => {
+          if (!idStr) return;
+          const cleanId = String(idStr).trim();
+          if (cleanId && !pendingIds.includes(cleanId)) pendingIds.push(cleanId);
+        };
+
+        const bindBlockAnchors = blockIdx => {
+          if (!fileFirstBlockMap.has(normF)) {
+            fileFirstBlockMap.set(normF, blockIdx);
+          }
+          if (pendingIds.length) {
+            pendingIds.forEach(id => {
+              const key = `${normF}#${id}`;
+              if (!fileHashBlockMap.has(key)) fileHashBlockMap.set(key, blockIdx);
+            });
+            pendingIds = [];
+          }
+        };
+
         const pushImg = (src, alt, w, h) => {
           if (!src) return;
           const last = rawBlocks[rawBlocks.length - 1];
           if (last && last.type === 'img' && last.src === src) return;
           const newPage = markChapterStart();
-          rawBlocks.push({ type: 'img', src, alt: alt || '', w: Number(w) || 0, h: Number(h) || 0, forceNewPage: newPage });
-          addedInChapter++;
+          const bi = rawBlocks.length;
+          rawBlocks.push({ _bi: bi, type: 'img', src, alt: alt || '', w: Number(w) || 0, h: Number(h) || 0, forceNewPage: newPage });
+          bindBlockAnchors(bi);
         };
 
-        els.forEach(el => {
-          const tag = el.tagName.toLowerCase();
+        const hasNestedBlockElement = el => {
+          for (const child of el.children) {
+            const cTag = child.tagName.toLowerCase();
+            if (BLOCK_TAGS.has(cTag)) return true;
+            if (hasNestedBlockElement(child)) return true;
+          }
+          return false;
+        };
+
+        const walkDom = node => {
+          if (!node || node.nodeType !== Node.ELEMENT_NODE) return;
+          const tag = node.tagName.toLowerCase();
+          recordId(node.getAttribute('id') || node.getAttribute('name'));
+
           if (tag === 'img') {
-            const href = el.getAttribute('src') || el.getAttribute('data-src') || '';
-            pushImg(lookupImage(f, href), el.getAttribute('alt'),
-              el.getAttribute('width'), el.getAttribute('height'));
+            const href = node.getAttribute('src') || node.getAttribute('data-src') || '';
+            pushImg(lookupImage(f, href), node.getAttribute('alt'), node.getAttribute('width'), node.getAttribute('height'));
             return;
           }
           if (tag === 'image') {
-            pushImg(lookupImage(f, el.getAttribute('xlink:href') || el.getAttribute('href') || ''), el.getAttribute('alt'),
-              el.getAttribute('width'), el.getAttribute('height'));
+            const href = node.getAttribute('xlink:href') || node.getAttribute('href') || '';
+            pushImg(lookupImage(f, href), node.getAttribute('alt'), node.getAttribute('width'), node.getAttribute('height'));
             return;
           }
-          if (tag === 'svg') return;
-          if (tag === 'div' && el.children.length > 0) return;
-          if (tag === 'figure') return;
-          const rawT = (el.textContent || '').replace(/\s+/g, ' ').trim();
-          if (!rawT) return;
-          const t = cleanText(rawT);
-          if (!isUsableText(rawT)) return;
-
-          const isHeadingTag = /^h[1-4]$/.test(tag);
-          const isNavTitle = navTitleSet.has(String(t).replace(/\s+/g, ' ').trim());
-          if (isHeadingTag) {
-            const newPage = markChapterStart();
-            rawBlocks.push({ type: 'heading', text: t, forceNewPage: newPage });
-          } else {
-            const newPage = markChapterStart() || (isNavTitle && addedInChapter === 0);
-            rawBlocks.push({ type: isNavTitle ? 'heading' : 'p', text: t, forceNewPage: newPage });
+          if (tag === 'svg') {
+            node.querySelectorAll('image').forEach(im => walkDom(im));
+            return;
           }
-          addedInChapter++;
-        });
+
+          if (BLOCK_TAGS.has(tag)) {
+            if (!hasNestedBlockElement(node)) {
+              node.querySelectorAll('[id], a[name]').forEach(sub => recordId(sub.getAttribute('id') || sub.getAttribute('name')));
+              node.querySelectorAll('img, image').forEach(im => walkDom(im));
+
+              const rawT = (node.textContent || '').replace(/\s+/g, ' ').trim();
+              if (rawT && isUsableText(rawT)) {
+                const t = cleanText(rawT);
+                if (t) {
+                  const isHeadingTag = /^h[1-4]$/.test(tag);
+                  const hitsHashToc = pendingIds.some(pid => tocTargetFileHashSet.has(`${normF}#${pid}`));
+                  const hitsFirstToc = !firstTextInFileHandled && tocTargetFileFirstSet.has(normF) && (isHeadingTag || t.length <= 60);
+                  const hitsTitleToc = !firstTextInFileHandled && tocNormTitleSet.has(normTitle(t));
+                  const isHeading = isHeadingTag || hitsHashToc || hitsFirstToc || hitsTitleToc;
+
+                  firstTextInFileHandled = true;
+                  const newPage = markChapterStart() || hitsHashToc;
+                  const bi = rawBlocks.length;
+                  rawBlocks.push({ _bi: bi, type: isHeading ? 'heading' : 'p', text: t, forceNewPage: newPage });
+                  bindBlockAnchors(bi);
+                }
+              }
+              return;
+            }
+          }
+
+          for (const child of node.children) {
+            walkDom(child);
+          }
+        };
+
+        walkDom(doc.body);
+        if (pendingIds.length && rawBlocks.length > 0) {
+          bindBlockAnchors(rawBlocks.length - 1);
+        }
         firstSpineFile = false;
       }
 
@@ -2751,8 +2987,121 @@
         else b.dead = true;
       }
 
-      if (!rawBlocks.length) rawBlocks.push({ type: 'p', text: `《${fallbackTitle}》已载入。` });
-      return { rawBlocks, coverDataUrl, parseVer: PARSE_VERSION };
+      if (!rawBlocks.length) rawBlocks.push({ _bi: 0, type: 'p', text: `《${fallbackTitle}》已载入。` });
+
+      const finalToc = [];
+      const seenTocKeys = new Set();
+
+      if (tocEntries.length > 0) {
+        let searchCursor = 0;
+        tocEntries.forEach(entry => {
+          let resolvedBi = -1;
+          if (entry.filePath && entry.hash) {
+            const key = `${entry.filePath}#${entry.hash}`;
+            if (fileHashBlockMap.has(key)) resolvedBi = fileHashBlockMap.get(key);
+          }
+          if (resolvedBi < 0 && entry.filePath && entry.text) {
+            const fileStart = fileFirstBlockMap.has(entry.filePath) ? fileFirstBlockMap.get(entry.filePath) : 0;
+            const nTarget = normTitle(entry.text);
+            if (nTarget) {
+              for (let i = fileStart; i < Math.min(rawBlocks.length, fileStart + 250); i++) {
+                const blk = rawBlocks[i];
+                if (blk.type === 'img') continue;
+                const bt = normTitle(blk.text);
+                if (bt === nTarget || (nTarget.length >= 3 && bt.length <= 50 && bt.includes(nTarget))) {
+                  resolvedBi = i;
+                  break;
+                }
+              }
+            }
+          }
+          if (resolvedBi < 0 && entry.filePath && fileFirstBlockMap.has(entry.filePath)) {
+            resolvedBi = fileFirstBlockMap.get(entry.filePath);
+          }
+          if (resolvedBi < 0 && entry.text) {
+            const nTarget = normTitle(entry.text);
+            if (nTarget) {
+              for (let i = searchCursor; i < rawBlocks.length; i++) {
+                const blk = rawBlocks[i];
+                if (blk.type !== 'img' && normTitle(blk.text) === nTarget) {
+                  resolvedBi = i;
+                  break;
+                }
+              }
+            }
+          }
+          if (resolvedBi >= 0 && resolvedBi < rawBlocks.length) {
+            searchCursor = Math.max(searchCursor, resolvedBi);
+            const targetBlk = rawBlocks[resolvedBi];
+            if (targetBlk && targetBlk.type === 'p' && (targetBlk.text || '').length <= 65) {
+              targetBlk.type = 'heading';
+            }
+            const dedupKey = `${resolvedBi}|${normTitle(entry.text)}`;
+            if (!seenTocKeys.has(dedupKey)) {
+              seenTocKeys.add(dedupKey);
+              finalToc.push({
+                text: entry.text,
+                blockIndex: resolvedBi,
+                level: entry.level || 0
+              });
+            }
+          }
+        });
+      }
+
+      if (!finalToc.length) {
+        const chapterRegex = /^(第[零一二三四五六七八九十百千万0-9]+[章节回卷部篇集]|Chapter\s+\d+|CHAPTER\s+\d+|序言|序章|前言|楔子|引子|尾声|后记|番外|附录)/;
+        rawBlocks.forEach((b, idx) => {
+          if (b.type === 'img' || !b.text) return;
+          const t = b.text.trim();
+          if (b.type === 'heading' && t.length <= 70) {
+            finalToc.push({ text: t, blockIndex: idx, level: 0 });
+          } else if (t.length <= 45 && chapterRegex.test(t)) {
+            b.type = 'heading';
+            finalToc.push({ text: t, blockIndex: idx, level: 0 });
+          }
+        });
+      }
+
+      return { rawBlocks, toc: finalToc, coverDataUrl, parseVer: PARSE_VERSION };
+    }
+
+    async function extractPdfOutline(pdfDoc) {
+      if (!pdfDoc || typeof pdfDoc.getOutline !== 'function') return [];
+      try {
+        const outline = await pdfDoc.getOutline();
+        if (!Array.isArray(outline) || !outline.length) return [];
+        const toc = [];
+        const resolveDestPage = async dest => {
+          try {
+            let explicit = dest;
+            if (typeof dest === 'string') {
+              explicit = await pdfDoc.getDestination(dest);
+            }
+            if (Array.isArray(explicit) && explicit[0]) {
+              const pageIdx = await pdfDoc.getPageIndex(explicit[0]);
+              if (typeof pageIdx === 'number' && pageIdx >= 0) return pageIdx;
+            }
+          } catch (e) {}
+          return 0;
+        };
+        const walk = async (items, level) => {
+          for (const it of items) {
+            const title = String(it.title || '').replace(/\s+/g, ' ').trim();
+            if (title) {
+              const pageIndex = await resolveDestPage(it.dest);
+              toc.push({ text: title, pageIndex, level: Math.min(3, level) });
+            }
+            if (Array.isArray(it.items) && it.items.length) {
+              await walk(it.items, level + 1);
+            }
+          }
+        };
+        await walk(outline, 0);
+        return toc;
+      } catch (e) {
+        return [];
+      }
     }
 
     async function handleFilesImport(files, uploadToCloud = false) {
@@ -2766,13 +3115,13 @@
         if (ext === 'epub') {
           showToast(`正在解析《${title}》...`);
           const parsed = await parseEpubBuffer(buf, title);
-          const { rawBlocks, coverDataUrl } = parsed;
+          const { rawBlocks, toc, coverDataUrl } = parsed;
           const newBook = {
             id: 'book-' + Date.now() + Math.random().toString(36).slice(2, 6),
             title, fileName: file.name, format: 'EPUB', shelf: defaultShelf,
             pinned: false, addedAt: Date.now(), coverUrl: coverDataUrl,
             hasBeenRead: false, progressPercent: 0, lastPageIndex: 0,
-            rawBlocks, fileBytes: buf, isCloudOnly: false, parseVer: parsed.parseVer
+            rawBlocks, toc, fileBytes: buf, isCloudOnly: false, parseVer: parsed.parseVer
           };
           state.books.unshift(newBook);
           await saveBookDB(newBook);
@@ -2781,12 +3130,13 @@
         } else if (ext === 'pdf') {
           showToast(`正在载入 PDF《${title}》...`);
           const pdfDoc = await window.pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
+          const toc = await extractPdfOutline(pdfDoc);
           const newBook = {
             id: 'book-' + Date.now() + Math.random().toString(36).slice(2, 6),
             title, fileName: file.name, format: 'PDF', shelf: defaultShelf,
             pinned: false, addedAt: Date.now(), coverUrl: '',
             hasBeenRead: false, progressPercent: 0, lastPageIndex: 0,
-            pdfDoc, numPages: pdfDoc.numPages, fileBytes: buf, isCloudOnly: false
+            pdfDoc, toc, numPages: pdfDoc.numPages, fileBytes: buf, isCloudOnly: false
           };
           state.books.unshift(newBook);
           await saveBookDB(newBook);
@@ -2831,6 +3181,8 @@
           const hasImg = parsed.rawBlocks.some(b => b.type === 'img');
           if (hasImg) {
             book.rawBlocks = parsed.rawBlocks;
+            book.toc = parsed.toc;
+            book.parseVer = parsed.parseVer;
             book.pages = undefined;
             if (parsed.coverDataUrl) book.coverUrl = parsed.coverDataUrl;
             await saveBookDB(book);
@@ -2852,23 +3204,209 @@
       return false;
     }
 
-    function buildToc(book) {
-      const toc = [];
-      (book.rawBlocks || []).forEach((b, bi) => {
-        if (b.type === 'heading' && b.text) toc.push({ text: b.text, blockIndex: bi });
+    // ==================== 全新目录 / 书签 / 搜索 / 统一跳转引擎 ====================
+    function ensureBlockIndices(book) {
+      if (!book || !Array.isArray(book.rawBlocks)) return;
+      book.rawBlocks.forEach((b, i) => {
+        if (b && typeof b._bi !== 'number') b._bi = i;
       });
-      return toc;
+    }
+
+    function buildToc(book) {
+      if (!book) return [];
+      if (book.format === 'PDF') {
+        return Array.isArray(book.toc) ? book.toc : [];
+      }
+      ensureBlockIndices(book);
+      if (Array.isArray(book.toc) && book.toc.length > 0) {
+        return book.toc;
+      }
+      const fallback = [];
+      (book.rawBlocks || []).forEach((b, bi) => {
+        if (b && b.type === 'heading' && b.text) {
+          fallback.push({ text: b.text, blockIndex: bi, level: 0 });
+        }
+      });
+      book.toc = fallback;
+      return fallback;
     }
 
     function findPageOfBlock(book, blockIndex) {
+      if (!book || book.format === 'PDF') return Math.max(0, Number(blockIndex) || 0);
       const pages = book.pages || [];
-      const block = (book.rawBlocks || [])[blockIndex];
-      if (!block) return 0;
+      if (!pages.length) return 0;
+      const targetBi = Number(blockIndex);
+      if (isNaN(targetBi) || targetBi < 0) return 0;
+
       for (let i = 0; i < pages.length; i++) {
-        const hit = pages[i].find(x => x === block || (x.type === block.type && x.text === block.text));
-        if (hit) return i;
+        const pg = pages[i];
+        if (pg && pg.some(x => x && x._bi === targetBi && !x.splitFrom)) {
+          return i;
+        }
       }
-      return 0;
+      for (let i = 0; i < pages.length; i++) {
+        const pg = pages[i];
+        if (pg && pg.some(x => x && x._bi === targetBi)) {
+          return i;
+        }
+      }
+      let bestPage = 0;
+      for (let i = 0; i < pages.length; i++) {
+        const pg = pages[i];
+        if (!pg || !pg.length) continue;
+        const firstBi = pg[0]._bi;
+        if (typeof firstBi === 'number' && firstBi <= targetBi) {
+          bestPage = i;
+        } else if (typeof firstBi === 'number' && firstBi > targetBi) {
+          break;
+        }
+      }
+      return bestPage;
+    }
+
+    function alignPageForMode(pageIndex) {
+      const p = Math.max(0, Number(pageIndex) || 0);
+      if (state.readerConfig.viewMode === 'dual') {
+        return p - (p % 2);
+      }
+      return p;
+    }
+
+    function getCurrentReadingBlockIndex() {
+      const book = state.currentBook;
+      if (!book || book.format === 'PDF') return -1;
+      ensureBlockIndices(book);
+
+      if (state.readerConfig.viewMode === 'scroll') {
+        const wrap = $('page-left-wrapper');
+        const leaf = $('page-left');
+        if (wrap && leaf) {
+          const scrollTop = wrap.scrollTop;
+          const nodes = leaf.querySelectorAll('[data-bi]');
+          for (const el of nodes) {
+            if (el.offsetTop + el.offsetHeight > scrollTop + 24) {
+              const bi = parseInt(el.dataset.bi, 10);
+              if (!isNaN(bi)) return bi;
+            }
+          }
+        }
+        return book.lastBlockIndex || 0;
+      }
+
+      const pages = book.pages || [];
+      const curPg = pages[state.currentPageIndex] || [];
+      const firstValid = curPg.find(b => b && typeof b._bi === 'number');
+      if (firstValid) return firstValid._bi;
+
+      if (state.readerConfig.viewMode === 'dual') {
+        const rightPg = pages[state.currentPageIndex + 1] || [];
+        const rightValid = rightPg.find(b => b && typeof b._bi === 'number');
+        if (rightValid) return rightValid._bi;
+      }
+      return book.lastBlockIndex || 0;
+    }
+
+    function getCurrentBlockIndex(book) {
+      return getCurrentReadingBlockIndex();
+    }
+
+    function getChapterNameForBlock(book, blockIndex) {
+      if (!book) return '';
+      const toc = buildToc(book);
+      if (toc.length) {
+        let cur = '';
+        for (const item of toc) {
+          if ((item.blockIndex || 0) <= blockIndex) cur = item.text;
+          else break;
+        }
+        if (cur) return cur;
+      }
+      const blocks = book.rawBlocks || [];
+      const limit = Math.min(blocks.length - 1, Math.max(0, blockIndex));
+      for (let i = limit; i >= 0; i--) {
+        if (blocks[i] && blocks[i].type === 'heading' && blocks[i].text) {
+          return blocks[i].text;
+        }
+      }
+      return '';
+    }
+
+    async function jumpToBookLocation(target = {}) {
+      const book = state.currentBook;
+      if (!book) return;
+
+      if (book.format === 'PDF') {
+        const rawPage = typeof target.pageIndex === 'number' ? target.pageIndex : 0;
+        state.currentPageIndex = alignPageForMode(rawPage);
+        await renderReaderPages();
+        return;
+      }
+
+      ensureBlockIndices(book);
+      let blockIdx = typeof target.blockIndex === 'number' ? target.blockIndex : -1;
+      if (blockIdx < 0 && typeof target.pageIndex === 'number') {
+        const pg = (book.pages || [])[target.pageIndex] || [];
+        const hit = pg.find(b => b && typeof b._bi === 'number');
+        if (hit) blockIdx = hit._bi;
+      }
+      blockIdx = Math.max(0, Math.min((book.rawBlocks || []).length - 1, blockIdx));
+      book.lastBlockIndex = blockIdx;
+
+      if (state.readerConfig.viewMode === 'scroll') {
+        await renderReaderPages();
+        requestAnimationFrame(() => {
+          const wrap = $('page-left-wrapper');
+          const leaf = $('page-left');
+          if (!wrap || !leaf) return;
+          const el = leaf.querySelector(`[data-bi="${blockIdx}"]`);
+          if (el) {
+            wrap.scrollTop = Math.max(0, el.offsetTop - 20);
+          }
+          const totalBlocks = Math.max(1, (book.rawBlocks || []).length);
+          book.progressPercent = Math.min(100, Math.max(0.05, ((blockIdx + 1) / totalBlocks) * 100));
+          saveBookProgressDebounced(book);
+        });
+      } else {
+        if (!book.pages || !book.pages.length) repaginate();
+        const pageIdx = findPageOfBlock(book, blockIdx);
+        state.currentPageIndex = alignPageForMode(pageIdx);
+        await renderReaderPages();
+      }
+    }
+
+    function getActiveTocIndex(book, toc) {
+      if (!book || !toc || !toc.length) return -1;
+      if (book.format === 'PDF') {
+        const curPage = state.currentPageIndex + (state.readerConfig.viewMode === 'dual' ? 1 : 0);
+        let activeIdx = 0;
+        for (let i = 0; i < toc.length; i++) {
+          if ((toc[i].pageIndex || 0) <= curPage) activeIdx = i;
+          else break;
+        }
+        return activeIdx;
+      }
+
+      let maxBiInView = getCurrentReadingBlockIndex();
+      if (state.readerConfig.viewMode !== 'scroll') {
+        const pages = book.pages || [];
+        const checkPages = state.readerConfig.viewMode === 'dual'
+          ? [pages[state.currentPageIndex], pages[state.currentPageIndex + 1]]
+          : [pages[state.currentPageIndex]];
+        checkPages.forEach(pg => {
+          (pg || []).forEach(b => {
+            if (b && typeof b._bi === 'number' && b._bi > maxBiInView) {
+              maxBiInView = b._bi;
+            }
+          });
+        });
+      }
+
+      let activeIdx = -1;
+      for (let i = 0; i < toc.length; i++) {
+        if ((toc[i].blockIndex || 0) <= maxBiInView) activeIdx = i;
+        else break;
+      }
+      return activeIdx;
     }
 
     function renderTocList() {
@@ -2881,26 +3419,41 @@
       if (state.tocTab === 'bm') {
         const marks = book.bookmarks || [];
         if (!marks.length) {
-          box.innerHTML = '<p class="text-sm text-neutral-400 mt-6 text-center">还没有书签，点右上角 ＋ 把当前页加入书签</p>';
+          box.innerHTML = '<p class="text-sm text-neutral-400 mt-6 text-center">还没有书签，点右上角 ＋ 把当前位置加入书签</p>';
           return;
         }
+        const totalPages = book.format === 'PDF'
+          ? Math.max(1, book.numPages || 1)
+          : Math.max(1, (book.pages && book.pages.length) || 1);
+
         marks.forEach((m, i) => {
+          const dynamicPage = book.format === 'PDF'
+            ? (m.pageIndex ?? m.page ?? 0)
+            : (typeof m.blockIndex === 'number' ? findPageOfBlock(book, m.blockIndex) : (m.page || 0));
+          const pctStr = `${Math.min(100, Math.max(1, Math.round(((dynamicPage + 1) / totalPages) * 100)))}%`;
+
           const row = document.createElement('div');
-          row.className = 'group flex items-start gap-2 px-5 py-4 border-b border-neutral-100 hover:bg-neutral-50 cursor-pointer';
+          row.className = 'group flex items-start gap-2 px-5 py-4 border-b border-neutral-100 hover:bg-neutral-50 cursor-pointer transition';
           row.innerHTML = `
             <div class="flex-1 min-w-0">
-              <div class="leading-relaxed text-[#3a3a3a]">${esc(m.label || '书签')}</div>
+              ${m.chapter ? `<div class="text-xs font-medium text-neutral-400 mb-1 truncate">${esc(m.chapter)}</div>` : ''}
+              <div class="leading-relaxed text-[#3a3a3a] line-clamp-2">${esc(m.label || '书签')}</div>
               <div class="flex items-center justify-between mt-2 opacity-70" style="font-size: 0.85em;">
-                <span class="text-neutral-500">第 ${m.page + 1} 页</span>
-                <span class="text-neutral-400">${m.progress || ''}</span>
+                <span class="text-neutral-500">第 ${dynamicPage + 1} 页</span>
+                <span class="text-neutral-400">${pctStr}</span>
               </div>
             </div>
-            <button type="button" class="del-bm opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-red-500 px-1 leading-none cursor-pointer" style="font-size: 0.85em;">✕</button>`;
-          row.onclick = e => {
+            <button type="button" class="del-bm opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-red-500 px-1.5 py-1 leading-none cursor-pointer" style="font-size: 0.85em;">✕</button>`;
+          row.onclick = async e => {
             if (e.target.classList.contains('del-bm')) return;
-            state.currentPageIndex = m.page;
-            renderReaderPages();
             closeTocDrawer();
+            if (book.format === 'PDF') {
+              await jumpToBookLocation({ pageIndex: m.pageIndex ?? m.page ?? 0 });
+            } else if (typeof m.blockIndex === 'number') {
+              await jumpToBookLocation({ blockIndex: m.blockIndex });
+            } else {
+              await jumpToBookLocation({ pageIndex: m.page || 0 });
+            }
           };
           row.querySelector('.del-bm').onclick = async ev2 => {
             ev2.stopPropagation();
@@ -2915,24 +3468,45 @@
 
       const toc = buildToc(book);
       if (!toc.length) {
-        box.innerHTML = '<p class="text-sm text-neutral-400 mt-6 text-center">这本书没有识别到章节</p>';
+        box.innerHTML = '<p class="text-sm text-neutral-400 mt-6 text-center">这本书没有识别到章节目录</p>';
         return;
       }
-      toc.forEach(item => {
-        const page = findPageOfBlock(book, item.blockIndex);
+
+      const activeIdx = getActiveTocIndex(book, toc);
+      let activeRowEl = null;
+
+      toc.forEach((item, idx) => {
+        const page = book.format === 'PDF'
+          ? (item.pageIndex || 0)
+          : findPageOfBlock(book, item.blockIndex);
+        const isCurrent = idx === activeIdx;
+        const level = Math.min(3, Math.max(0, Number(item.level) || 0));
+        const indentPx = 20 + level * 16;
+
         const row = document.createElement('button');
         row.type = 'button';
-        row.className = 'w-full text-left px-5 py-4 border-b border-neutral-100 hover:bg-neutral-50 cursor-pointer flex items-baseline gap-3';
+        row.style.paddingLeft = `${indentPx}px`;
+        row.className = `w-full text-left pr-5 py-3.5 border-b border-neutral-100 hover:bg-neutral-50 cursor-pointer flex items-baseline gap-3 transition ${isCurrent ? 'bg-neutral-100/80 font-semibold text-[#1f1f1f]' : 'text-[#3a3a3a]'}`;
         row.innerHTML = `
-          <span class="flex-1 min-w-0 leading-relaxed text-[#3a3a3a]">${esc(item.text)}</span>
+          <span class="flex-1 min-w-0 leading-relaxed ${level > 0 && !isCurrent ? 'text-[14.5px] text-neutral-600' : ''}">${esc(item.text)}</span>
           <span class="text-neutral-400 shrink-0 opacity-80 tabular-nums" style="font-size: 0.82em;">${page + 1}</span>`;
-        row.onclick = () => {
-          state.currentPageIndex = page;
-          renderReaderPages();
+        row.onclick = async () => {
           closeTocDrawer();
+          if (book.format === 'PDF') {
+            await jumpToBookLocation({ pageIndex: item.pageIndex || 0 });
+          } else {
+            await jumpToBookLocation({ blockIndex: item.blockIndex });
+          }
         };
+        if (isCurrent) activeRowEl = row;
         box.appendChild(row);
       });
+
+      if (activeRowEl) {
+        requestAnimationFrame(() => {
+          activeRowEl.scrollIntoView({ block: 'center' });
+        });
+      }
     }
 
     function updateTocTabs() {
@@ -2985,39 +3559,39 @@
         box.innerHTML = '<p class="text-sm text-neutral-400 mt-6 text-center">没有打开的书</p>';
         return;
       }
+      if (book.format === 'PDF') {
+        box.innerHTML = '<p class="text-sm text-neutral-400 mt-6 text-center">PDF 暂不支持全文检索，请使用目录跳转</p>';
+        return;
+      }
       if (!kw) {
         box.innerHTML = '<p class="text-sm text-neutral-400 mt-6 text-center">输入关键词搜索全书</p>';
         return;
       }
 
+      ensureBlockIndices(book);
       const blocks = book.rawBlocks || [];
-      const pages = book.pages || [];
       const lowerKw = kw.toLowerCase();
-
-      const pageOfBlock = new Map();
-      pages.forEach((pg, pi) => {
-        pg.forEach(b => { if (!pageOfBlock.has(b)) pageOfBlock.set(b, pi); });
-      });
 
       const groups = [];
       let curGroup = null;
       blocks.forEach((b, bi) => {
-        if (b.type === 'img' || b.dead) return;
+        if (!b || b.type === 'img' || b.dead) return;
         const text = b.text || '';
         if (!text) return;
         if (b.type === 'heading') {
           curGroup = { title: text, items: [] };
           groups.push(curGroup);
-          return;
         }
         if (!curGroup) {
           curGroup = { title: '正文开头', items: [] };
           groups.push(curGroup);
         }
         if (text.toLowerCase().includes(lowerKw)) {
-          let pi = pageOfBlock.has(b) ? pageOfBlock.get(b) : -1;
-          if (pi < 0) pi = Math.min((pages.length || 1) - 1, Math.floor(bi / 3));
-          curGroup.items.push({ block: b, page: pi, snippet: snippetAround(text, kw) });
+          curGroup.items.push({
+            blockIndex: bi,
+            page: findPageOfBlock(book, bi),
+            snippet: snippetAround(text, kw)
+          });
         }
       });
 
@@ -3045,10 +3619,9 @@
           row.type = 'button';
           row.className = 'w-full text-left block px-1 py-3 border-t border-neutral-100 hover:bg-neutral-50 cursor-pointer';
           row.innerHTML = `<p class="text-[14px] leading-relaxed text-[#4a4a4a]">${highlightKeyword(it.snippet, kw)}</p>`;
-          row.onclick = () => {
-            state.currentPageIndex = Math.max(0, it.page);
-            renderReaderPages();
+          row.onclick = async () => {
             closeTocDrawer();
+            await jumpToBookLocation({ blockIndex: it.blockIndex });
           };
           sec.appendChild(row);
         });
@@ -3074,10 +3647,10 @@
     function openTocDrawer() {
       state.tocTab = state.tocTab || 'toc';
       updateTocTabs();
-      renderTocList();
       closeTocSearch();
       $('reader-toc-drawer').classList.remove('-translate-x-full');
       $('toc-backdrop').classList.remove('hidden');
+      renderTocList();
     }
     function closeTocDrawer() {
       $('reader-toc-drawer').classList.add('-translate-x-full');
@@ -3085,15 +3658,15 @@
     }
 
     async function openBook(book) {
-      if (book.format === 'EPUB' && book.fileBytes && (book.parseVer || 0) < PARSE_VERSION) {
+      if (book.format === 'EPUB' && book.fileBytes && ((book.parseVer || 0) < PARSE_VERSION || !Array.isArray(book.toc))) {
         try {
           const parsed = await parseEpubBuffer(book.fileBytes.slice(0), book.title);
           book.rawBlocks = parsed.rawBlocks;
+          book.toc = parsed.toc;
           book.parseVer = parsed.parseVer;
           book.pages = undefined;
           if (parsed.coverDataUrl) book.coverUrl = parsed.coverDataUrl;
           await saveBookDB(book);
-          showToast('已按新版规则重新解析本书');
         } catch (e) {}
       }
 
@@ -3116,11 +3689,13 @@
           if (book.format === 'EPUB') {
             const parsed = await parseEpubBuffer(buf, book.title);
             book.rawBlocks = parsed.rawBlocks;
+            book.toc = parsed.toc;
             book.parseVer = parsed.parseVer;
             if (parsed.coverDataUrl) book.coverUrl = parsed.coverDataUrl;
           } else {
             book.pdfDoc = await window.pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
             book.numPages = book.pdfDoc.numPages;
+            book.toc = await extractPdfOutline(book.pdfDoc);
           }
           book.isCloudOnly = false;
           await saveBookDB(book);
@@ -3130,10 +3705,14 @@
       } else if (book.format === 'PDF' && !book.pdfDoc && book.fileBytes) {
         book.pdfDoc = await window.pdfjsLib.getDocument({ data: book.fileBytes.slice(0) }).promise;
         book.numPages = book.pdfDoc.numPages;
+        if (!Array.isArray(book.toc) || !book.toc.length) {
+          book.toc = await extractPdfOutline(book.pdfDoc);
+        }
       }
 
+      ensureBlockIndices(book);
       state.currentBook = book;
-      state.currentPageIndex = book.lastPageIndex || 0;
+      state.currentPageIndex = alignPageForMode(book.lastPageIndex || 0);
       book.hasBeenRead = true;
 
       $('library-view').classList.add('hidden');
@@ -3143,6 +3722,13 @@
       applyLayoutStyles();
       requestAnimationFrame(() => {
         repaginate();
+        if (book.format === 'EPUB' && typeof book.lastBlockIndex === 'number' && book.lastBlockIndex > 0) {
+          if (state.readerConfig.viewMode === 'scroll') {
+            jumpToBookLocation({ blockIndex: book.lastBlockIndex });
+            return;
+          }
+          state.currentPageIndex = alignPageForMode(findPageOfBlock(book, book.lastBlockIndex));
+        }
         renderReaderPages();
       });
     }
@@ -3198,7 +3784,7 @@
       });
     }
 
-    function imgBlockHtml(item) {
+    function imgBlockHtml(item, biAttr = '') {
       const alt = esc(item.alt || '');
       const w = Number(item.w) || 0;
       const h = Number(item.h) || 0;
@@ -3206,14 +3792,15 @@
       const sizeStyle = (w > 0 && h > 0)
         ? `width:100%;max-width:min(100%, ${Math.round(w)}px);${ratio}`
         : 'width:100%;';
-      return `<div class="fig-wrap my-3 flex justify-center"><img src="${esc(item.src)}" alt="${alt}" style="${sizeStyle}height:auto;max-height:45vh;object-fit:contain;border-radius:6px;" class="object-contain" loading="eager" decoding="sync" /></div>`;
+      return `<div${biAttr} class="fig-wrap my-3 flex justify-center"><img src="${esc(item.src)}" alt="${alt}" style="${sizeStyle}height:auto;max-height:45vh;object-fit:contain;border-radius:6px;" class="object-contain" loading="eager" decoding="sync" /></div>`;
     }
 
     function blockHtml(item) {
       if (!item) return '';
-      if (item.type === 'heading') return `<h2 class="font-semibold mt-3" style="margin-bottom:var(--reader-para-spacing);font-size:calc(var(--reader-font-size)*1.22);">${esc(item.text)}</h2>`;
-      if (item.type === 'img') return item.dead ? '' : imgBlockHtml(item);
-      return `<p style="margin-bottom:var(--reader-para-spacing);text-align:justify;">${esc(item.text)}</p>`;
+      const biAttr = typeof item._bi === 'number' ? ` data-bi="${item._bi}"` : '';
+      if (item.type === 'heading') return `<h2${biAttr} class="font-semibold mt-3" style="margin-bottom:var(--reader-para-spacing);font-size:calc(var(--reader-font-size)*1.22);">${esc(item.text)}</h2>`;
+      if (item.type === 'img') return item.dead ? '' : imgBlockHtml(item, biAttr);
+      return `<p${biAttr} style="margin-bottom:var(--reader-para-spacing);text-align:justify;">${esc(item.text)}</p>`;
     }
 
     let imgFailHandlerBound = false;
@@ -3242,13 +3829,22 @@
     }
 
     function getAnchorBlock(book) {
-      if (!book || !book.pages || !book.pages.length) return null;
+      if (!book) return null;
+      const bi = getCurrentReadingBlockIndex();
+      if (bi >= 0 && book.rawBlocks && book.rawBlocks[bi]) {
+        return book.rawBlocks[bi];
+      }
+      if (!book.pages || !book.pages.length) return null;
       const pg = book.pages[state.currentPageIndex] || [];
       return pg.find(b => b && (b.text || b.src)) || pg[0] || null;
     }
 
     function restorePageIndexByAnchor(book, anchor) {
       if (!book || !anchor || !book.pages || !book.pages.length) return;
+      if (typeof anchor._bi === 'number') {
+        state.currentPageIndex = alignPageForMode(findPageOfBlock(book, anchor._bi));
+        return;
+      }
       const pages = book.pages;
       const targetText = anchor.text ? String(anchor.text).slice(0, 24) : '';
       for (let i = 0; i < pages.length; i++) {
@@ -3258,7 +3854,7 @@
           (anchor.type === 'img' && b.type === 'img' && b.src === anchor.src)
         );
         if (hit) {
-          state.currentPageIndex = state.readerConfig.viewMode === 'dual' ? (i - (i % 2)) : i;
+          state.currentPageIndex = alignPageForMode(i);
           return;
         }
       }
@@ -3295,6 +3891,7 @@
     function repaginate() {
       const book = state.currentBook;
       if (!book || book.format === 'PDF') return;
+      ensureBlockIndices(book);
       const blocks = book.rawBlocks || [];
       const pageLeft = $('page-left');
       const measure = $('page-measure-box');
@@ -3376,9 +3973,9 @@
             const maxUnits = fitLines * charsPerLine;
             const [head, tail] = splitTextByVisualUnits(b.text, maxUnits);
             if (head && head.length >= 8 && tail && tail.length >= 8) {
-              cur.push({ type: 'p', text: head });
+              cur.push({ _bi: b._bi, type: 'p', text: head });
               flush();
-              queue.splice(qi + 1, 0, { ...b, text: tail, splitFrom: true });
+              queue.splice(qi + 1, 0, { ...b, _bi: b._bi, text: tail, splitFrom: true, forceNewPage: false });
               continue;
             }
           }
@@ -3411,7 +4008,7 @@
         }
       }
 
-      book.pages = merged.length ? merged : [[{ type: 'p', text: '暂无内容' }]];
+      book.pages = merged.length ? merged : [[{ _bi: 0, type: 'p', text: '暂无内容' }]];
     }
 
     let repaginateTimer = null;
@@ -3449,8 +4046,17 @@
 
       const total = book.format === 'PDF' ? (book.numPages || 1) : ((book.pages && book.pages.length) || 1);
       state.currentPageIndex = Math.max(0, Math.min(state.currentPageIndex, total - 1));
+      if (mode === 'dual') state.currentPageIndex = alignPageForMode(state.currentPageIndex);
+
       book.lastPageIndex = state.currentPageIndex;
-      book.progressPercent = Math.min(100, Math.max(0.05, ((state.currentPageIndex + 1) / total) * 100));
+      if (book.format === 'EPUB' && mode !== 'scroll') {
+        const curPg = (book.pages && book.pages[state.currentPageIndex]) || [];
+        const firstBlk = curPg.find(b => b && typeof b._bi === 'number');
+        if (firstBlk) book.lastBlockIndex = firstBlk._bi;
+      }
+
+      const stepSpan = mode === 'dual' ? 2 : 1;
+      book.progressPercent = Math.min(100, Math.max(0.05, (Math.min(total, state.currentPageIndex + stepSpan) / total) * 100));
       if (opts && opts.skipDbSave) {
         saveQuickProgress(book);
       } else {
@@ -3613,6 +4219,23 @@
       updateStorageUsageDisplay();
 
       $('reader-fullscreen-toggle').onclick = toggleReaderFullscreen;
+
+      let scrollProgressTimer = null;
+      $('page-left-wrapper').addEventListener('scroll', () => {
+        if (state.readerConfig.viewMode !== 'scroll' || !state.currentBook) return;
+        clearTimeout(scrollProgressTimer);
+        scrollProgressTimer = setTimeout(() => {
+          const book = state.currentBook;
+          if (!book || book.format === 'PDF') return;
+          const bi = getCurrentReadingBlockIndex();
+          if (bi >= 0) {
+            book.lastBlockIndex = bi;
+            const total = Math.max(1, (book.rawBlocks || []).length);
+            book.progressPercent = Math.min(100, Math.max(0.05, ((bi + 1) / total) * 100));
+            saveBookProgressDebounced(book);
+          }
+        }, 180);
+      }, { passive: true });
 
       const handleSelectionEnd = () => {
         if ($('reader-view').classList.contains('hidden')) return;
@@ -4080,24 +4703,52 @@
       $('toc-search-input').onkeydown = e => {
         if (e.key === 'Escape') { e.stopPropagation(); closeTocSearch(); }
       };
+
       $('add-bookmark-btn').onclick = async () => {
         const book = state.currentBook;
         if (!book) return;
         book.bookmarks = book.bookmarks || [];
-        let page = state.currentPageIndex;
-        if (state.readerConfig.viewMode === 'dual' && page % 2 === 1) page = page - 1;
-        const isEmpty = pg => !pg || pg.length === 0 || !pg.some(b => b.text);
-        if (isEmpty(book.pages && book.pages[page]) && page > 0) page = page - 1;
-        if (book.bookmarks.some(m => m.page === page)) return showToast('当前页已在书签中');
-        const pageBlocks = (book.pages && book.pages[page]) || [];
-        const first = pageBlocks.find(b => b.text);
-        book.bookmarks.push({
-          page,
-          label: first ? first.text.slice(0, 40) : `第 ${page + 1} 页`,
-          progress: `${Math.round(((page + 1) / Math.max(1, (book.pages || []).length)) * 100)}%`,
-          createdAt: Date.now()
-        });
-        book.bookmarks.sort((a, b) => a.page - b.page);
+
+        if (book.format === 'PDF') {
+          const pageIndex = alignPageForMode(state.currentPageIndex);
+          if (book.bookmarks.some(m => (m.pageIndex ?? m.page) === pageIndex)) {
+            return showToast('当前页已在书签中');
+          }
+          const chap = currentChapterName();
+          book.bookmarks.push({
+            pageIndex,
+            page: pageIndex,
+            chapter: chap,
+            label: chap ? `${chap} · 第 ${pageIndex + 1} 页` : `第 ${pageIndex + 1} 页`,
+            createdAt: Date.now()
+          });
+          book.bookmarks.sort((a, b) => (a.pageIndex ?? a.page ?? 0) - (b.pageIndex ?? b.page ?? 0));
+        } else {
+          ensureBlockIndices(book);
+          const bi = getCurrentReadingBlockIndex();
+          const curPage = findPageOfBlock(book, bi);
+          if (book.bookmarks.some(m => (typeof m.blockIndex === 'number' ? findPageOfBlock(book, m.blockIndex) : m.page) === curPage)) {
+            return showToast('当前位置已在书签中');
+          }
+          const blocks = book.rawBlocks || [];
+          let snippet = '';
+          for (let i = Math.max(0, bi); i < Math.min(blocks.length, bi + 6); i++) {
+            if (blocks[i] && blocks[i].text) {
+              snippet = blocks[i].text.slice(0, 48);
+              break;
+            }
+          }
+          const chap = getChapterNameForBlock(book, bi);
+          book.bookmarks.push({
+            blockIndex: Math.max(0, bi),
+            page: curPage,
+            chapter: chap,
+            label: snippet || chap || `第 ${curPage + 1} 页`,
+            createdAt: Date.now()
+          });
+          book.bookmarks.sort((a, b) => (a.blockIndex ?? 0) - (b.blockIndex ?? 0));
+        }
+
         await saveBookDB(book);
         state.tocTab = 'bm';
         updateTocTabs();
@@ -4106,9 +4757,18 @@
       };
 
       document.querySelectorAll('.view-mode-btn').forEach(b => {
-        b.onclick = () => {
+        b.onclick = async () => {
+          const book = state.currentBook;
+          const anchorBi = book ? getCurrentReadingBlockIndex() : -1;
           state.readerConfig.viewMode = b.dataset.mode;
-          savePrefs(); applyLayoutStyles(); repaginate(); renderReaderPages();
+          savePrefs();
+          applyLayoutStyles();
+          repaginate();
+          if (book && book.format === 'EPUB' && anchorBi >= 0) {
+            await jumpToBookLocation({ blockIndex: anchorBi });
+          } else {
+            await renderReaderPages();
+          }
         };
       });
 
