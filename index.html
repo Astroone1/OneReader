@@ -594,7 +594,7 @@
     const PREFS_VER = 2;
     const DB_NAME = 'OneReaderDB_v4';
     const FONT_DB_NAME = 'OneReaderFonts_v1';
-    const PARSE_VERSION = 4;
+    const PARSE_VERSION = 5;
 
     // 极轻量进度表（避免每次翻页或改设置都把整本几十 MB 的书重写进 IndexedDB）
     function saveQuickProgress(book) {
@@ -2846,6 +2846,147 @@
         return t.length >= 1;
       };
 
+      // 解析 EPUB 内置 CSS 与行内彩色样式（保留说话人专属颜色/字重，忽略普通黑灰正文色）
+      const normalizeAccentColor = rawColor => {
+        if (!rawColor) return '';
+        const c = String(rawColor).replace(/!important/gi, '').trim().toLowerCase();
+        if (!c || c === 'inherit' || c === 'initial' || c === 'unset' || c === 'currentcolor' || c === 'transparent' || c === 'black' || c === 'windowtext') return '';
+        let r = -1, g = -1, b = -1;
+        const hex3 = c.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/i);
+        const hex6 = c.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})?$/i);
+        const rgbM = c.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+        if (hex3) {
+          r = parseInt(hex3[1] + hex3[1], 16);
+          g = parseInt(hex3[2] + hex3[2], 16);
+          b = parseInt(hex3[3] + hex3[3], 16);
+        } else if (hex6) {
+          r = parseInt(hex6[1], 16);
+          g = parseInt(hex6[2], 16);
+          b = parseInt(hex6[3], 16);
+        } else if (rgbM) {
+          r = Number(rgbM[1]);
+          g = Number(rgbM[2]);
+          b = Number(rgbM[3]);
+        } else {
+          return c;
+        }
+        const max = Math.max(r, g, b), min = Math.min(r, g, b);
+        const diff = max - min;
+        // 排除接近纯黑/纯白或无饱和度的普通灰黑正文色
+        if (diff < 18 && (max < 95 || min > 215)) return '';
+        if (diff < 12) return '';
+        return c;
+      };
+
+      const cssColorRules = [];
+      const parseCssText = cssStr => {
+        const cleaned = String(cssStr || '').replace(/\/\*[\s\S]*?\*\//g, '');
+        const re = /([^{}]+)\{([^{}]+)\}/g;
+        let m;
+        while ((m = re.exec(cleaned)) !== null) {
+          const selectors = m[1].trim();
+          const body = m[2];
+          const colorMatch = body.match(/(?:^|;|\s)color\s*:\s*([^;!}]+)/i);
+          const weightMatch = body.match(/(?:^|;|\s)font-weight\s*:\s*([^;!}]+)/i);
+          const accent = colorMatch ? normalizeAccentColor(colorMatch[1]) : '';
+          const isBold = weightMatch ? /^(bold|[6-9]00)$/i.test(weightMatch[1].trim()) : false;
+          if (!accent && !isBold) continue;
+          selectors.split(',').forEach(sel => {
+            const s = sel.trim();
+            if (!s || s.includes(':') || s.includes('>') || s.includes('+') || s.includes('~')) return;
+            cssColorRules.push({ selector: s, color: accent, bold: isBold });
+          });
+        }
+      };
+
+      for (const [p, entry] of Object.entries(zip.files)) {
+        if (entry.dir || !/\.css$/i.test(p)) continue;
+        try {
+          const cssTxt = await entry.async('string');
+          parseCssText(cssTxt);
+        } catch (e) {}
+      }
+
+      const resolveNodeStyle = el => {
+        if (!el || el.nodeType !== Node.ELEMENT_NODE) return { color: '', bold: false };
+        let color = '';
+        let bold = /^(b|strong|h[1-6])$/i.test(el.tagName);
+
+        for (const rule of cssColorRules) {
+          try {
+            if (el.matches(rule.selector)) {
+              if (rule.color) color = rule.color;
+              if (rule.bold) bold = true;
+            }
+          } catch (e) {}
+        }
+
+        const attrColor = el.getAttribute('color');
+        if (attrColor) {
+          const ac = normalizeAccentColor(attrColor);
+          if (ac) color = ac;
+        }
+
+        const inlineStyle = el.getAttribute('style') || '';
+        if (inlineStyle) {
+          const cm = inlineStyle.match(/(?:^|;|\s)color\s*:\s*([^;!}]+)/i);
+          if (cm) {
+            const ic = normalizeAccentColor(cm[1]);
+            if (ic) color = ic;
+          }
+          const wm = inlineStyle.match(/(?:^|;|\s)font-weight\s*:\s*([^;!}]+)/i);
+          if (wm && /^(bold|[6-9]00)$/i.test(wm[1].trim())) bold = true;
+        }
+
+        return { color, bold };
+      };
+
+      const extractStyledBlockInfo = node => {
+        const selfStyle = resolveNodeStyle(node);
+        let blockColor = selfStyle.color;
+        let blockBold = selfStyle.bold;
+
+        if (!blockColor && node.children && node.children.length === 1) {
+          const onlyChild = node.children[0];
+          if ((onlyChild.textContent || '').trim() === (node.textContent || '').trim()) {
+            const cs = resolveNodeStyle(onlyChild);
+            if (cs.color) blockColor = cs.color;
+            if (cs.bold) blockBold = true;
+          }
+        }
+
+        const spans = [];
+        let hasStyledSpan = false;
+        const collectSpans = (cur, inheritedColor, inheritedBold) => {
+          for (const child of cur.childNodes) {
+            if (child.nodeType === Node.TEXT_NODE) {
+              const tx = (child.nodeValue || '').replace(/\s+/g, ' ');
+              if (tx) {
+                spans.push({ text: tx, color: inheritedColor || '', bold: Boolean(inheritedBold) });
+              }
+            } else if (child.nodeType === Node.ELEMENT_NODE) {
+              const tag = child.tagName.toLowerCase();
+              if (tag === 'img' || tag === 'image' || tag === 'svg') continue;
+              const st = resolveNodeStyle(child);
+              const nextColor = st.color || inheritedColor;
+              const nextBold = st.bold || inheritedBold;
+              if (st.color) hasStyledSpan = true;
+              collectSpans(child, nextColor, nextBold);
+            }
+          }
+        };
+
+        if (!blockColor) {
+          collectSpans(node, '', blockBold);
+        }
+
+        return {
+          color: blockColor,
+          bold: blockBold,
+          spans: (hasStyledSpan && spans.length > 0) ? spans : null
+        };
+      };
+
       const BLOCK_TAGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'div', 'blockquote', 'li', 'figure']);
 
       let firstSpineFile = true;
@@ -2861,7 +3002,11 @@
         const u8 = await zip.file(f).async('uint8array');
         const txt = new TextDecoder('utf-8').decode(u8);
         const doc = parser.parseFromString(txt, 'text/html');
-        doc.querySelectorAll('script, style, svg style').forEach(el => el.remove());
+        doc.querySelectorAll('style').forEach(stEl => {
+          parseCssText(stEl.textContent || '');
+          stEl.remove();
+        });
+        doc.querySelectorAll('script, svg style').forEach(el => el.remove());
         doc.querySelectorAll('[style]').forEach(el => {
           const st = el.getAttribute('style') || '';
           if (/base64,/i.test(st) || st.length > 600) el.removeAttribute('style');
@@ -2965,10 +3110,16 @@
                   const hitsTitleToc = !firstTextInFileHandled && tocNormTitleSet.has(normTitle(t));
                   const isHeading = isHeadingTag || hitsHashToc || hitsFirstToc || hitsTitleToc;
 
+                  const styleInfo = extractStyledBlockInfo(node);
+
                   firstTextInFileHandled = true;
                   const newPage = markChapterStart() || hitsHashToc;
                   const bi = rawBlocks.length;
-                  rawBlocks.push({ _bi: bi, type: isHeading ? 'heading' : 'p', text: t, forceNewPage: newPage });
+                  const blkObj = { _bi: bi, type: isHeading ? 'heading' : 'p', text: t, forceNewPage: newPage };
+                  if (styleInfo.color) blkObj.color = styleInfo.color;
+                  if (styleInfo.bold) blkObj.bold = true;
+                  if (styleInfo.spans) blkObj.spans = styleInfo.spans;
+                  rawBlocks.push(blkObj);
                   bindBlockAnchors(bi);
                 }
               }
@@ -3708,9 +3859,24 @@
     function blockHtml(item) {
       if (!item) return '';
       const biAttr = typeof item._bi === 'number' ? ` data-bi="${item._bi}"` : '';
-      if (item.type === 'heading') return `<h2${biAttr} class="font-semibold mt-3" style="margin-bottom:var(--reader-para-spacing);font-size:calc(var(--reader-font-size)*1.22);">${esc(item.text)}</h2>`;
+      const colorStyle = item.color ? `color:${esc(item.color)};` : '';
+      const boldStyle = item.bold ? 'font-weight:600;' : '';
+
+      const renderInner = it => {
+        if (Array.isArray(it.spans) && it.spans.length > 0 && !it.splitFrom) {
+          return it.spans.map(sp => {
+            const st = `${sp.color ? `color:${esc(sp.color)};` : ''}${sp.bold ? 'font-weight:600;' : ''}`;
+            return st ? `<span style="${st}">${esc(sp.text)}</span>` : esc(sp.text);
+          }).join('');
+        }
+        return esc(it.text);
+      };
+
+      if (item.type === 'heading') {
+        return `<h2${biAttr} class="font-semibold mt-3" style="margin-bottom:var(--reader-para-spacing);font-size:calc(var(--reader-font-size)*1.22);${colorStyle}">${renderInner(item)}</h2>`;
+      }
       if (item.type === 'img') return item.dead ? '' : imgBlockHtml(item, biAttr);
-      return `<p${biAttr} style="margin-bottom:var(--reader-para-spacing);text-align:justify;">${esc(item.text)}</p>`;
+      return `<p${biAttr} style="margin-bottom:var(--reader-para-spacing);text-align:justify;${colorStyle}${boldStyle}">${renderInner(item)}</p>`;
     }
 
     let imgFailHandlerBound = false;
@@ -3883,7 +4049,7 @@
             const maxUnits = fitLines * charsPerLine;
             const [head, tail] = splitTextByVisualUnits(b.text, maxUnits);
             if (head && head.length >= 8 && tail && tail.length >= 8) {
-              cur.push({ _bi: b._bi, type: 'p', text: head });
+              cur.push({ _bi: b._bi, type: 'p', text: head, color: b.color, bold: b.bold });
               flush();
               queue.splice(qi + 1, 0, { ...b, _bi: b._bi, text: tail, splitFrom: true, forceNewPage: false });
               continue;
