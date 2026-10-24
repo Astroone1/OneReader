@@ -103,7 +103,7 @@
           <nav id="main-nav-list" class="space-y-1">
             <button type="button" data-nav="all" class="nav-item w-full flex items-center gap-4 pl-6 pr-4 py-3 rounded-r-full bg-[#4a4a4a] text-white text-[15px] font-medium transition cursor-pointer">
               <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10.5L12 3l9 7.5V20a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1v-9.5z"/></svg>
-              <span>全部图书</span>
+              <span>本地图书</span>
             </button>
             <button type="button" data-nav="notes" class="nav-item w-full flex items-center gap-4 pl-6 pr-4 py-3 rounded-r-full text-neutral-700 hover:bg-neutral-100 text-[15px] transition cursor-pointer">
               <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5.5A1.5 1.5 0 015.5 4H9v16H5.5A1.5 1.5 0 014 18.5v-13z"/><path stroke-linecap="round" stroke-linejoin="round" d="M9 4h9.5A1.5 1.5 0 0120 5.5v13a1.5 1.5 0 01-1.5 1.5H9"/><path stroke-linecap="round" stroke-linejoin="round" d="M12.5 9h4M12.5 13h4"/></svg>
@@ -152,6 +152,7 @@
             <select id="notes-book-filter" class="h-9 px-2.5 rounded-lg border border-neutral-300 bg-white text-sm text-neutral-700 focus:outline-none cursor-pointer max-w-[240px]">
               <option value="">请选择</option>
             </select>
+            <!-- 笔记栏云笔记图标保持不变，点击弹出下行/上行面板 -->
             <button id="notes-sync-btn" type="button" title="与私有仓同步笔记" class="w-9 h-9 flex items-center justify-center rounded-lg border border-neutral-300 hover:bg-neutral-100 text-neutral-600 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
               <svg class="w-[19px] h-[19px]" viewBox="0 0 40 32" fill="none">
                 <path d="M11.5 26.5H29.5C33.6421 26.5 37 23.1421 37 19C37 15.203 34.1783 12.065 30.514 11.568C29.389 6.657 25.002 3 19.75 3C13.675 3 8.75 7.925 8.75 14C8.75 14.389 8.77 14.773 8.81 15.151C5.534 15.792 3 18.678 3 22.15C3 24.552 4.948 26.5 7.35 26.5H11.5Z" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="rgba(59,59,59,0.03)"/>
@@ -179,11 +180,34 @@
       <div id="multiselect-bar" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-[#3b3b3b] text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-4 text-sm">
         <span id="multiselect-count" class="text-neutral-200 font-medium">已选 0 本</span>
         <div class="h-4 w-[1px] bg-neutral-600"></div>
-        <button id="batch-add-shelf-btn" type="button" class="hover:text-amber-300 transition cursor-pointer">添加到书架</button>
+        <button id="batch-add-shelf-btn" type="button" class="hover:text-amber-300 transition cursor-pointer">移动书架</button>
         <button id="batch-pin-btn" type="button" class="hover:text-amber-300 transition cursor-pointer">置顶</button>
         <button id="batch-delete-btn" type="button" class="text-red-300 hover:text-red-400 transition cursor-pointer">删除</button>
         <div class="h-4 w-[1px] bg-neutral-600"></div>
         <button id="batch-exit-btn" type="button" class="px-2.5 py-1 rounded-lg bg-white/15 hover:bg-white/25 transition cursor-pointer">退出</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 1.5 云笔记上下行同步弹窗 ==================== -->
+  <div id="notes-sync-modal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-[400px] w-full p-6 shadow-2xl border border-neutral-100 flex flex-col">
+      <div class="relative flex items-center justify-center pb-4 border-b border-neutral-100">
+        <h3 class="text-[18px] font-medium text-[#333]">云端笔记同步</h3>
+        <button id="close-notes-sync-modal-btn" type="button" class="absolute right-0 p-1.5 text-neutral-500 hover:text-black rounded-full hover:bg-neutral-100 transition cursor-pointer">✕</button>
+      </div>
+      <div class="pt-4 space-y-3 text-sm">
+        <div id="notes-sync-status-badge" class="px-3.5 py-2.5 rounded-xl bg-neutral-100 text-neutral-600 text-xs leading-relaxed">
+          上传前请先「下行拉取合并」云端笔记，确保远古笔记与多端修改已在本地合并对齐。
+        </div>
+        <button id="notes-pull-btn" type="button" class="w-full py-3 px-4 rounded-2xl bg-[#3b3b3b] hover:bg-black text-white font-medium text-sm transition flex items-center justify-center gap-2 cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16"/></svg>
+          <span>1. 下行：拉取云笔记并本地合并</span>
+        </button>
+        <button id="notes-push-btn" type="button" disabled class="w-full py-3 px-4 rounded-2xl bg-[#3b3b3b] hover:bg-black text-white font-medium text-sm transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 20V8m0 0l-4 4m4-4l4 4M4 4h16"/></svg>
+          <span>2. 上行：替换上传当前本地笔记</span>
+        </button>
       </div>
     </div>
   </div>
@@ -211,7 +235,7 @@
           <button id="hub-import-local-btn" type="button" class="py-2 px-4 rounded-xl bg-[#484848] hover:bg-black text-white text-xs font-medium transition cursor-pointer">
             📂 导入
           </button>
-          <button id="hub-import-cloud-btn" type="button" title="连接仓库后可用：导入并同时上传到仓库" class="py-2 px-4 rounded-xl bg-[#484848] hover:bg-black text-white text-xs font-medium transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+          <button id="hub-import-cloud-btn" type="button" title="连接仓库后可用：在具体书架内导入并上传到对应文件夹" class="py-2 px-4 rounded-xl bg-[#484848] hover:bg-black text-white text-xs font-medium transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
             ☁️ 云导入
           </button>
         </div>
@@ -261,8 +285,8 @@
             保存并拉取私有仓书库
           </button>
           <div class="grid grid-cols-2 gap-2">
-            <button id="hub-download-html-btn" type="button" class="py-2 rounded-xl border border-neutral-300 hover:bg-neutral-100 text-neutral-700 text-xs font-medium transition cursor-pointer">
-              💾 导出最新 index.html
+            <button id="hub-sync-shelves-btn" type="button" class="py-2 rounded-xl border border-neutral-300 hover:bg-neutral-100 text-neutral-700 text-xs font-medium transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+              🔄 同步书架
             </button>
             <button id="gh-clear-config-btn" type="button" class="py-2 rounded-xl border border-red-200 hover:bg-red-50 text-red-600 text-xs font-medium transition cursor-pointer">
               断开并清除本地密钥
@@ -278,7 +302,7 @@
   <div id="book-action-popover" class="hidden fixed z-50 w-48 bg-white rounded-2xl shadow-[0_10px_32px_rgba(0,0,0,0.16)] border border-neutral-100 py-1.5 px-1.5 text-[15px] text-[#3a3a3a] select-none">
     <button id="book-act-shelf" type="button" class="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-neutral-100 transition cursor-pointer text-left">
       <svg class="w-4 h-4 text-neutral-700 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="5" rx="1.5"/><rect x="4" y="13" width="16" height="5" rx="1.5"/></svg>
-      <span>添加到书架</span>
+      <span>移动书架</span>
     </button>
     <button id="book-act-multiselect" type="button" class="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-neutral-100 transition cursor-pointer text-left">
       <svg class="w-4 h-4 text-neutral-700 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
@@ -316,11 +340,11 @@
     </div>
   </div>
 
-  <!-- 添加到书架弹窗 -->
+  <!-- 移动书架弹窗 -->
   <div id="assign-shelf-modal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-neutral-100">
       <div class="relative flex items-center justify-center pb-3">
-        <h4 class="text-[18px] font-normal text-[#3b3b3b]">添加到书架</h4>
+        <h4 class="text-[18px] font-normal text-[#3b3b3b]">移动书架</h4>
         <button id="close-assign-shelf-btn" type="button" class="absolute right-0 p-1 text-neutral-500 hover:text-black rounded-full cursor-pointer">✕</button>
       </div>
       <div id="assign-shelf-options" class="mt-2 space-y-1.5 max-h-60 overflow-y-auto"></div>
@@ -388,7 +412,7 @@
 
     <!-- 左侧目录 / 书签面板 -->
     <div id="toc-backdrop" class="hidden fixed inset-0 z-40 bg-black/10"></div>
-    <aside id="reader-toc-drawer" class="fixed top-0 left-0 bottom-0 max-w-full bg-white border-r border-neutral-200 shadow-2xl z-50 flex flex-col transform -translate-x-full transition-transform duration-200 ease-out" style="font-family: var(--reader-font-family); font-size: calc(var(--reader-font-size) * 0.78); width: clamp(290px, calc(var(--reader-font-size) * 17), 430px);">
+    <aside id="reader-toc-drawer" class="fixed top-0 left-0 bottom-0 max-w-full bg-white border-r border-neutral-200 shadow-2xl z-50 flex flex-col transform -translate-x-full transition-transform duration-200 ease-out" style="font-family: var(--reader-font-family); font-size: 16px; width: clamp(290px, 82vw, 380px);">
       <div class="relative h-[68px] flex items-center justify-between gap-2 px-4 shrink-0">
         <div class="flex items-center gap-6 shrink-0">
           <button id="toc-tab-toc" type="button" class="py-1 cursor-pointer">目录</button>
@@ -530,11 +554,13 @@
 
     const state = {
       shelves: ['交易', '世界', '小说', '技能'],
-      currentNav: 'all',
+      currentNav: 'all', // 'all' 代表「本地图书」（未分类 / 失去书架的书）
       searchQuery: '',
       books: [],
       notes: [],          // 全部笔记（单一实体，content 空=纯摘抄）
       notesBookFilter: '',  // 笔记页"按图书筛选"的当前值（空=全部）
+      notesPulledReady: false, // 是否已执行下行拉取合并（未下行前锁住上行）
+      lastPulledNotesSha: null, // 最近一次拉取到的云端 notes.json sha（null 表示云端尚无该文件）
       currentBook: null,
       currentPageIndex: 0,
       activeMenuBookId: null,
@@ -567,10 +593,40 @@
 
     const PREFS_KEY = 'onereader_prefs_v4';
     const GH_KEY = 'onereader_gh_v4';
+    const PROGRESS_KEY = 'onereader_progress_v1';
     const PREFS_VER = 2;
     const DB_NAME = 'OneReaderDB_v4';
     const FONT_DB_NAME = 'OneReaderFonts_v1';
     const PARSE_VERSION = 3;
+
+    // 极轻量进度表（避免每次翻页或改设置都把整本几十 MB 的书重写进 IndexedDB）
+    function saveQuickProgress(book) {
+      if (!book || !book.id) return;
+      try {
+        const map = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
+        map[book.id] = {
+          lastPageIndex: book.lastPageIndex || 0,
+          progressPercent: book.progressPercent || 0,
+          hasBeenRead: Boolean(book.hasBeenRead),
+          updatedAt: Date.now()
+        };
+        localStorage.setItem(PROGRESS_KEY, JSON.stringify(map));
+      } catch (e) {}
+    }
+
+    function mergeQuickProgress(books) {
+      try {
+        const map = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
+        (books || []).forEach(b => {
+          const p = map[b.id];
+          if (p) {
+            b.lastPageIndex = p.lastPageIndex ?? b.lastPageIndex ?? 0;
+            b.progressPercent = p.progressPercent ?? b.progressPercent ?? 0;
+            b.hasBeenRead = Boolean(p.hasBeenRead || b.hasBeenRead);
+          }
+        });
+      } catch (e) {}
+    }
 
     let toastTimer = null;
     let pendingUploadToCloud = false;
@@ -622,6 +678,20 @@
       if (!db) return;
       const copy = { ...b, pdfDoc: undefined, pages: undefined };
       db.transaction('books', 'readwrite').objectStore('books').put(copy);
+      updateStorageUsageDisplay();
+    }
+
+    // 批量写入图书（避免上千本书连接时逐本开事务造成卡顿）
+    async function saveBooksBatchDB(books) {
+      const db = await openDB();
+      if (!db || !books || !books.length) return;
+      await new Promise(res => {
+        const tx = db.transaction('books', 'readwrite');
+        const store = tx.objectStore('books');
+        books.forEach(b => store.put({ ...b, pdfDoc: undefined, pages: undefined }));
+        tx.oncomplete = res;
+        tx.onerror = res;
+      });
       updateStorageUsageDisplay();
     }
 
@@ -848,16 +918,18 @@
 
     async function purgeAllLocalCache() {
       let freed = 0;
+      const changed = [];
       for (const b of state.books) {
         if (b.fileBytes && (b.cloudPath || b.cloudSha)) {
           b.fileBytes = null;
           b.rawBlocks = null;
           b.pdfDoc = null;
           b.isCloudOnly = true;
-          await saveBookDB(b);
+          changed.push(b);
           freed++;
         }
       }
+      if (changed.length) await saveBooksBatchDB(changed);
       renderLibrary();
       updateStorageUsageDisplay();
       showToast(`已释放 ${freed} 本书的手机空间，云端记录已保留`);
@@ -917,7 +989,7 @@
       }, 200);
     });
 
-    // ==================== GitHub REST API 私有仓直连 ====================
+    // ==================== GitHub REST API 私有仓直连 & 文件夹书架同步 ====================
     function updateCloudIndicator() {
       const connected = Boolean(state.github.owner && state.github.repo && state.github.token);
       $('cloud-status-dot').className = `absolute top-2 right-2 w-2.5 h-2.5 rounded-full ring-2 ring-white transition-colors ${connected ? 'bg-emerald-500' : 'bg-neutral-400'}`;
@@ -925,7 +997,8 @@
       badge.textContent = connected ? `已连 ${state.github.owner}/${state.github.repo}` : '未连接';
       badge.className = `text-xs px-2.5 py-0.5 rounded-full ${connected ? 'bg-emerald-50 text-emerald-700 font-medium' : 'bg-neutral-100 text-neutral-500'}`;
       const cloudButtons = {
-        'hub-import-cloud-btn': '连接仓库后可用：导入并同时上传到仓库',
+        'hub-import-cloud-btn': '连接仓库后可用：在具体书架内导入并上传到对应文件夹',
+        'hub-sync-shelves-btn': '连接仓库后可用：将书架归类与顺序同步到仓库文件夹',
         'book-act-cloud-delete': '连接仓库后可用：同时删除仓库里的这本'
       };
       Object.entries(cloudButtons).forEach(([id, tip]) => {
@@ -953,6 +1026,10 @@
       return `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
     }
 
+    function encodeRepoPath(p) {
+      return String(p || '').split('/').filter(Boolean).map(encodeURIComponent).join('/');
+    }
+
     function arrayBufferToBase64(buf) {
       const bytes = new Uint8Array(buf);
       let binary = '';
@@ -965,7 +1042,7 @@
 
     async function getCloudFileSha(path) {
       const branch = state.github.branch || 'main';
-      const url = `${repoApiBase()}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}&_t=${Date.now()}`;
+      const url = `${repoApiBase()}/contents/${encodeRepoPath(path)}?ref=${encodeURIComponent(branch)}&_t=${Date.now()}`;
       const res = await fetch(url, { headers: ghHeaders(), cache: 'no-store' });
       if (res.status === 404) return null;
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -977,15 +1054,16 @@
       if (!isCloudConnected()) throw new Error('未连接私有仓');
       if (!book.fileBytes) throw new Error('本地没有原始文件，无法上传');
       const branch = state.github.branch || 'main';
-      const path = book.fileName || `${book.title}.${book.format === 'PDF' ? 'pdf' : 'epub'}`;
-      const sha = await getCloudFileSha(path);
+      const fileName = book.fileName || `${book.title}.${book.format === 'PDF' ? 'pdf' : 'epub'}`;
+      const targetPath = book.shelf ? `${book.shelf}/${fileName}` : fileName;
+      const sha = await getCloudFileSha(targetPath);
       const body = {
-        message: `upload: ${path}`,
+        message: `upload: ${targetPath}`,
         content: arrayBufferToBase64(book.fileBytes),
         branch
       };
       if (sha) body.sha = sha;
-      const res = await fetch(`${repoApiBase()}/contents/${encodeURIComponent(path)}`, {
+      const res = await fetch(`${repoApiBase()}/contents/${encodeRepoPath(targetPath)}`, {
         method: 'PUT',
         headers: ghHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(body)
@@ -995,19 +1073,19 @@
         throw new Error(`HTTP ${res.status} ${t.slice(0, 120)}`);
       }
       const data = await res.json();
-      book.cloudPath = path;
+      book.cloudPath = targetPath;
       book.cloudSha = data && data.content ? data.content.sha : (sha || '');
-      return path;
+      return targetPath;
     }
 
     async function deleteBookFromCloud(book) {
       if (!isCloudConnected()) throw new Error('未连接私有仓');
       const branch = state.github.branch || 'main';
-      const path = book.cloudPath || book.fileName;
+      const path = book.cloudPath || (book.shelf ? `${book.shelf}/${book.fileName}` : book.fileName);
       if (!path) throw new Error('该书没有云端路径');
       const sha = await getCloudFileSha(path);
       if (!sha) return { skipped: true };
-      const res = await fetch(`${repoApiBase()}/contents/${encodeURIComponent(path)}`, {
+      const res = await fetch(`${repoApiBase()}/contents/${encodeRepoPath(path)}`, {
         method: 'DELETE',
         headers: ghHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ message: `delete: ${path}`, sha, branch })
@@ -1039,52 +1117,258 @@
       progBar.style.width = '20%';
 
       try {
-        const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents?ref=${encodeURIComponent(branch)}&_t=${Date.now()}`;
-        const resp = await fetch(url, { headers: ghHeaders(), cache: 'no-store' });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const files = await resp.json();
-        if (!Array.isArray(files)) throw new Error('返回结构异常');
+        try {
+          const gotShelves = await getCloudJSON('data/shelves.json');
+          if (gotShelves && gotShelves.data && Array.isArray(gotShelves.data.shelves)) {
+            gotShelves.data.shelves.forEach(s => {
+              if (s && !state.shelves.includes(s)) state.shelves.push(s);
+            });
+            const ordered = gotShelves.data.shelves.filter(Boolean);
+            state.shelves.forEach(s => { if (!ordered.includes(s)) ordered.push(s); });
+            state.shelves = ordered;
+          }
+        } catch (e) {}
 
-        progBar.style.width = '50%';
-        progTxt.textContent = '检测图书列表...';
+        progBar.style.width = '45%';
+        progTxt.textContent = '正在读取仓库目录树...';
 
-        const bookFiles = files.filter(f => f.type === 'file' && /\.(epub|pdf)$/i.test(f.name));
-        for (let i = 0; i < bookFiles.length; i++) {
-          const f = bookFiles[i];
-          const pct = Math.round(50 + ((i + 1) / bookFiles.length) * 45);
-          progBar.style.width = `${pct}%`;
-          progTxt.textContent = `发现云端书目 (${i + 1}/${bookFiles.length}): ${f.name}`;
+        const refRes = await fetch(`${repoApiBase()}/git/ref/heads/${encodeURIComponent(branch)}?_t=${Date.now()}`, {
+          headers: ghHeaders(),
+          cache: 'no-store'
+        });
+        if (!refRes.ok) throw new Error(`HTTP ${refRes.status}`);
+        const refData = await refRes.json();
+        const headCommitSha = refData.object.sha;
 
-          const title = f.name.replace(/\.(epub|pdf)$/i, '');
-          const format = f.name.toLowerCase().endsWith('.pdf') ? 'PDF' : 'EPUB';
-          let exist = state.books.find(b => b.fileName === f.name || b.title === title);
+        const treeRes = await fetch(`${repoApiBase()}/git/trees/${encodeURIComponent(headCommitSha)}?recursive=1&_t=${Date.now()}`, {
+          headers: ghHeaders(),
+          cache: 'no-store'
+        });
+        if (!treeRes.ok) throw new Error(`HTTP ${treeRes.status}`);
+        const treeData = await treeRes.json();
+        const treeList = Array.isArray(treeData.tree) ? treeData.tree : [];
+
+        treeList.forEach(item => {
+          if (item.type !== 'blob') return;
+          const parts = String(item.path || '').split('/');
+          if (parts.length >= 2 && parts[0] !== 'data' && !parts[0].startsWith('.')) {
+            const folderName = parts[0];
+            if (folderName && !state.shelves.includes(folderName)) {
+              state.shelves.push(folderName);
+            }
+          }
+        });
+
+        const bookEntries = treeList.filter(item => item.type === 'blob' && /\.(epub|pdf)$/i.test(item.path));
+        progBar.style.width = '75%';
+        progTxt.textContent = `索引 ${bookEntries.length} 本云端图书...`;
+
+        const toSave = [];
+        for (let i = 0; i < bookEntries.length; i++) {
+          const entry = bookEntries[i];
+          const parts = entry.path.split('/');
+          const fileName = parts[parts.length - 1];
+          const folderShelf = (parts.length >= 2 && parts[0] !== 'data' && !parts[0].startsWith('.')) ? parts[0] : '';
+          const title = fileName.replace(/\.(epub|pdf)$/i, '');
+          const format = fileName.toLowerCase().endsWith('.pdf') ? 'PDF' : 'EPUB';
+
+          let exist = state.books.find(b => b.cloudSha === entry.sha || b.fileName === fileName || b.title === title);
           if (!exist) {
             const newCloudBook = {
-              id: 'cloud-' + f.sha.slice(0, 10),
-              title, fileName: f.name, format, shelf: '',
-              pinned: false, addedAt: Date.now(), coverUrl: '',
-              hasBeenRead: false, progressPercent: 0, lastPageIndex: 0,
-              cloudPath: f.path, cloudSha: f.sha, isCloudOnly: true
+              id: 'cloud-' + entry.sha.slice(0, 10) + '-' + i,
+              title,
+              fileName,
+              format,
+              shelf: folderShelf,
+              pinned: false,
+              addedAt: Date.now(),
+              coverUrl: '',
+              hasBeenRead: false,
+              progressPercent: 0,
+              lastPageIndex: 0,
+              cloudPath: entry.path,
+              cloudSha: entry.sha,
+              isCloudOnly: true
             };
             state.books.push(newCloudBook);
-            await saveBookDB(newCloudBook);
+            toSave.push(newCloudBook);
           } else {
-            exist.cloudPath = f.path;
-            exist.cloudSha = f.sha;
-            await saveBookDB(exist);
+            exist.cloudPath = entry.path;
+            exist.cloudSha = entry.sha;
+            exist.shelf = folderShelf;
+            toSave.push(exist);
           }
         }
 
+        if (toSave.length) await saveBooksBatchDB(toSave);
+        savePrefs();
         updateCloudIndicator();
         renderShelves();
         renderLibrary();
         progBox.classList.add('hidden');
         $('cloud-hub-modal').classList.add('hidden');
-        showToast(`同步完成：已索引 ${bookFiles.length} 本云端图书`);
+        showToast(`同步完成：已索引 ${bookEntries.length} 本云端图书`);
       } catch (err) {
         console.error(err);
         progBox.classList.add('hidden');
         showToast('连接失败：请核对用户名、仓库名或 Token');
+      }
+    }
+
+    async function syncShelvesWithCloud() {
+      if (!isCloudConnected()) return showToast('请先连接私有仓');
+      const btn = $('hub-sync-shelves-btn');
+      const progBox = $('sync-progress-box');
+      const progTxt = $('sync-progress-text');
+      const progBar = $('sync-progress-bar');
+
+      btn.disabled = true;
+      progBox.classList.remove('hidden');
+      progTxt.textContent = '正在读取云端目录树...';
+      progBar.style.width = '25%';
+
+      try {
+        const branch = state.github.branch || 'main';
+        const refRes = await fetch(`${repoApiBase()}/git/ref/heads/${encodeURIComponent(branch)}?_t=${Date.now()}`, {
+          headers: ghHeaders(),
+          cache: 'no-store'
+        });
+        if (!refRes.ok) throw new Error(`HTTP ${refRes.status}`);
+        const refData = await refRes.json();
+        const latestCommitSha = refData.object.sha;
+
+        const commitRes = await fetch(`${repoApiBase()}/git/commits/${encodeURIComponent(latestCommitSha)}?_t=${Date.now()}`, {
+          headers: ghHeaders(),
+          cache: 'no-store'
+        });
+        if (!commitRes.ok) throw new Error(`HTTP ${commitRes.status}`);
+        const commitData = await commitRes.json();
+        const baseTreeSha = commitData.tree.sha;
+
+        const treeRes = await fetch(`${repoApiBase()}/git/trees/${encodeURIComponent(baseTreeSha)}?recursive=1&_t=${Date.now()}`, {
+          headers: ghHeaders(),
+          cache: 'no-store'
+        });
+        if (!treeRes.ok) throw new Error(`HTTP ${treeRes.status}`);
+        const treeData = await treeRes.json();
+        const oldBlobs = (treeData.tree || []).filter(it => it.type === 'blob');
+
+        progBar.style.width = '55%';
+        progTxt.textContent = '正在整理书架文件夹结构...';
+
+        const newTreeItems = [];
+        const usedPaths = new Set();
+        const updatedLocalBooks = [];
+
+        oldBlobs.forEach(item => {
+          const isBook = /\.(epub|pdf)$/i.test(item.path);
+          const isGitKeep = item.path.endsWith('/.gitkeep');
+          const isShelvesJson = item.path === 'data/shelves.json';
+          if (!isBook && !isGitKeep && !isShelvesJson) {
+            newTreeItems.push({
+              path: item.path,
+              mode: item.mode || '100644',
+              type: 'blob',
+              sha: item.sha
+            });
+            usedPaths.add(item.path);
+          }
+        });
+
+        oldBlobs.forEach(item => {
+          if (!/\.(epub|pdf)$/i.test(item.path)) return;
+          const fileName = item.path.split('/').pop();
+          const localBook = state.books.find(b => b.cloudPath === item.path || b.cloudSha === item.sha || b.fileName === fileName);
+          let targetPath = item.path;
+          if (localBook) {
+            const validShelf = (localBook.shelf && state.shelves.includes(localBook.shelf)) ? localBook.shelf : '';
+            localBook.shelf = validShelf;
+            targetPath = validShelf ? `${validShelf}/${localBook.fileName || fileName}` : (localBook.fileName || fileName);
+            if (localBook.cloudPath !== targetPath || localBook.cloudSha !== item.sha) {
+              localBook.cloudPath = targetPath;
+              localBook.cloudSha = item.sha;
+              updatedLocalBooks.push(localBook);
+            }
+          }
+          if (!usedPaths.has(targetPath)) {
+            newTreeItems.push({
+              path: targetPath,
+              mode: item.mode || '100644',
+              type: 'blob',
+              sha: item.sha
+            });
+            usedPaths.add(targetPath);
+          }
+        });
+
+        state.shelves.forEach(shelfName => {
+          const keepPath = `${shelfName}/.gitkeep`;
+          if (!usedPaths.has(keepPath)) {
+            newTreeItems.push({
+              path: keepPath,
+              mode: '100644',
+              type: 'blob',
+              content: ''
+            });
+            usedPaths.add(keepPath);
+          }
+        });
+
+        newTreeItems.push({
+          path: 'data/shelves.json',
+          mode: '100644',
+          type: 'blob',
+          content: JSON.stringify({ shelves: state.shelves, updatedAt: Date.now() }, null, 2)
+        });
+
+        progBar.style.width = '80%';
+        progTxt.textContent = '正在提交云端书架结构...';
+
+        const createTreeRes = await fetch(`${repoApiBase()}/git/trees`, {
+          method: 'POST',
+          headers: ghHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ tree: newTreeItems })
+        });
+        if (!createTreeRes.ok) throw new Error(`HTTP ${createTreeRes.status}`);
+        const newTreeData = await createTreeRes.json();
+
+        if (newTreeData.sha === baseTreeSha) {
+          progBox.classList.add('hidden');
+          showToast('云端书架已是最新，无需更改');
+          return;
+        }
+
+        const createCommitRes = await fetch(`${repoApiBase()}/git/commits`, {
+          method: 'POST',
+          headers: ghHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({
+            message: 'shelves: sync folder structure',
+            tree: newTreeData.sha,
+            parents: [latestCommitSha]
+          })
+        });
+        if (!createCommitRes.ok) throw new Error(`HTTP ${createCommitRes.status}`);
+        const newCommitData = await createCommitRes.json();
+
+        const updateRefRes = await fetch(`${repoApiBase()}/git/refs/heads/${encodeURIComponent(branch)}`, {
+          method: 'PATCH',
+          headers: ghHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ sha: newCommitData.sha })
+        });
+        if (!updateRefRes.ok) throw new Error(`HTTP ${updateRefRes.status}`);
+
+        if (updatedLocalBooks.length) await saveBooksBatchDB(updatedLocalBooks);
+        savePrefs();
+        renderShelves();
+        renderLibrary();
+        progBox.classList.add('hidden');
+        showToast('已同步书架结构到云端仓库');
+      } catch (e) {
+        console.error(e);
+        progBox.classList.add('hidden');
+        showToast(`同步书架失败：${e.message || '请检查仓库权限'}`);
+      } finally {
+        btn.disabled = !isCloudConnected();
       }
     }
 
@@ -1130,24 +1414,40 @@
               <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
             </button>
             <button type="button" class="ren-btn p-1 hover:text-black cursor-pointer" title="重命名">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536M9 15l6.232-6.232a2.5 2.5 0 013.536 3.536L12.536 18.5H9V15z"/><path stroke-linecap="round" d="M4 21h16"/></svg>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536M9 15l6.232-6.232a2.5 2.5 0 013.536 3.536L12.536 18.5H9V15z"/><path stroke-linecap="round" stroke-linejoin="round" d="M4 21h16"/></svg>
             </button>
             <span class="p-1 cursor-grab active:cursor-grabbing" title="拖动排序">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M4 7h16M4 12h16M4 17h16"/></svg>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M4 12h16M4 17h16"/></svg>
             </span>
           </div>`;
 
-        row.querySelector('.del-btn').onclick = () => {
+        row.querySelector('.del-btn').onclick = async () => {
           state.shelves.splice(idx, 1);
-          state.books.forEach(b => { if (b.shelf === name) b.shelf = ''; });
+          const affected = [];
+          state.books.forEach(b => {
+            if (b.shelf === name) {
+              b.shelf = '';
+              affected.push(b);
+            }
+          });
+          if (affected.length) await saveBooksBatchDB(affected);
           if (state.currentNav === `shelf:${name}`) state.currentNav = 'all';
           savePrefs(); renderShelves(); renderLibrary(); renderManageShelvesList();
+          showToast(`已删除书架「${name}」，原书已移回本地图书`);
         };
-        row.querySelector('.ren-btn').onclick = () => {
-          openPrompt('重命名书架', `将「${name}」修改为：`, name, val => {
+        row.querySelector('.ren-btn').onclick = async () => {
+          openPrompt('重命名书架', `将「${name}」修改为：`, name, async val => {
             if (!val || val === name) return;
             state.shelves[idx] = val;
-            state.books.forEach(b => { if (b.shelf === name) b.shelf = val; });
+            const affected = [];
+            state.books.forEach(b => {
+              if (b.shelf === name) {
+                b.shelf = val;
+                affected.push(b);
+              }
+            });
+            if (affected.length) await saveBooksBatchDB(affected);
+            if (state.currentNav === `shelf:${name}`) state.currentNav = `shelf:${val}`;
             savePrefs(); renderShelves(); renderLibrary(); renderManageShelvesList();
           });
         };
@@ -1200,6 +1500,7 @@
       grid.innerHTML = '';
 
       list.forEach(n => {
+        const bookExists = Boolean(n.bookFile && state.books.some(b => b.fileName === n.bookFile));
         const card = document.createElement('div');
         card.className = 'relative bg-white rounded-2xl border border-neutral-200/80 shadow-[0_1px_4px_rgba(0,0,0,0.04)] p-4 flex flex-col';
         card.style.height = '290px';
@@ -1218,13 +1519,15 @@
               <button type="button" class="note-edit w-7 h-7 flex items-center justify-center rounded-lg hover:bg-neutral-100 text-neutral-600 cursor-pointer" title="编辑备注">
                 <svg class="w-[17px] h-[17px]" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M4 20l4.5-1.2L20 7.3a2 2 0 000-2.8l-.5-.5a2 2 0 00-2.8 0L5.2 15.5 4 20z"/></svg>
               </button>
-              <button type="button" class="note-jump w-7 h-7 flex items-center justify-center rounded-lg hover:bg-neutral-100 text-neutral-600 cursor-pointer" title="在书中展示">
+              <button type="button" ${bookExists ? '' : 'disabled'} class="note-jump w-7 h-7 flex items-center justify-center rounded-lg ${bookExists ? 'hover:bg-neutral-100 text-neutral-600 cursor-pointer' : 'text-neutral-300 opacity-50 cursor-not-allowed'}" title="${bookExists ? '在书中展示' : '原书不在当前书库中'}">
                 <svg class="w-[17px] h-[17px]" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 00-3.5 10.9c.5.4.8 1 .8 1.6V16h5.4v-.5c0-.6.3-1.2.8-1.6A6 6 0 0012 3z"/></svg>
               </button>
             </div>
           </div>`;
         card.querySelector('.note-edit').onclick = () => openNoteEditor(n);
-        card.querySelector('.note-jump').onclick = () => jumpToNote(n);
+        if (bookExists) {
+          card.querySelector('.note-jump').onclick = () => jumpToNote(n);
+        }
         grid.appendChild(card);
       });
     }
@@ -1407,7 +1710,6 @@
       return '';
     }
 
-    // ==================== 核心修复 1：选中哪就摘抄哪（支持跨页、跨段，一字不差） ====================
     function extractExactRangeText(range) {
       const frag = range.cloneContents();
       const spine = frag.querySelector && frag.querySelector('#dual-page-spine');
@@ -1447,8 +1749,6 @@
 
       if (!blocks.length) return range.toString();
 
-      // 若是跨页选区，且左页最后一个段落恰好是被分页拆开的半截段落（splitFrom），
-      // 则左页末尾与右页开头原本属于同一自然段，直接无缝拼接，不插入多余换行
       if (blocks.length >= 2 && state.currentBook && state.readerConfig.viewMode === 'dual') {
         const pages = state.currentBook.pages || [];
         const rightPage = pages[state.currentPageIndex + 1] || [];
@@ -1509,12 +1809,10 @@
       const leafL = $('page-left'), leafR = $('page-right');
       if (!viewport) return null;
 
-      // 只要选区起点和终点落在阅读视口内（无论是左页、右页，还是跨左右双页），一律允许
       const startIn = viewport.contains(range.startContainer);
       const endIn = viewport.contains(range.endContainer);
       if (!startIn || !endIn) return null;
 
-      // 精确提取用户选中的字符，不截断跨段、不截断跨页、不增删任何选区字符
       const quote = extractExactRangeText(range);
       if (!quote || quote.length < 1) return null;
 
@@ -1565,10 +1863,9 @@
       return { quote, blockIndex: idx, rect };
     }
 
-    // ==================== 笔记：在书中展示（跳转） ====================
     async function jumpToNote(note) {
       const book = state.books.find(b => b.fileName === note.bookFile);
-      if (!book) return showToast('找不到对应的书，可能已被删除');
+      if (!book) return;
       if (!$('reader-view').classList.contains('hidden') && state.currentBook === book) {
         doJump();
         return;
@@ -1612,7 +1909,6 @@
       }
     }
 
-    // ==================== 核心修复 2：支持单段、跨段、跨页的精确高亮 ====================
     function wrapTextNodeSlice(textNode, startOffset, endOffset, note) {
       if (!textNode || endOffset <= startOffset) return;
       try {
@@ -1745,10 +2041,8 @@
       });
     }
 
-    // ==================== 核心修复 3：笔记多端零丢失同步机制 ====================
     const NOTES_CLOUD_PATH = 'data/notes.json';
 
-    // 生成确定性的冲突副本 ID，防止多次同步或重试时无限裂变出重复副本
     function deterministicConflictId(baseId, content, quote) {
       const str = `${baseId}|${quote || ''}|${content || ''}`;
       let h = 2166136261;
@@ -1759,10 +2053,6 @@
       return `${baseId}_c_${(h >>> 0).toString(36)}`;
     }
 
-    // 多端安全合并算法：
-    // 1. 改颜色不覆盖备注文字：对比 syncedContent（上次同步基准）或 contentUpdatedAt，单端修改文字直接获胜。
-    // 2. 双端同时修改了不同备注文字：不论时间差是几秒还是几小时，绝不静默丢弃！新者为主笔记，旧者生成唯一冲突副本保留。
-    // 3. 删除保护：若一端删除了空摘抄，但另一端新写了实质文字备注，则自动复活保留文字，防止误杀长评。
     function mergeNoteLists(localList, remoteList) {
       const byId = new Map();
 
@@ -1797,7 +2087,6 @@
         const incText = (inc.content || '').trim();
         const baseText = (cur.syncedContent ?? inc.syncedContent ?? '').trim();
 
-        // 情况 A：至少有一端标记了删除
         if (curDel || incDel) {
           if (curDel && incDel) {
             return (inc.updatedAt || 0) > (cur.updatedAt || 0) ? { ...inc } : { ...cur };
@@ -1809,35 +2098,29 @@
           const aliveContentTime = alive.contentUpdatedAt || alive.updatedAt || 0;
           const delTime = dead.deletedAt || dead.updatedAt || 0;
 
-          // 如果存活端相比删除端新增/修改了实质文字（或文字修改时间晚于删除时间），保留存活端，绝不误删文字
           if (aliveText && (aliveText !== deadText || aliveContentTime > delTime)) {
             return { ...alive, deletedAt: null, updatedAt: Math.max(alive.updatedAt || 0, delTime + 1) };
           }
           return { ...dead };
         }
 
-        // 情况 B：两端都未删除，且备注文字与摘抄完全一致（例如只改了颜色）
         if (curText === incText && (cur.quote || '') === (inc.quote || '')) {
           const newer = (inc.updatedAt || 0) >= (cur.updatedAt || 0) ? inc : cur;
           return { ...newer, syncedContent: curText };
         }
 
-        // 情况 C：两端备注文字不同，利用基准 syncedContent 判断是否只有单端修改了文字
         const curChanged = curText !== baseText;
         const incChanged = incText !== baseText;
 
         if (curChanged && !incChanged) {
-          // 只有本地修改了文字（远端可能只是改了颜色），本地文字获胜，同时吸收最新颜色
           const latestColor = (inc.updatedAt || 0) > (cur.updatedAt || 0) ? inc.color : cur.color;
           return { ...cur, color: latestColor, updatedAt: Math.max(cur.updatedAt || 0, inc.updatedAt || 0), syncedContent: curText };
         }
         if (!curChanged && incChanged) {
-          // 只有远端修改了文字（本地可能只是改了颜色），远端文字获胜，同时吸收最新颜色
           const latestColor = (cur.updatedAt || 0) > (inc.updatedAt || 0) ? cur.color : inc.color;
           return { ...inc, color: latestColor, updatedAt: Math.max(cur.updatedAt || 0, inc.updatedAt || 0), syncedContent: incText };
         }
 
-        // 若一方为空摘抄、另一方有文字，且无基准记录（首次跨端合并），有文字的一方直接获胜，不产生空摘抄副本
         if (!curText && incText) {
           return { ...inc, updatedAt: Math.max(cur.updatedAt || 0, inc.updatedAt || 0), syncedContent: incText };
         }
@@ -1845,7 +2128,6 @@
           return { ...cur, updatedAt: Math.max(cur.updatedAt || 0, inc.updatedAt || 0), syncedContent: curText };
         }
 
-        // 情况 D：两端都修改了实质文字且内容不同 -> 绝不静默覆盖！保留较新者为主卡片，较旧者存为确定性冲突副本
         const curTime = cur.contentUpdatedAt || cur.updatedAt || 0;
         const incTime = inc.contentUpdatedAt || inc.updatedAt || 0;
         const winner = incTime >= curTime ? { ...inc, syncedContent: incText } : { ...cur, syncedContent: curText };
@@ -1870,8 +2152,7 @@
         }
       });
 
-      // 所有合并完成后的存活笔记统一更新 syncedContent 基准
-      for (const [id, note] of byId.entries()) {
+      for (const [, note] of byId.entries()) {
         if (!note.deletedAt) {
           note.syncedContent = (note.content || '').trim();
         }
@@ -1880,51 +2161,40 @@
       return Array.from(byId.values());
     }
 
-    function notesSignature(notes) {
-      const rows = (notes || [])
-        .map(n => [
-          n.id,
-          n.bookFile || '',
-          n.bookTitle || '',
-          n.chapter || '',
-          n.quote || '',
-          n.content || '',
-          n.color || '',
-          n.deletedAt ? 1 : 0,
-          n.createdAt || 0,
-          n.conflictOf || ''
-        ].join('\u0001'))
-        .sort();
-      return rows.join('\u0002');
+    function openNotesSyncModal() {
+      if (!isCloudConnected()) return showToast('请先连接私有仓');
+      updateNotesSyncModalUI();
+      $('notes-sync-modal').classList.remove('hidden');
     }
 
-    async function syncNotesWithCloud() {
+    function updateNotesSyncModalUI() {
+      const badge = $('notes-sync-status-badge');
+      const pushBtn = $('notes-push-btn');
+      if (state.notesPulledReady) {
+        badge.className = 'px-3.5 py-2.5 rounded-xl bg-emerald-50 text-emerald-800 text-xs leading-relaxed';
+        badge.textContent = `已在本地完成云端笔记合并（当前共 ${sortedNotes(state.notes).length} 条有效笔记）。你现在可以随时编辑/删除远古笔记，或点击下方「上行」直接替换上传。`;
+        pushBtn.disabled = false;
+      } else {
+        badge.className = 'px-3.5 py-2.5 rounded-xl bg-neutral-100 text-neutral-600 text-xs leading-relaxed';
+        badge.textContent = '上传前请先执行「1. 下行：拉取云笔记并本地合并」，确保远古笔记与多端改动已在本地对齐。';
+        pushBtn.disabled = true;
+      }
+    }
+
+    async function pullNotesFromCloud() {
       if (!isCloudConnected()) return showToast('请先连接私有仓');
-      const btn = $('notes-sync-btn');
-      btn.disabled = true;
-      btn.classList.add('is-syncing');
+      const pullBtn = $('notes-pull-btn');
+      const syncIconBtn = $('notes-sync-btn');
+      pullBtn.disabled = true;
+      syncIconBtn.classList.add('is-syncing');
       try {
-        let merged = null;
-        let jsonPushed = false;
-        for (let attempt = 0; attempt < 3; attempt++) {
-          const got = await getCloudJSON(NOTES_CLOUD_PATH);
-          const remoteNotes = (got && got.data && Array.isArray(got.data.notes)) ? got.data.notes : [];
-          merged = mergeNoteLists(state.notes, remoteNotes);
-
-          const remoteSig = notesSignature(remoteNotes);
-          const mergedSig = notesSignature(merged);
-          if (got && remoteSig === mergedSig) {
-            jsonPushed = false;
-            break;
-          }
-
-          const payload = { version: 1, updatedAt: Date.now(), notes: merged };
-          const ok = await putCloudJSON(NOTES_CLOUD_PATH, payload, got ? got.sha : null, 'notes: sync');
-          if (ok) { jsonPushed = true; break; }
-          merged = null;
-        }
-        if (!merged) throw new Error('多次重试仍冲突，请稍后再试');
+        const got = await getCloudJSON(NOTES_CLOUD_PATH);
+        const remoteNotes = (got && got.data && Array.isArray(got.data.notes)) ? got.data.notes : [];
+        const merged = mergeNoteLists(state.notes, remoteNotes);
         state.notes = merged;
+        state.lastPulledNotesSha = got ? got.sha : null;
+        state.notesPulledReady = true;
+
         const db = await openNotesDB();
         if (db) {
           const tx = db.transaction(NOTES_STORE, 'readwrite');
@@ -1934,48 +2204,65 @@
         if (!$('reader-view').classList.contains('hidden')) renderReaderPages();
         renderNotesBookFilter();
         renderNotes();
-
-        let htmlNote = '';
-        try {
-          const built = buildNotesHtml(state.notes);
-          if (built) {
-            const htmlPath = 'data/notes.html';
-            const gotHtml = await getCloudJSONRaw(htmlPath);
-            const remoteHtml = gotHtml ? String(gotHtml.text || '') : '';
-            if (gotHtml && remoteHtml === built.html) {
-              htmlNote = jsonPushed ? '，HTML 无变化' : '，云端已是最新';
-            } else {
-              const okHtml = await putCloudText(htmlPath, built.html, gotHtml ? gotHtml.sha : null, 'notes: sync html');
-              htmlNote = okHtml ? '，HTML 已更新' : '，HTML 冲突未更新';
-            }
-          }
-        } catch (e) {
-          htmlNote = '，HTML 更新失败';
-        }
-
-        if (!jsonPushed && htmlNote === '，云端已是最新') {
-          showToast(`云端已是最新，无需推送（${sortedNotes(state.notes).length} 条笔记）`);
-        } else {
-          showToast(`同步完成，共 ${sortedNotes(state.notes).length} 条笔记${htmlNote}`);
-        }
+        updateNotesSyncModalUI();
+        showToast(`下行合并完成：本地现有 ${sortedNotes(state.notes).length} 条笔记，已解锁上行`);
       } catch (e) {
-        showToast(`同步失败：${e.message || '请检查仓库权限'}`);
+        showToast(`拉取云笔记失败：${e.message || '请检查仓库权限'}`);
       } finally {
-        btn.disabled = !isCloudConnected();
-        btn.classList.remove('is-syncing');
+        pullBtn.disabled = false;
+        syncIconBtn.classList.remove('is-syncing');
       }
     }
 
-    // 读取云端文本/JSON：强制绕过浏览器与 CDN 缓存，且支持超过 1MB 的大文件自动回退 Git Blob API
+    async function pushNotesToCloud() {
+      if (!isCloudConnected()) return showToast('请先连接私有仓');
+      if (!state.notesPulledReady) return showToast('请先执行下行拉取合并');
+      const pushBtn = $('notes-push-btn');
+      const syncIconBtn = $('notes-sync-btn');
+      pushBtn.disabled = true;
+      syncIconBtn.classList.add('is-syncing');
+      try {
+        const currentJsonSha = await getCloudFileSha(NOTES_CLOUD_PATH);
+        if (currentJsonSha && state.lastPulledNotesSha && currentJsonSha !== state.lastPulledNotesSha) {
+          state.notesPulledReady = false;
+          updateNotesSyncModalUI();
+          showToast('检测到云端刚刚有新改动，请先重新点一次「下行」合并后再上行');
+          return;
+        }
+
+        state.notes.forEach(n => {
+          if (!n.deletedAt) n.syncedContent = (n.content || '').trim();
+        });
+        const payload = { version: 1, updatedAt: Date.now(), notes: state.notes };
+        const okJson = await putCloudJSON(NOTES_CLOUD_PATH, payload, currentJsonSha, 'notes: push replace');
+        if (!okJson) throw new Error('写入 notes.json 冲突，请重新下行后再试');
+
+        state.lastPulledNotesSha = await getCloudFileSha(NOTES_CLOUD_PATH);
+
+        const htmlPath = 'data/notes.html';
+        const built = buildNotesHtml(state.notes);
+        const htmlContent = built ? built.html : '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>Notes</title></head><body><p>暂无笔记</p></body></html>';
+        const currentHtmlSha = await getCloudFileSha(htmlPath);
+        await putCloudText(htmlPath, htmlContent, currentHtmlSha, 'notes: replace html');
+
+        $('notes-sync-modal').classList.add('hidden');
+        showToast(`上行替换成功：共上传 ${sortedNotes(state.notes).length} 条笔记及 HTML`);
+      } catch (e) {
+        showToast(`上行失败：${e.message || '请检查仓库权限'}`);
+      } finally {
+        pushBtn.disabled = !state.notesPulledReady;
+        syncIconBtn.classList.remove('is-syncing');
+      }
+    }
+
     async function getCloudJSONRaw(path) {
       const branch = state.github.branch || 'main';
-      const url = `${repoApiBase()}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}&_t=${Date.now()}`;
+      const url = `${repoApiBase()}/contents/${encodeRepoPath(path)}?ref=${encodeURIComponent(branch)}&_t=${Date.now()}`;
       const res = await fetch(url, { headers: ghHeaders(), cache: 'no-store' });
       if (res.status === 404) return null;
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const meta = await res.json();
       let b64 = meta.content ? meta.content.replace(/\s/g, '') : '';
-      // 当文件超过 1MB 时，Contents API 的 content 为空，自动通过 Git Blobs API 获取完整内容
       if (!b64 && meta.sha) {
         const blobUrl = `${repoApiBase()}/git/blobs/${encodeURIComponent(meta.sha)}?_t=${Date.now()}`;
         const blobRes = await fetch(blobUrl, { headers: ghHeaders(), cache: 'no-store' });
@@ -2008,7 +2295,7 @@
       for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
       const body = { message, content: btoa(bin), branch };
       if (sha) body.sha = sha;
-      const res = await fetch(`${repoApiBase()}/contents/${encodeURIComponent(path)}`, {
+      const res = await fetch(`${repoApiBase()}/contents/${encodeRepoPath(path)}`, {
         method: 'PUT',
         headers: ghHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(body),
@@ -2114,7 +2401,12 @@
       $('notes-view').classList.add('hidden');
 
       const list = state.books.filter(b => {
-        if (state.currentNav.startsWith('shelf:') && b.shelf !== state.currentNav.slice(6)) return false;
+        const bookShelf = (b.shelf && state.shelves.includes(b.shelf)) ? b.shelf : '';
+        if (state.currentNav === 'all') {
+          if (bookShelf !== '') return false;
+        } else if (state.currentNav.startsWith('shelf:')) {
+          if (bookShelf !== state.currentNav.slice(6)) return false;
+        }
         if (state.searchQuery && !b.title.toLowerCase().includes(state.searchQuery.toLowerCase())) return false;
         return true;
       }).sort((a, b) => (Boolean(b.pinned) - Boolean(a.pinned)) || ((b.addedAt || 0) - (a.addedAt || 0)));
@@ -2143,7 +2435,7 @@
           : `<div class="w-full h-full bg-[#f4f1ea] flex flex-col justify-between p-4 border border-neutral-200/80">
                <div class="text-[10px] tracking-widest text-neutral-400 font-medium">${esc(book.format || 'EPUB')}</div>
                <div class="text-[15px] font-semibold text-[#2b2b2b] line-clamp-3 leading-snug">${esc(book.title)}</div>
-               <div class="text-[11px] text-neutral-400 truncate">${esc(book.shelf || 'OneReader')}</div>
+               <div class="text-[11px] text-neutral-400 truncate">${esc(book.shelf || '本地图书')}</div>
              </div>`;
         card.innerHTML = `
           <div class="cover-box relative aspect-[3/4.15] w-full rounded-lg shadow-[0_2px_10px_rgba(0,0,0,0.08)] group-hover:shadow-lg transition overflow-hidden cursor-pointer bg-[#f5f3ef]">
@@ -2187,7 +2479,6 @@
       updateStorageUsageDisplay();
     }
 
-    // ==================== EPUB / PDF 解析 ====================
     function blobToDataUrl(blob) {
       return new Promise(res => {
         const fr = new FileReader();
@@ -2508,10 +2799,10 @@
             showToast('未连接私有仓，已仅导入本地');
           } else {
             try {
-              showToast(`正在上传《${created.title}》到私有仓...`);
+              showToast(`正在上传《${created.title}》到书架「${created.shelf}」...`);
               await uploadBookToCloud(created);
               await saveBookDB(created);
-              showToast(`已导入并上传《${created.title}》`);
+              showToast(`已导入并上传《${created.title}》到云端「${created.shelf}」`);
             } catch (e) {
               showToast(`上传失败：${e.message || '请检查仓库权限'}`);
             }
@@ -2561,7 +2852,6 @@
       return false;
     }
 
-    // ==================== 目录 / 书签 ====================
     function buildToc(book) {
       const toc = [];
       (book.rawBlocks || []).forEach((b, bi) => {
@@ -2653,7 +2943,6 @@
       if (b) b.className = state.tocTab === 'bm' ? on : off;
     }
 
-    // ==================== 全书搜索 ====================
     function escapeRegExp(s) {
       return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
@@ -2819,8 +3108,8 @@
         }
         showToast(`正在下载《${book.title}》...`);
         try {
-          const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeURIComponent(book.cloudPath)}?ref=${encodeURIComponent(branch || 'main')}&_t=${Date.now()}`;
-          const res = await fetch(url, { headers: ghHeaders({ 'Accept': 'application/vnd.github.raw' }), cache: 'no-store' });
+          const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeRepoPath(book.cloudPath)}?ref=${encodeURIComponent(branch || 'main')}`;
+          const res = await fetch(url, { headers: ghHeaders({ 'Accept': 'application/vnd.github.raw' }) });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const buf = await res.arrayBuffer();
           book.fileBytes = buf;
@@ -2858,7 +3147,6 @@
       });
     }
 
-    // ==================== 性能核心：颜色0ms修改 vs 几何排版防抖 ====================
     function applyThemeColors() {
       const c = state.readerConfig;
       const root = document.documentElement;
@@ -2941,13 +3229,67 @@
       }, true);
     }
 
-    let repaginateTimer = null;
-    function repaginateDebounced() {
-      clearTimeout(repaginateTimer);
-      repaginateTimer = setTimeout(() => {
-        repaginate();
-        renderReaderPages();
-      }, 280);
+    let sliderRafId = 0;
+    let saveProgressTimer = null;
+
+    function saveBookProgressDebounced(book) {
+      if (!book) return;
+      saveQuickProgress(book);
+      clearTimeout(saveProgressTimer);
+      saveProgressTimer = setTimeout(() => {
+        saveBookDB(book);
+      }, 2500);
+    }
+
+    function getAnchorBlock(book) {
+      if (!book || !book.pages || !book.pages.length) return null;
+      const pg = book.pages[state.currentPageIndex] || [];
+      return pg.find(b => b && (b.text || b.src)) || pg[0] || null;
+    }
+
+    function restorePageIndexByAnchor(book, anchor) {
+      if (!book || !anchor || !book.pages || !book.pages.length) return;
+      const pages = book.pages;
+      const targetText = anchor.text ? String(anchor.text).slice(0, 24) : '';
+      for (let i = 0; i < pages.length; i++) {
+        const hit = pages[i].some(b =>
+          b === anchor ||
+          (b.type === anchor.type && targetText && String(b.text || '').startsWith(targetText)) ||
+          (anchor.type === 'img' && b.type === 'img' && b.src === anchor.src)
+        );
+        if (hit) {
+          state.currentPageIndex = state.readerConfig.viewMode === 'dual' ? (i - (i % 2)) : i;
+          return;
+        }
+      }
+    }
+
+    function calcVisualUnits(text) {
+      if (!text) return 0;
+      let units = 0;
+      for (let i = 0; i < text.length; i++) {
+        const code = text.charCodeAt(i);
+        units += (code <= 0x00ff) ? 0.56 : 1;
+      }
+      return units;
+    }
+
+    function splitTextByVisualUnits(text, maxUnits) {
+      if (!text || maxUnits <= 0) return ['', text];
+      let acc = 0;
+      let cut = 0;
+      for (let i = 0; i < text.length; i++) {
+        const u = (text.charCodeAt(i) <= 0x00ff) ? 0.56 : 1;
+        if (acc + u > maxUnits) break;
+        acc += u;
+        cut = i + 1;
+      }
+      if (cut <= 0) return ['', text];
+      if (cut >= text.length) return [text, ''];
+      const head = text.slice(0, cut);
+      const m = head.match(/[\s，。、；：！？,.;:!?）》」』】—…](?![\s\S]*[\s，。、；：！？,.;:!?）》」』】—…])/);
+      if (m && m.index > cut * 0.6) cut = m.index + 1;
+      return [text.slice(0, cut), text.slice(cut)];
     }
 
     function repaginate() {
@@ -2956,104 +3298,97 @@
       const blocks = book.rawBlocks || [];
       const pageLeft = $('page-left');
       const measure = $('page-measure-box');
+      if (!pageLeft || !measure) return;
+
       const cs = getComputedStyle(pageLeft);
       const availW = Math.max(160, pageLeft.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
       const availH = Math.max(140, pageLeft.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 6);
+      const fontSize = Number(state.readerConfig.fontSize) || 22;
+      const letterSpacing = Number(state.readerConfig.letterSpacing) || 0;
+      const paraSpacing = Number(state.readerConfig.paraSpacing) || 15;
 
       measure.style.width = availW + 'px';
-      measure.innerHTML = `<div id="m-col" style="width:100%;font-family:var(--reader-font-family);font-size:var(--reader-font-size);letter-spacing:var(--reader-letter-spacing);line-height:1.72;"></div>`;
-      const col = $('m-col');
+      measure.innerHTML = `<div id="m-probe" style="width:100%;font-family:var(--reader-font-family);font-size:${fontSize}px;letter-spacing:${letterSpacing}px;line-height:1.72;"><span id="m-span">测试中文字符宽度校准探针十个字</span></div>`;
+      const probeEl = $('m-probe');
+      const spanEl = $('m-span');
+      const lineH = (probeEl && parseFloat(getComputedStyle(probeEl).lineHeight)) || (fontSize * 1.72);
+      const spanW = (spanEl && spanEl.getBoundingClientRect().width) || (15 * (fontSize + letterSpacing));
+      const singleCharW = Math.max(8, spanW / 15);
+      const charsPerLine = Math.max(5, (availW / singleCharW) * 0.96);
+      const headingCharsPerLine = Math.max(4, charsPerLine / 1.22);
+      const headingLineH = fontSize * 1.22 * 1.48;
+      measure.innerHTML = '';
 
       const pages = [];
       let cur = [];
+      let curH = 0;
+      const isDual = state.readerConfig.viewMode === 'dual';
+
       const flush = () => {
         if (!cur.length) return;
         pages.push(cur);
         cur = [];
-        col.innerHTML = '';
+        curH = 0;
       };
 
-      const splitParagraph = (text, remainH) => {
-        if (remainH <= 0) return ['', text];
-        const probe = document.createElement('p');
-        probe.style.cssText = 'margin:0;padding-bottom:var(--reader-para-spacing);text-align:justify;';
-        col.appendChild(probe);
-        const limit = remainH - 2;
-        let lo = 0, hi = text.length, best = 0;
-        while (lo <= hi) {
-          const mid = (lo + hi) >> 1;
-          probe.textContent = text.slice(0, mid);
-          if (probe.scrollHeight <= limit) { best = mid; lo = mid + 1; }
-          else hi = mid - 1;
-        }
-        col.removeChild(probe);
-        if (best <= 0) return ['', text];
-        if (best >= text.length) return [text, ''];
-        const head = text.slice(0, best);
-        const m = head.match(/[\s，。、；：！？,.;:!?）》」』】—…](?![\s\S]*[\s，。、；：！？,.;:!?）》」』】—…])/);
-        let cut = best;
-        if (m && m.index > best * 0.6) cut = m.index + 1;
-        return [text.slice(0, cut), text.slice(cut)];
-      };
-
-      const renderInto = (item, container) => {
-        const w = document.createElement('div');
-        w.innerHTML = blockHtml(item);
-        const n = w.firstElementChild;
-        if (n) container.appendChild(n);
-        return n;
-      };
-
-      const rebuildCol = () => {
-        col.innerHTML = '';
-        for (const it of cur) renderInto(it, col);
+      const forceChapterStart = () => {
+        if (cur.length) flush();
+        if (isDual && pages.length % 2 === 1) pages.push([]);
       };
 
       const queue = blocks.slice();
       let guard = 0;
-      const isDual = state.readerConfig.viewMode === 'dual';
-      const forceChapterStart = () => {
-        if (cur.length) flush();
-        if (isDual && pages.length % 2 === 1) {
-          pages.push([]);
-        }
-      };
 
       for (let qi = 0; qi < queue.length; qi++) {
         if (++guard > 200000) break;
         const b = queue[qi];
-        if (b.forceNewPage) { forceChapterStart(); }
+        if (b.forceNewPage) forceChapterStart();
         if (b.type === 'img' && b.dead) continue;
 
-        const node = renderInto(b, col);
-        if (!node) continue;
+        let blockH = 0;
+        if (b.type === 'img') {
+          const w = Number(b.w) || availW * 0.8;
+          const h = Number(b.h) || availH * 0.4;
+          const scale = Math.min(1, availW / Math.max(1, w));
+          blockH = Math.min(availH * 0.45, h * scale) + 24;
+        } else if (b.type === 'heading') {
+          const units = calcVisualUnits(b.text || '');
+          const lines = Math.max(1, Math.ceil(units / headingCharsPerLine));
+          blockH = 12 + lines * headingLineH + paraSpacing;
+        } else {
+          const units = calcVisualUnits(b.text || '');
+          const lines = Math.max(1, Math.ceil(units / charsPerLine));
+          blockH = lines * lineH + paraSpacing;
+        }
 
-        if (col.scrollHeight <= availH) {
+        if (curH + blockH <= availH) {
           cur.push(b);
+          curH += blockH;
           continue;
         }
 
-        col.removeChild(node);
-        const remainH = availH - col.scrollHeight;
-        const lineH = parseFloat(getComputedStyle(col).lineHeight) || 40;
-
+        const remainH = availH - curH;
         const isPlainText = b.type === 'p' && typeof b.text === 'string' && b.text.length > 0;
+
         if (isPlainText && !b.splitFrom && remainH >= lineH * 2) {
-          const [head, tail] = splitParagraph(b.text, remainH);
-          if (head && head.length >= 8 && tail && tail.length >= 8) {
-            cur.push({ type: 'p', text: head });
-            rebuildCol();
-            queue.splice(qi + 1, 0, { ...b, text: tail, splitFrom: true });
-            continue;
+          const fitLines = Math.floor(Math.max(0, remainH - 4) / lineH);
+          if (fitLines >= 2) {
+            const maxUnits = fitLines * charsPerLine;
+            const [head, tail] = splitTextByVisualUnits(b.text, maxUnits);
+            if (head && head.length >= 8 && tail && tail.length >= 8) {
+              cur.push({ type: 'p', text: head });
+              flush();
+              queue.splice(qi + 1, 0, { ...b, text: tail, splitFrom: true });
+              continue;
+            }
           }
         }
 
         flush();
-        renderInto(b, col);
         cur.push(b);
+        curH = Math.min(availH, blockH);
       }
       if (cur.length) pages.push(cur);
-      measure.innerHTML = '';
 
       const merged = [];
       for (const pg of pages) {
@@ -3079,47 +3414,17 @@
       book.pages = merged.length ? merged : [[{ type: 'p', text: '暂无内容' }]];
     }
 
-    function repaginateCurrentPageOnly() {
-      const book = state.currentBook;
-      if (!book || book.format === 'PDF' || !book.pages) return;
-      const mode = state.readerConfig.viewMode;
-      if (mode === 'scroll') { renderReaderPages(); return; }
-      const leaf = $('page-left');
-      const measure = $('page-measure-box');
-      if (!leaf) return;
-      const cs = getComputedStyle(leaf);
-      const availW = Math.max(160, leaf.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
-      const availH = Math.max(140, leaf.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 6);
-
-      measure.style.width = availW + 'px';
-      measure.innerHTML = `<div id="m-cur" style="width:100%;font-family:var(--reader-font-family);font-size:var(--reader-font-size);letter-spacing:var(--reader-letter-spacing);line-height:1.72;"></div>`;
-      const col = $('m-cur');
-
-      const idx = state.currentPageIndex;
-      const flat = [];
-      for (let i = idx; i < book.pages.length && flat.length < 60; i++) flat.push(...book.pages[i]);
-
-      const out = [];
-      for (const b of flat) {
-        if (b.type === 'img' && b.dead) continue;
-        const w = document.createElement('div');
-        w.innerHTML = blockHtml(b);
-        const n = w.firstElementChild;
-        if (!n) continue;
-        col.appendChild(n);
-        if (col.scrollHeight <= availH) {
-          out.push(b);
-        } else {
-          col.removeChild(n);
-          break;
-        }
-      }
-      measure.innerHTML = '';
-
-      if (out.length) {
-        book.pages[idx] = out;
-      }
-      renderReaderPages();
+    let repaginateTimer = null;
+    function repaginateDebounced() {
+      clearTimeout(repaginateTimer);
+      repaginateTimer = setTimeout(() => {
+        const book = state.currentBook;
+        if (!book) return;
+        const anchor = getAnchorBlock(book);
+        repaginate();
+        restorePageIndexByAnchor(book, anchor);
+        renderReaderPages({ skipDbSave: true });
+      }, 60);
     }
 
     async function renderPdfPage(pdfDoc, num, box) {
@@ -3136,7 +3441,7 @@
       await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
     }
 
-    async function renderReaderPages() {
+    async function renderReaderPages(opts = {}) {
       const book = state.currentBook;
       if (!book) return;
       const mode = state.readerConfig.viewMode;
@@ -3146,7 +3451,11 @@
       state.currentPageIndex = Math.max(0, Math.min(state.currentPageIndex, total - 1));
       book.lastPageIndex = state.currentPageIndex;
       book.progressPercent = Math.min(100, Math.max(0.05, ((state.currentPageIndex + 1) / total) * 100));
-      saveBookDB(book);
+      if (opts && opts.skipDbSave) {
+        saveQuickProgress(book);
+      } else {
+        saveBookProgressDebounced(book);
+      }
 
       if (book.format === 'PDF' && book.pdfDoc) {
         await renderPdfPage(book.pdfDoc, state.currentPageIndex + 1, pL);
@@ -3228,11 +3537,11 @@
       buildGroup('text-color-swatches', 'customTextColors', 'textColor', 'native-text-picker', '已取消，恢复原书文字色');
     }
 
-    // ==================== 事件监听绑定与初始化 ====================
     window.addEventListener('DOMContentLoaded', async () => {
       bindImageFallback();
       loadPrefs();
       state.books = await loadAllBooksDB();
+      mergeQuickProgress(state.books);
       state.notes = await loadAllNotesDB();
 
       state.localFonts = await loadAllLocalFonts();
@@ -3269,24 +3578,28 @@
           const v = Number(e.target.value);
           state.readerConfig[d.key] = v;
           $(`lbl-${d.key}`).textContent = e.target.value;
-          savePrefs();
-          if (!d.isLayout) {
-            applyThemeColors();
-          } else {
-            applyLayoutStyles();
-            if (isMobile()) {
-              repaginateCurrentPageOnly();
+          if (sliderRafId) cancelAnimationFrame(sliderRafId);
+          sliderRafId = requestAnimationFrame(() => {
+            sliderRafId = 0;
+            if (!d.isLayout) {
+              applyThemeColors();
             } else {
-              repaginateDebounced();
+              applyLayoutStyles();
             }
-          }
+          });
         };
+
         div.querySelector('input').onchange = () => {
+          savePrefs();
           if (!d.isLayout) return;
-          if (isMobile()) {
+          requestAnimationFrame(() => {
+            const book = state.currentBook;
+            if (!book) return;
+            const anchor = getAnchorBlock(book);
             repaginate();
-            renderReaderPages();
-          }
+            restorePageIndexByAnchor(book, anchor);
+            renderReaderPages({ skipDbSave: true });
+          });
         };
       });
 
@@ -3301,7 +3614,6 @@
 
       $('reader-fullscreen-toggle').onclick = toggleReaderFullscreen;
 
-      // ==================== 笔记：选中文字 -> 划线弹窗 ====================
       const handleSelectionEnd = () => {
         if ($('reader-view').classList.contains('hidden')) return;
         if (!$('note-editor-modal').classList.contains('hidden')) return;
@@ -3337,7 +3649,6 @@
         hideSelectionPopover();
       });
 
-      // 墨绿笔：新建带备注的笔记
       $('sel-note-btn').onclick = () => {
         if (!pendingSelection) return;
         hideSelectionPopover();
@@ -3362,7 +3673,6 @@
         window.getSelection().removeAllRanges();
       };
 
-      // 蓝色块：直接存为纯摘抄（content 为空）
       $('sel-quote-btn').onclick = async () => {
         if (!pendingSelection) return;
         hideSelectionPopover();
@@ -3391,7 +3701,6 @@
         showToast('已添加摘抄');
       };
 
-      // 复制
       $('sel-copy-btn').onclick = async () => {
         if (!pendingSelection) return;
         try {
@@ -3403,7 +3712,6 @@
         hideSelectionPopover();
       };
 
-      // 编辑弹窗
       $('note-editor-confirm').onclick = saveEditedNote;
       $('note-editor-cancel').onclick = closeNoteEditor;
       $('note-editor-delete').onclick = () => {
@@ -3427,7 +3735,6 @@
         if ($('reader-view').classList.contains('mobile-controls-active')) autoHideMobileControls();
       }, { passive: true });
 
-      // 侧边栏
       $('toggle-sidebar-btn').onclick = () => {
         const sb = $('library-sidebar');
         if (isMobile()) {
@@ -3450,7 +3757,14 @@
         updateNavSelection();
         showNotesView();
       };
-      $('notes-sync-btn').onclick = syncNotesWithCloud;
+      $('notes-sync-btn').onclick = openNotesSyncModal;
+      $('close-notes-sync-modal-btn').onclick = () => $('notes-sync-modal').classList.add('hidden');
+      $('notes-sync-modal').onclick = e => {
+        if (e.target === $('notes-sync-modal')) $('notes-sync-modal').classList.add('hidden');
+      };
+      $('notes-pull-btn').onclick = pullNotesFromCloud;
+      $('notes-push-btn').onclick = pushNotesToCloud;
+
       $('notes-export-btn').onclick = exportNotesJSON;
       $('notes-book-filter').onchange = e => {
         state.notesBookFilter = e.target.value;
@@ -3461,7 +3775,6 @@
         $('shelf-chevron').classList.toggle('-rotate-90');
       };
 
-      // ==================== 书库搜索：显式提交 ====================
       const libSearch = $('library-search-input');
 
       function applyLibrarySearch() {
@@ -3522,7 +3835,6 @@
       state.searchQuery = '';
       if (libSearch) libSearch.value = '';
 
-      // 书架管理
       $('create-shelf-btn').onclick = () => {
         openPrompt('新建书架', '请输入新书架名称：', '', name => {
           if (!name || state.shelves.includes(name)) return;
@@ -3543,13 +3855,13 @@
       };
       $('close-manage-shelves-btn').onclick = () => $('manage-shelves-modal').classList.add('hidden');
 
-      // 云端弹窗交互
       $('open-cloud-modal-btn').onclick = () => {
         $('gh-owner-input').value = state.github.owner || '';
         $('gh-repo-input').value = state.github.repo || '';
         $('gh-branch-input').value = state.github.branch || '';
         $('gh-token-input').value = state.github.token || '';
         updateStorageUsageDisplay();
+        updateCloudIndicator();
         $('cloud-hub-modal').classList.remove('hidden');
       };
       $('close-cloud-modal-btn').onclick = () => $('cloud-hub-modal').classList.add('hidden');
@@ -3562,6 +3874,8 @@
       $('gh-connect-pull-btn').onclick = pullFromGitHubPrivateRepo;
       $('gh-clear-config-btn').onclick = () => {
         state.github = { owner: '', repo: '', branch: '', token: '', metaSha: '' };
+        state.notesPulledReady = false;
+        state.lastPulledNotesSha = null;
         $('gh-owner-input').value = ''; $('gh-repo-input').value = ''; $('gh-branch-input').value = ''; $('gh-token-input').value = '';
         savePrefs(); updateCloudIndicator();
         showToast('已清除本地 GitHub 密钥');
@@ -3575,18 +3889,15 @@
       };
       $('hub-import-cloud-btn').onclick = () => {
         if (!isCloudConnected()) return showToast('请先连接私有仓');
+        if (!state.currentNav.startsWith('shelf:')) {
+          return showToast('请在书架使用此功能');
+        }
         $('cloud-hub-modal').classList.add('hidden');
         pendingUploadToCloud = true;
         $('file-upload-input').click();
       };
-      $('hub-download-html-btn').onclick = () => {
-        const src = '\uFEFF<!DOCTYPE html>\n' + document.documentElement.outerHTML;
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob([src], { type: 'text/html;charset=utf-8' }));
-        a.download = 'index.html';
-        a.click();
-        showToast('已下载 index.html');
-      };
+      $('hub-sync-shelves-btn').onclick = syncShelvesWithCloud;
+
       $('file-upload-input').onchange = e => {
         const toCloud = pendingUploadToCloud;
         pendingUploadToCloud = false;
@@ -3603,17 +3914,45 @@
       const openAssignModal = ids => {
         const box = $('assign-shelf-options');
         box.innerHTML = '';
+
+        const localBtn = document.createElement('button');
+        localBtn.type = 'button';
+        localBtn.className = 'w-full text-left px-4 py-2.5 rounded-xl hover:bg-neutral-100 text-[15px] text-neutral-600 cursor-pointer flex justify-between border-b border-neutral-100';
+        localBtn.innerHTML = `<span>本地图书（移出书架）</span><span class="text-xs text-neutral-400">移动</span>`;
+        localBtn.onclick = async () => {
+          const changed = [];
+          state.books.forEach(bk => {
+            if (ids.includes(bk.id)) {
+              bk.shelf = '';
+              changed.push(bk);
+            }
+          });
+          if (changed.length) await saveBooksBatchDB(changed);
+          $('assign-shelf-modal').classList.add('hidden');
+          state.multiSelectMode = false; state.selectedBookIds.clear();
+          renderLibrary();
+          showToast('已移动到「本地图书」');
+        };
+        box.appendChild(localBtn);
+
         state.shelves.forEach(s => {
           const b = document.createElement('button');
           b.type = 'button';
           b.className = 'w-full text-left px-4 py-2.5 rounded-xl hover:bg-neutral-100 text-[15px] cursor-pointer flex justify-between';
-          b.innerHTML = `<span>${esc(s)}</span><span class="text-xs text-neutral-400">选择</span>`;
-          b.onclick = () => {
-            state.books.forEach(bk => { if (ids.includes(bk.id)) { bk.shelf = s; saveBookDB(bk); } });
+          b.innerHTML = `<span>${esc(s)}</span><span class="text-xs text-neutral-400">移动</span>`;
+          b.onclick = async () => {
+            const changed = [];
+            state.books.forEach(bk => {
+              if (ids.includes(bk.id)) {
+                bk.shelf = s;
+                changed.push(bk);
+              }
+            });
+            if (changed.length) await saveBooksBatchDB(changed);
             $('assign-shelf-modal').classList.add('hidden');
             state.multiSelectMode = false; state.selectedBookIds.clear();
             renderLibrary();
-            showToast(`已添加到「${s}」`);
+            showToast(`已移动到书架「${s}」`);
           };
           box.appendChild(b);
         });
@@ -3638,6 +3977,9 @@
         closeBookMenu();
         const bk = state.books.find(b => b.id === state.activeMenuBookId);
         if (bk) {
+          if (!bk.cloudPath && !bk.cloudSha) {
+            return showToast('该书仅在本地存在，未上传云端，不可释放本地文件');
+          }
           bk.fileBytes = null;
           bk.rawBlocks = null;
           bk.pdfDoc = null;
@@ -3676,8 +4018,15 @@
       };
 
       $('batch-add-shelf-btn').onclick = () => openAssignModal(Array.from(state.selectedBookIds));
-      $('batch-pin-btn').onclick = () => {
-        state.books.forEach(b => { if (state.selectedBookIds.has(b.id)) { b.pinned = true; saveBookDB(b); } });
+      $('batch-pin-btn').onclick = async () => {
+        const changed = [];
+        state.books.forEach(b => {
+          if (state.selectedBookIds.has(b.id)) {
+            b.pinned = true;
+            changed.push(b);
+          }
+        });
+        if (changed.length) await saveBooksBatchDB(changed);
         state.multiSelectMode = false; state.selectedBookIds.clear(); renderLibrary();
       };
       $('batch-delete-btn').onclick = async () => {
@@ -3690,10 +4039,16 @@
       $('batch-exit-btn').onclick = () => { state.multiSelectMode = false; state.selectedBookIds.clear(); renderLibrary(); };
 
       $('reader-home-trigger').onclick = () => {
+        clearTimeout(saveProgressTimer);
+        if (state.currentBook) {
+          saveQuickProgress(state.currentBook);
+          saveBookDB(state.currentBook);
+        }
         exitFullscreenIfAny();
         $('reader-view').classList.add('hidden');
         $('library-view').classList.remove('hidden');
-        renderLibrary();
+        if (state.currentNav === 'notes') showNotesView();
+        else renderLibrary();
       };
       $('reader-settings-trigger').onclick = () => {
         $('reader-settings-drawer').classList.remove('translate-x-full');
@@ -3702,12 +4057,6 @@
       const closeDrawer = () => {
         $('reader-settings-drawer').classList.add('translate-x-full');
         $('settings-backdrop').classList.add('hidden');
-        if (state.currentBook) {
-          setTimeout(() => {
-            repaginate();
-            renderReaderPages();
-          }, 60);
-        }
       };
       $('close-settings-drawer-btn').onclick = closeDrawer;
       $('settings-backdrop').onclick = closeDrawer;
@@ -3790,7 +4139,16 @@
 
       $('select-font-family').onchange = e => {
         state.readerConfig.fontFamily = e.target.value;
-        savePrefs(); applyLayoutStyles(); repaginate(); renderReaderPages();
+        savePrefs();
+        applyLayoutStyles();
+        requestAnimationFrame(() => {
+          const book = state.currentBook;
+          if (!book) return;
+          const anchor = getAnchorBlock(book);
+          repaginate();
+          restorePageIndexByAnchor(book, anchor);
+          renderReaderPages({ skipDbSave: true });
+        });
       };
 
       $('import-local-font-btn').onclick = () => $('font-upload-input').click();
@@ -3800,7 +4158,6 @@
         await handleLocalFontImport(file);
       };
 
-      // ==================== 全能翻页：键盘、滚轮、触屏滑动 ====================
       let lastWheelTime = 0;
       window.addEventListener('wheel', e => {
         if ($('reader-view').classList.contains('hidden')) return;
