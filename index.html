@@ -934,7 +934,15 @@
       const isFs = doc.fullscreenElement || doc.webkitFullscreenElement;
       if (!isFs) {
         const el = $('reader-view') || doc.documentElement;
-        (el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen)?.call(el);
+        const request = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+        if (!request) { showToast('当前浏览器不支持全屏'); return; }
+        const fsFailed = () => showToast('浏览器拒绝了全屏请求，再按一次 Alt+Enter 试试');
+        try {
+          const ret = request.call(el);
+          if (ret && typeof ret.catch === 'function') ret.catch(fsFailed);
+        } catch (err) {
+          fsFailed();
+        }
       } else {
         (doc.exitFullscreen || doc.webkitExitFullscreen || doc.msExitFullscreen)?.call(doc);
       }
@@ -945,6 +953,20 @@
       if (doc.fullscreenElement || doc.webkitFullscreenElement) {
         (doc.exitFullscreen || doc.webkitExitFullscreen || doc.msExitFullscreen)?.call(doc);
       }
+    }
+
+    // 返回书库：浮窗「返回书库」与 Esc 共用同一套收尾逻辑
+    function goBackToLibrary() {
+      clearTimeout(saveProgressTimer);
+      if (state.currentBook) {
+        saveQuickProgress(state.currentBook);
+        saveBookDB(state.currentBook);
+      }
+      exitFullscreenIfAny();
+      $('reader-view').classList.add('hidden');
+      $('library-view').classList.remove('hidden');
+      if (state.currentNav === 'notes') showNotesView();
+      else renderLibrary();
     }
 
     function updateFullscreenIcons() {
@@ -974,6 +996,46 @@
     }
     document.addEventListener('fullscreenchange', updateFullscreenIcons);
     document.addEventListener('webkitfullscreenchange', updateFullscreenIcons);
+
+    // Alt+Enter 切换沉浸全屏（阅读器打开时生效）；Esc 退出全屏为浏览器原生行为，予以保留
+    document.addEventListener('keydown', e => {
+      const isEnter = e.key === 'Enter' || e.code === 'Enter' || e.code === 'NumpadEnter';
+      // macOS 用 Option+Enter 会插入特殊字符，兼容 e.altKey 与 e.getModifierState('Alt')
+      const altPressed = e.altKey || (typeof e.getModifierState === 'function' && e.getModifierState('Alt'));
+      if (!isEnter || !altPressed || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const readerView = $('reader-view');
+      if (!readerView || readerView.classList.contains('hidden')) return;
+      const target = e.target instanceof Element ? e.target : null;
+      if (target && target.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""]')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      toggleReaderFullscreen();
+    }, true);
+
+    // Esc 返回主页（仅在非全屏阅读时生效）。
+    // 全屏状态下按 Esc 交给浏览器原生退出全屏，避免一次按键既退全屏又跳回书库。
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Escape' && e.code !== 'Escape') return;
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+      if (document.fullscreenElement || document.webkitFullscreenElement) return;
+      const readerView = $('reader-view');
+      if (!readerView || readerView.classList.contains('hidden')) return;
+      // 优先级：笔记编辑器 > 设置抽屉 > 目录抽屉 > 全书搜索，逐层先关，不做返回
+      if (!$('note-editor-modal').classList.contains('hidden')) { closeNoteEditor(); return; }
+      if (!$('settings-backdrop').classList.contains('hidden')) {
+        $('reader-settings-drawer').classList.add('translate-x-full');
+        $('settings-backdrop').classList.add('hidden');
+        return;
+      }
+      if (!$('toc-search-panel').classList.contains('hidden')) {
+        closeTocSearch();
+        return;
+      }
+      if (!$('toc-backdrop').classList.contains('hidden')) { closeTocDrawer(); return; }
+      const pop = $('selection-popover');
+      if (pop && !pop.classList.contains('hidden')) { hideSelectionPopover(); return; }
+      goBackToLibrary();
+    }, true);
 
     let resizeTimer = null;
     window.addEventListener('resize', () => {
@@ -4724,18 +4786,7 @@
       };
       $('batch-exit-btn').onclick = () => { state.multiSelectMode = false; state.selectedBookIds.clear(); renderLibrary(); };
 
-      $('reader-home-trigger').onclick = () => {
-        clearTimeout(saveProgressTimer);
-        if (state.currentBook) {
-          saveQuickProgress(state.currentBook);
-          saveBookDB(state.currentBook);
-        }
-        exitFullscreenIfAny();
-        $('reader-view').classList.add('hidden');
-        $('library-view').classList.remove('hidden');
-        if (state.currentNav === 'notes') showNotesView();
-        else renderLibrary();
-      };
+      $('reader-home-trigger').onclick = goBackToLibrary;
       $('reader-settings-trigger').onclick = () => {
         $('reader-settings-drawer').classList.remove('translate-x-full');
         $('settings-backdrop').classList.remove('hidden');
