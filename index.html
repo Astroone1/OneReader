@@ -594,7 +594,9 @@
     const PREFS_VER = 2;
     const DB_NAME = 'OneReaderDB_v4';
     const FONT_DB_NAME = 'OneReaderFonts_v1';
-    const PARSE_VERSION = 5;
+    // v6：正文改用 XML(XHTML) 优先解析，修复 <title/> 自闭合标签吞掉整篇内容
+    // 导致解析出 0 个块的问题。提升后，已导入的旧书打开时会自动重新解析。
+    const PARSE_VERSION = 6;
 
     // 极轻量进度表（避免每次翻页或改设置都把整本几十 MB 的书重写进 IndexedDB）
     function saveQuickProgress(book) {
@@ -2630,6 +2632,21 @@
       return { filePath: normalizeResPath(resolved), hash: hash.trim() };
     }
 
+    // 解析 EPUB 内的 XHTML。优先用 XML 解析器：EPUB 正文是合法 XHTML，常用 <title/> 自闭合标签，
+    // 若交给 text/html 解析器，<title/> 会被当成 <title> 开始标签，把后续整篇文档（含 </head><body>）
+    // 都吞进 title 文本，导致 doc.body 为空、解析出 0 个内容块（表现为"已载入"却看不到书）。
+    // XML 解析失败时回退 HTML 解析器（更宽容，可容忍 &nbsp; 等未定义实体）。
+    function parseXhtmlDocument(txt) {
+      const src = String(txt || '');
+      try {
+        const xdoc = new DOMParser().parseFromString(src, 'application/xhtml+xml');
+        const el = xdoc && xdoc.documentElement;
+        const bad = !el || el.tagName.toLowerCase() === 'parsererror' || !!xdoc.querySelector('parsererror');
+        if (!bad && xdoc.body) return xdoc;
+      } catch (e) {}
+      return new DOMParser().parseFromString(src.replace(/^\s*<\?xml[^>]*\?>/i, ''), 'text/html');
+    }
+
     async function parseEpubBuffer(arrayBuffer, fallbackTitle) {
       const zip = await window.JSZip.loadAsync(arrayBuffer);
       const parser = new DOMParser();
@@ -3063,7 +3080,7 @@
 
         const u8 = await zip.file(f).async('uint8array');
         const txt = new TextDecoder('utf-8').decode(u8);
-        const doc = parser.parseFromString(txt, 'text/html');
+        const doc = parseXhtmlDocument(txt);
         doc.querySelectorAll('style').forEach(stEl => {
           parseCssText(stEl.textContent || '');
           stEl.remove();
@@ -3290,6 +3307,22 @@
       return { rawBlocks, toc: finalToc, coverDataUrl, parseVer: PARSE_VERSION };
     }
 
+    // 同一本书是否已在书架中（本地书与仅云端索引的书都算）。
+    // 书名或文件名任一相同即视为同一本；比较前去 .epub 后缀、空白，忽略大小写。
+    function findDuplicateBook(fileName, title) {
+      const nName = s => String(s || '').trim().toLowerCase();
+      const nTitle = s => String(s || '').replace(/\.epub$/i, '').replace(/\s+/g, '').trim().toLowerCase();
+      const tName = nName(fileName);
+      const tTitle = nTitle(title);
+      if (!tName && !tTitle) return null;
+      return (state.books || []).find(b => {
+        if (!b) return false;
+        if (tName && nName(b.fileName) === tName) return true;
+        if (tTitle && nTitle(b.title) === tTitle) return true;
+        return false;
+      }) || null;
+    }
+
     async function handleFilesImport(files, uploadToCloud = false) {
       for (const file of Array.from(files || [])) {
         const ext = file.name.split('.').pop().toLowerCase();
@@ -3298,6 +3331,13 @@
           continue;
         }
         const title = file.name.replace(/\.epub$/i, '');
+
+        // 重复导入拦截：同一本书只保留一份，命中则提示并跳过
+        if (findDuplicateBook(file.name, title)) {
+          showToast(`【图书重复】《${title}》已在书架中，已跳过导入`);
+          continue;
+        }
+
         const buf = await file.arrayBuffer();
         const defaultShelf = state.currentNav.startsWith('shelf:') ? state.currentNav.slice(6) : '';
 
