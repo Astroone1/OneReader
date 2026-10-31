@@ -5360,9 +5360,49 @@
       };
 
       let lastWheelTime = 0;
+
+      // 判断某个元素当前是否「真的能纵向滚动」（有溢出且允许滚动）
+      const isScrollableEl = el => {
+        if (!el || el.nodeType !== 1) return false;
+        const oy = getComputedStyle(el).overflowY;
+        if (oy !== 'auto' && oy !== 'scroll' && oy !== 'overlay') return false;
+        return el.scrollHeight - el.clientHeight > 1;
+      };
+
+      // 目录/书签、设置面板是否正在展示
+      const readerPaneOpen = () => {
+        const toc = $('reader-toc-drawer');
+        const settings = $('reader-settings-drawer');
+        return Boolean(
+          (toc && !toc.classList.contains('-translate-x-full')) ||
+          (settings && !settings.classList.contains('translate-x-full'))
+        );
+      };
+
+      // 这些元素覆盖在正文之上：滚轮归面板，不翻页
+      const isPaneSurface = el => {
+        if (!el || !el.closest) return false;
+        return Boolean(el.closest('#reader-toc-drawer, #toc-backdrop, #reader-settings-drawer, #settings-backdrop, #reader-toc-drawer *'));
+      };
+
+      // 指针下方存在可滚动容器时，滚轮归它管，不翻页。
+      const wheelBelongsToScrollPane = target => {
+        for (let el = target; el && el !== document.body; el = el.parentElement) {
+          if (isScrollableEl(el)) return true;
+        }
+        return false;
+      };
+
       window.addEventListener('wheel', e => {
         if ($('reader-view').classList.contains('hidden')) return;
         if (state.readerConfig.viewMode === 'scroll') return;
+
+        // 面板打开时：指针落在面板、面板遮罩或任何可滚动容器内 → 只滚面板
+        if (isPaneSurface(e.target)) return;
+        if (wheelBelongsToScrollPane(e.target)) return;
+        // 面板开着时，落在遮罩背后的正文也不翻页（视觉上正文被遮住了，滚它会很突兀）
+        if (readerPaneOpen()) return;
+
         const now = Date.now();
         if (now - lastWheelTime < 240) return;
         if (Math.abs(e.deltaY) > 20) {
@@ -5371,8 +5411,13 @@
         }
       }, { passive: true });
 
+      // 目录/书签或设置面板打开时，键盘翻页也要让位给面板（否则在搜索框里按方向键会翻正文）
       window.addEventListener('keydown', e => {
         if ($('reader-view').classList.contains('hidden')) return;
+        const t = e.target;
+        // 正在输入框里打字：方向键属于输入框
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+        if (readerPaneOpen()) return;
         if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) turnPage(-1);
         if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(e.key)) turnPage(1);
       });
