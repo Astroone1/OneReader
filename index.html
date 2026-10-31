@@ -35,6 +35,41 @@
     }
     @keyframes cloudPulse { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
     .cloud-btn-hover:hover svg .cloud-arrow { animation: cloudPulse 1.2s ease-in-out infinite; }
+
+    /* ===== 云仓库上传动画：封面底部进度条 + 右上角旋转环 + 完成后云标志弹出 ===== */
+    .upload-band {
+      position: absolute; left: 0; right: 0; bottom: 0; height: 5px;
+      background: rgba(0,0,0,.10); overflow: hidden;
+      border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;
+    }
+    .upload-bar-fill {
+      position: relative; height: 100%; width: 0%;
+      background: linear-gradient(90deg, #6ee7b7 0%, #34d399 40%, #10b981 100%);
+      box-shadow: 0 0 10px rgba(16,185,129,.9);
+      border-radius: 0 999px 999px 0;
+      transition: width .12s linear;
+      overflow: hidden;
+    }
+    .upload-bar-fill::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.9) 50%, rgba(255,255,255,0) 100%);
+      animation: uploadBarShine 1.15s linear infinite;
+    }
+    @keyframes uploadBarShine { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }
+    .upload-ring { animation: uploadRingSpin .95s linear infinite; }
+    @keyframes uploadRingSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .upload-bar-fail { background: linear-gradient(90deg, #f87171 0%, #ef4444 100%) !important; box-shadow: 0 0 10px rgba(239,68,68,.85) !important; }
+    .upload-bar-fail::after { animation: none !important; background: none !important; }
+    @keyframes cloudBadgePop {
+      0%   { opacity: 0; transform: scale(.4) translateY(4px); }
+      55%  { opacity: 1; transform: scale(1.12) translateY(0); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+    .cloud-badge-pop { animation: cloudBadgePop .52s cubic-bezier(.34,1.56,.64,1) both; }
+    @media (prefers-reduced-motion: reduce) {
+      .upload-bar-fill, .upload-bar-fill::after, .upload-ring, .cloud-badge-pop { animation: none !important; }
+    }
     @keyframes noteSyncSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     #notes-sync-btn.is-syncing svg { animation: noteSyncSpin 1.4s linear infinite; }
     .note-card-text {
@@ -633,6 +668,50 @@
 
     let toastTimer = null;
     let pendingUploadToCloud = false;
+    // ==================== 云仓库上传进度（按书 id 记录，供卡片渲染进度条） ====================
+    // phase: 'uploading' 上传中（封面底部进度条 + 右上角旋转环） / 'done' 已完成（进度条满格待淡出）
+    const uploadProgress = new Map();
+    // 最近一次上传成功的时间戳：让右上角云标志做一次弹出动画
+    const justUploaded = new Map();
+    const uploadTimers = new Map();
+    const delay = ms => new Promise(r => setTimeout(r, ms));
+
+    const clampPct = v => Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
+    const uploadTitle = pct => `正在上传到云仓库 ${pct}%`;
+    const bookCardSel = id => {
+      const safe = (window.CSS && CSS.escape) ? CSS.escape(String(id)) : String(id).replace(/["\\]/g, '\\$&');
+      return `[data-book-card="${safe}"]`;
+    };
+
+    // 只推进度条宽度（不整卡重绘），避免封面图片被反复重建而闪烁
+    function paintUploadBar(bookId, percent) {
+      const card = document.querySelector(bookCardSel(bookId));
+      if (!card) return false;
+      const fill = card.querySelector('.upload-bar-fill');
+      if (!fill) return false;
+      const pct = clampPct(percent);
+      fill.style.width = `${pct}%`;
+      const band = fill.parentElement;
+      if (band) band.title = uploadTitle(pct);
+      return true;
+    }
+
+    // 卡片局部刷新：整格重绘（并重新绑定点击事件），避免重建整个书库列表导致滚动位置跳动
+    // 卡片不在当前视图（切了书架 / 进了阅读器）时静默跳过，等下次 renderLibrary 自然带上进度态
+    function refreshBookCard(bookId) {
+      if (!bookId) return;
+      const card = document.querySelector(bookCardSel(bookId));
+      if (!card) return;
+      const book = state.books.find(b => b.id === bookId);
+      if (!book) return;
+      const holder = document.createElement('div');
+      holder.innerHTML = renderBookCard(book).trim();
+      const node = holder.firstElementChild;
+      if (!node) return;
+      card.replaceWith(node);
+      bindBookCard(node, book);
+    }
+
     function showToast(msg) {
       const el = $('toast-message');
       el.textContent = msg;
@@ -1105,6 +1184,66 @@
       return btoa(binary);
     }
 
+    // 异步版：几十 MB 的书一次编码会长时间占住主线程，进度条会整段卡死。
+    // 这里分片编码、定期让出主线程，进度条才能持续平滑前进。
+    // 注意：String.fromCharCode.apply 的参数个数有上限（约 6 万），单次分片不能太大。
+    // 用 setTimeout 而不是 requestAnimationFrame 让出：切到后台标签页时 rAF 会被冻结，
+    // 用 rAF 会让上传直接卡死。
+    const yieldToUI = () => new Promise(r => setTimeout(r, 0));
+    async function arrayBufferToBase64Async(buf, onChunk) {
+      const bytes = new Uint8Array(buf);
+      const slice = 0x8000;       // 每次 apply 的安全分片（32768 个参数）
+      const yieldEvery = 0x40000; // 每处理约 256KB 让出一次主线程
+      let binary = '';
+      let sinceYield = 0;
+      for (let i = 0; i < bytes.length; i += slice) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + slice));
+        sinceYield += slice;
+        if (sinceYield >= yieldEvery && i + slice < bytes.length) {
+          sinceYield = 0;
+          if (onChunk) onChunk(Math.min(1, (i + slice) / bytes.length));
+          await yieldToUI();
+        }
+      }
+      if (onChunk) onChunk(1);
+      return btoa(binary);
+    }
+
+    // 用 XHR 而不是 fetch 发 PUT：fetch 拿不到「已发出多少个字节」，
+    // 只能靠假定时器推进度条；XHR 的 upload.onprogress 是真实上传字节数，
+    // 所以大文件上传时进度条走的是真正的进度。
+    function putJsonWithProgress(url, payload, headers, onProgress) {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', url, true);
+        Object.entries(headers || {}).forEach(([k, v]) => {
+          try { xhr.setRequestHeader(k, v); } catch (e) {}
+        });
+        xhr.upload.onprogress = e => {
+          if (!e.lengthComputable || !e.total) return;
+          try { onProgress && onProgress(e.loaded / e.total); } catch (err) {}
+        };
+        xhr.onload = () => {
+          const ok = xhr.status >= 200 && xhr.status < 300;
+          let data = null;
+          try { data = xhr.responseText ? JSON.parse(xhr.responseText) : null; } catch (e) { data = null; }
+          if (!ok) {
+            reject(new Error(`HTTP ${xhr.status} ${String(xhr.responseText || '').slice(0, 120)}`));
+            return;
+          }
+          resolve(data);
+        };
+        xhr.onerror = () => reject(new Error('网络中断，请检查连接'));
+        xhr.ontimeout = () => reject(new Error('上传超时'));
+        xhr.onabort = () => reject(new Error('上传已取消'));
+        try {
+          xhr.send(JSON.stringify(payload));
+        } catch (e) {
+          reject(e);
+        }
+      });
+    }
+
     async function getCloudFileSha(path) {
       const branch = state.github.branch || 'main';
       const url = `${repoApiBase()}/contents/${encodeRepoPath(path)}?ref=${encodeURIComponent(branch)}&_t=${Date.now()}`;
@@ -1115,33 +1254,144 @@
       return data && data.sha ? data.sha : null;
     }
 
-    async function uploadBookToCloud(book) {
+    // 上传时的进度回调约定：onProgress(percent, stageText)
+    // percent 为 0~100；stageText 仅用于提示文案，卡片上只显示进度条本身
+    async function uploadBookToCloud(book, onProgress) {
       if (!isCloudConnected()) throw new Error('未连接私有仓');
       if (!book.fileBytes) throw new Error('本地没有原始文件，无法上传');
+      const report = (pct, text) => { try { onProgress && onProgress(pct, text); } catch (e) {} };
       const branch = state.github.branch || 'main';
       const fileName = book.fileName || `${book.title}.epub`;
       const targetPath = book.shelf ? `${book.shelf}/${fileName}` : fileName;
+      report(3, '检查云端是否已有同名文件');
       const sha = await getCloudFileSha(targetPath);
+      report(8, '编码文件内容');
+      // 编码阶段占 8%~50%
+      const content = await arrayBufferToBase64Async(book.fileBytes, done => {
+        report(8 + done * 42, '编码文件内容');
+      });
       const body = {
         message: `upload: ${targetPath}`,
-        content: arrayBufferToBase64(book.fileBytes),
+        content,
         branch
       };
       if (sha) body.sha = sha;
-      const res = await fetch(`${repoApiBase()}/contents/${encodeRepoPath(targetPath)}`, {
-        method: 'PUT',
-        headers: ghHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify(body)
-      });
-      if (!res.ok) {
-        const t = await res.text().catch(() => '');
-        throw new Error(`HTTP ${res.status} ${t.slice(0, 120)}`);
-      }
-      const data = await res.json();
+      report(50, '正在上传到私有仓');
+      // 真正的传输阶段占 50%~96%，按已发送字节数推进
+      const data = await putJsonWithProgress(
+        `${repoApiBase()}/contents/${encodeRepoPath(targetPath)}`,
+        body,
+        ghHeaders({ 'Content-Type': 'application/json' }),
+        ratio => report(50 + Math.min(1, ratio) * 46, '正在上传到私有仓')
+      );
+      report(97, '等待仓库确认提交');
       book.cloudPath = targetPath;
       book.cloudSha = data && data.content ? data.content.sha : (sha || '');
       book.cloudMissing = false;
+      report(100, '上传完成');
       return targetPath;
+    }
+
+    // 带进度动画的云仓库上传：
+    // 1) 卡片右上角先变成旋转环，封面底部进度条开始跑；
+    // 2) 进度条跟随真实上传阶段推进（不是假动画：Base64 编码可能耗时很长，这里单独给一段）；
+    // 3) 成功后进度条走满 → 卡片重绘成「右上角云标志」→ 进度条淡出并移除。
+    async function uploadBookWithProgress(book) {
+      if (!book) return null;
+      const id = book.id;
+      const prevTimer = uploadTimers.get(id);
+      if (prevTimer) { clearTimeout(prevTimer); uploadTimers.delete(id); }
+      justUploaded.delete(id);
+
+      let shown = 0;
+      let target = 0;
+      // 传输阶段的「涓流」：52% → 95% 缓慢爬升。
+      // 真实字节进度（XHR upload.onprogress）会不断把 target 顶上去；
+      // 如果浏览器/代理不上报上传进度，涓流保证进度条不会在 50% 死等。
+      const CRAWL_FROM = 52;
+      const CRAWL_TO = 95;
+      const CRAWL_TAU = 4200; // 时间常数：约 4 秒逼近上限，越接近越慢
+      let crawlStartAt = 0;
+      let gotRealBytes = false;
+      const crawlTarget = () => {
+        if (!crawlStartAt) return CRAWL_FROM;
+        const elapsed = Date.now() - crawlStartAt;
+        return CRAWL_FROM + (CRAWL_TO - CRAWL_FROM) * (1 - Math.exp(-elapsed / CRAWL_TAU));
+      };
+      // 进度条目标值平滑逼近：真实阶段是跳跃的（3→8→50→96），直接跳会显得很生硬
+      const ease = () => {
+        uploadTimers.delete(id);
+        // 只有「上传中」这一阶段才继续逼近；进入 done/error 后由主流程直接定宽度
+        const st = uploadProgress.get(id);
+        if (!st || st.phase !== 'uploading') return;
+        if (!document.querySelector(`${bookCardSel(id)} .upload-bar-fill`)) return;
+        if (crawlStartAt && !gotRealBytes) target = Math.max(target, crawlTarget());
+        shown += Math.max(0.6, (target - shown) * 0.22);
+        if (shown > target) shown = target;
+        paintUploadBar(id, shown);
+        // 没到目标、或涓流还没爬到顶，就继续走
+        if (shown < target - 0.05 || (crawlStartAt && !gotRealBytes && target < CRAWL_TO - 0.5)) {
+          uploadTimers.set(id, setTimeout(ease, 90));
+        }
+      };
+      const stopEase = () => {
+        const t = uploadTimers.get(id);
+        if (t) { clearTimeout(t); uploadTimers.delete(id); }
+      };
+
+      uploadProgress.set(id, { percent: 0, phase: 'uploading' });
+      refreshBookCard(id);
+      target = 8;
+      ease();
+
+      try {
+        const path = await uploadBookToCloud(book, pct => {
+          const v = clampPct(pct);
+          if (v >= 50 && !crawlStartAt) crawlStartAt = Date.now();
+          if (v > crawlTarget() + 0.5) gotRealBytes = true;
+          target = Math.max(target, v);
+          // 真实阶段跳变时立刻把计时器踢起来，让进度条马上跟着动
+          if (!uploadTimers.has(id)) ease();
+        });
+        // 上传接口返回：先把进度条视觉上冲满，再切换到「完成」态
+        stopEase();
+        shown = 100;
+        paintUploadBar(id, 100);
+        await delay(320); // 满格停留一下，让用户看清「传完了」
+        uploadProgress.set(id, { percent: 100, phase: 'done' });
+        // 此刻重绘：旋转环换成云标志（带一次弹出动画），进度条满格
+        justUploaded.set(id, Date.now());
+        refreshBookCard(id);
+        justUploaded.delete(id); // 弹出动画只在这一次重绘里播，后面收尾重绘不再重播
+        await delay(420);
+        await fadeUploadBand(id); // 进度条淡出，然后移除，只留右上角云标志
+        uploadProgress.delete(id);
+        refreshBookCard(id);
+        return path;
+      } catch (e) {
+        // 失败：进度条停在当前位置变红，让用户看见「这次没传成」，然后淡出消失
+        stopEase();
+        await delay(120);
+        uploadProgress.set(id, { percent: clampPct(shown), phase: 'error' });
+        refreshBookCard(id);
+        await delay(900);
+        await fadeUploadBand(id);
+        uploadProgress.delete(id);
+        refreshBookCard(id);
+        throw e;
+      } finally {
+        stopEase();
+      }
+    }
+
+    // 进度条淡出：直接对现有 DOM 做透明度过渡，然后交给调用方重绘移除
+    async function fadeUploadBand(bookId) {
+      const card = document.querySelector(bookCardSel(bookId));
+      const band = card && card.querySelector('.upload-band');
+      if (!band) return;
+      band.style.transition = 'opacity .28s ease';
+      band.style.opacity = '0';
+      await delay(300);
     }
 
     async function deleteBookFromCloud(book) {
@@ -2539,99 +2789,134 @@
       const grid = $('books-grid');
       grid.innerHTML = '';
       list.forEach(book => {
-        const selected = state.selectedBookIds.has(book.id);
-        const pct = !book.hasBeenRead ? 'New' : (book.progressPercent < 1 ? Math.max(0.05, Number(book.progressPercent || 0)).toFixed(2) + '%' : Math.round(book.progressPercent) + '%');
-        const hasCloud = Boolean(book.cloudPath || book.cloudSha);
-        // 云端已删除：本地还能读，但仓库里那份已经不在了（在别的设备上云删除）
-        const cloudLost = Boolean(book.cloudMissing) && !hasCloud;
-        const isLocalReady = Boolean(book.fileBytes || !book.isCloudOnly);
-        const card = document.createElement('div');
-        card.className = 'group flex flex-col select-none';
-        const coverHtml = book.coverUrl
-          ? `<img src="${esc(book.coverUrl)}" class="w-full h-full object-cover" />`
-          : `<div class="w-full h-full bg-[#f4f1ea] flex flex-col justify-between p-4 border border-neutral-200/80">
-               <div class="text-[10px] tracking-widest text-neutral-400 font-medium">EPUB</div>
-               <div class="text-[15px] font-semibold text-[#2b2b2b] line-clamp-3 leading-snug">${esc(book.title)}</div>
-               <div class="text-[11px] text-neutral-400 truncate">${esc(book.shelf || '本地图书')}</div>
-             </div>`;
-        const cloudLostBadgeHtml = (!state.multiSelectMode && cloudLost)
-          ? `<div class="absolute top-2 right-2 w-7 h-7 rounded-xl bg-white/90 backdrop-blur-sm shadow-[0_2px_6px_rgba(0,0,0,0.12)] flex items-center justify-center pointer-events-none" title="云端已删除（其他设备已从私有仓移除，本地仍可阅读）">
-               <svg class="w-5 h-5 text-neutral-400" viewBox="0 0 40 32" fill="none">
-                 <path d="M11.5 26.5H29.5C33.6421 26.5 37 23.1421 37 19C37 15.203 34.1783 12.065 30.514 11.568C29.389 6.657 25.002 3 19.75 3C13.675 3 8.75 7.925 8.75 14C8.75 14.389 8.77 14.773 8.81 15.151C5.534 15.792 3 18.678 3 22.15C3 24.552 4.948 26.5 7.35 26.5H11.5Z" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" fill="rgba(115,115,115,0.04)"/>
-                 <path d="M7 27L33 5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
-               </svg>
-             </div>`
-          : '';
-        const cloudBadgeHtml = (!state.multiSelectMode && hasCloud)
-          ? `<div class="absolute top-2 right-2 w-7 h-7 rounded-xl bg-white/90 backdrop-blur-sm shadow-[0_2px_6px_rgba(0,0,0,0.12)] flex items-center justify-center pointer-events-none" title="${isLocalReady ? '已同步云端（已下载到本地）' : '云端图书（点击下载阅读）'}">
-               <svg class="w-5 h-5 text-[#3b3b3b]" viewBox="0 0 40 32" fill="none">
-                 <path d="M11.5 26.5H29.5C33.6421 26.5 37 23.1421 37 19C37 15.203 34.1783 12.065 30.514 11.568C29.389 6.657 25.002 3 19.75 3C13.675 3 8.75 7.925 8.75 14C8.75 14.389 8.77 14.773 8.81 15.151C5.534 15.792 3 18.678 3 22.15C3 24.552 4.948 26.5 7.35 26.5H11.5Z" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" fill="rgba(59,59,59,0.04)"/>
-                 <g stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
-                   <path d="M16.5 19.5V12.5M16.5 12.5L13.8 15.2M16.5 12.5L19.2 15.2"/>
-                   <path d="M23.5 13.5V20.5M23.5 20.5L20.8 17.8M23.5 20.5L26.2 17.8"/>
-                 </g>
-               </svg>
-               ${isLocalReady ? `<span class="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-white"></span>` : ''}
-             </div>`
-          : '';
-        card.innerHTML = `
+        const holder = document.createElement('div');
+        holder.innerHTML = renderBookCard(book).trim();
+        const card = holder.firstElementChild;
+        if (!card) return;
+        grid.appendChild(card);
+        bindBookCard(card, book);
+      });
+      updateStorageUsageDisplay();
+    }
+
+    // 单张书卡 HTML：上传中会在封面底部挂进度条，右上角挂旋转环；上传完成后恢复为云标志
+    function renderBookCard(book) {
+      const selected = state.selectedBookIds.has(book.id);
+      const pct = !book.hasBeenRead ? 'New' : (book.progressPercent < 1 ? Math.max(0.05, Number(book.progressPercent || 0)).toFixed(2) + '%' : Math.round(book.progressPercent) + '%');
+      const hasCloud = Boolean(book.cloudPath || book.cloudSha);
+      // 云端已删除：本地还能读，但仓库里那份已经不在了（在别的设备上云删除）
+      const cloudLost = Boolean(book.cloudMissing) && !hasCloud;
+      const isLocalReady = Boolean(book.fileBytes || !book.isCloudOnly);
+      const up = uploadProgress.get(book.id) || null;
+      const uploading = Boolean(up && up.phase === 'uploading');
+      const upFailed = Boolean(up && up.phase === 'error');
+      // 刚上传成功的那一下，让云标志做一次弹出动画
+      const upStamp = justUploaded.get(book.id);
+      const popBadge = Boolean(upStamp) && (Date.now() - upStamp) < 1800;
+      const coverHtml = book.coverUrl
+        ? `<img src="${esc(book.coverUrl)}" class="w-full h-full object-cover" />`
+        : `<div class="w-full h-full bg-[#f4f1ea] flex flex-col justify-between p-4 border border-neutral-200/80">
+             <div class="text-[10px] tracking-widest text-neutral-400 font-medium">EPUB</div>
+             <div class="text-[15px] font-semibold text-[#2b2b2b] line-clamp-3 leading-snug">${esc(book.title)}</div>
+             <div class="text-[11px] text-neutral-400 truncate">${esc(book.shelf || '本地图书')}</div>
+           </div>`;
+      const cloudLostBadgeHtml = (!state.multiSelectMode && cloudLost && !uploading)
+        ? `<div class="absolute top-2 right-2 w-7 h-7 rounded-xl bg-white/90 backdrop-blur-sm shadow-[0_2px_6px_rgba(0,0,0,0.12)] flex items-center justify-center pointer-events-none" title="云端已删除（其他设备已从私有仓移除，本地仍可阅读）">
+             <svg class="w-5 h-5 text-neutral-400" viewBox="0 0 40 32" fill="none">
+               <path d="M11.5 26.5H29.5C33.6421 26.5 37 23.1421 37 19C37 15.203 34.1783 12.065 30.514 11.568C29.389 6.657 25.002 3 19.75 3C13.675 3 8.75 7.925 8.75 14C8.75 14.389 8.77 14.773 8.81 15.151C5.534 15.792 3 18.678 3 22.15C3 24.552 4.948 26.5 7.35 26.5H11.5Z" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" fill="rgba(115,115,115,0.04)"/>
+               <path d="M7 27L33 5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+             </svg>
+           </div>`
+        : '';
+      // 上传中：右上角先占位成旋转环，告诉用户「正在飘向云端」
+      const uploadingBadgeHtml = (!state.multiSelectMode && uploading)
+        ? `<div class="absolute top-2 right-2 w-7 h-7 rounded-xl bg-white/90 backdrop-blur-sm shadow-[0_2px_6px_rgba(0,0,0,0.12)] flex items-center justify-center pointer-events-none" title="正在上传到云仓库…">
+             <svg class="upload-ring w-[18px] h-[18px] text-emerald-500" viewBox="0 0 24 24" fill="none">
+               <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity="0.18" stroke-width="2.6"/>
+               <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+             </svg>
+           </div>`
+        : '';
+      const cloudBadgeHtml = (!state.multiSelectMode && hasCloud && !uploading)
+        ? `<div class="absolute top-2 right-2 w-7 h-7 rounded-xl bg-white/90 backdrop-blur-sm shadow-[0_2px_6px_rgba(0,0,0,0.12)] flex items-center justify-center pointer-events-none ${popBadge ? 'cloud-badge-pop' : ''}" title="${isLocalReady ? '已同步云端（已下载到本地）' : '云端图书（点击下载阅读）'}">
+             <svg class="w-5 h-5 text-[#3b3b3b]" viewBox="0 0 40 32" fill="none">
+               <path d="M11.5 26.5H29.5C33.6421 26.5 37 23.1421 37 19C37 15.203 34.1783 12.065 30.514 11.568C29.389 6.657 25.002 3 19.75 3C13.675 3 8.75 7.925 8.75 14C8.75 14.389 8.77 14.773 8.81 15.151C5.534 15.792 3 18.678 3 22.15C3 24.552 4.948 26.5 7.35 26.5H11.5Z" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" fill="rgba(59,59,59,0.04)"/>
+               <g stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+                 <path d="M16.5 19.5V12.5M16.5 12.5L13.8 15.2M16.5 12.5L19.2 15.2"/>
+                 <path d="M23.5 13.5V20.5M23.5 20.5L20.8 17.8M23.5 20.5L26.2 17.8"/>
+               </g>
+             </svg>
+             ${isLocalReady ? `<span class="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-white"></span>` : ''}
+           </div>`
+        : '';
+      // 封面底部进度条：上传中跟随真实阶段推进，完成后满格停留再消失，失败则变红
+      const uploadBarHtml = (up)
+        ? `<div class="upload-band" title="${upFailed ? '上传失败' : (uploading ? uploadTitle(clampPct(up.percent)) : '上传完成')}">
+             <div class="upload-bar-fill ${upFailed ? 'upload-bar-fail' : ''}" style="width:${clampPct(up.percent)}%"></div>
+           </div>`
+        : '';
+      return `
+        <div class="group flex flex-col select-none" data-book-card="${esc(book.id)}">
           <div class="cover-box relative aspect-[3/4.15] w-full rounded-lg shadow-[0_2px_10px_rgba(0,0,0,0.08)] group-hover:shadow-lg transition overflow-hidden cursor-pointer bg-[#f5f3ef]">
             ${coverHtml}
             ${cloudBadgeHtml}
             ${cloudLostBadgeHtml}
+            ${uploadingBadgeHtml}
             ${state.multiSelectMode ? `<div class="absolute top-2.5 right-2.5 w-6 h-6 rounded-full border-2 flex items-center justify-center ${selected ? 'bg-[#3b3b3b] border-[#3b3b3b] text-white' : 'bg-white/85 border-neutral-400 text-transparent'}">✓</div>` : ''}
+            ${uploadBarHtml}
           </div>
           <div class="title-box mt-2.5 text-[15px] text-[#3a3a3a] truncate cursor-pointer">${esc(book.title)}</div>
           <div class="mt-1 flex items-center justify-between text-[14px] text-[#666666]">
-            <span>${esc(pct)}</span>
+            <span>${upFailed ? '<span class="text-red-500">上传失败</span>' : esc(pct)}</span>
             <button type="button" class="more-btn px-1.5 py-0.5 rounded-lg hover:bg-neutral-100 text-[#666] hover:text-black cursor-pointer">•••</button>
-          </div>`;
+          </div>
+        </div>`;
+    }
 
-        const onOpen = () => {
-          if (state.multiSelectMode) {
-            selected ? state.selectedBookIds.delete(book.id) : state.selectedBookIds.add(book.id);
-            renderLibrary();
+    function bindBookCard(card, book) {
+      const selected = state.selectedBookIds.has(book.id);
+      const onOpen = () => {
+        if (state.multiSelectMode) {
+          selected ? state.selectedBookIds.delete(book.id) : state.selectedBookIds.add(book.id);
+          renderLibrary();
+        } else {
+          openBook(book);
+        }
+      };
+      card.querySelector('.cover-box').onclick = onOpen;
+      card.querySelector('.title-box').onclick = onOpen;
+      card.querySelector('.more-btn').onclick = e => {
+        e.stopPropagation();
+        state.activeMenuBookId = book.id;
+        updateCloudIndicator();
+        const uploadBtn = $('book-act-cloud-upload');
+        const uploadLabel = $('book-act-cloud-upload-label');
+        const inShelfView = state.currentNav.startsWith('shelf:') && Boolean(book.shelf && state.shelves.includes(book.shelf));
+        const alreadyCloud = Boolean(book.cloudPath || book.cloudSha);
+        if (uploadBtn && uploadLabel) {
+          uploadLabel.textContent = alreadyCloud ? '已存云仓库' : (book.cloudMissing ? '重新上传云端' : '云仓库');
+          uploadBtn.disabled = !isCloudConnected() || !inShelfView || alreadyCloud || !book.fileBytes;
+          if (!isCloudConnected()) {
+            uploadBtn.title = '请先连接私有仓';
+          } else if (!inShelfView) {
+            uploadBtn.title = '仅可在具体书架中使用（本地图书不可直接上传）';
+          } else if (alreadyCloud) {
+            uploadBtn.title = '该书已在云仓库中';
+          } else if (!book.fileBytes) {
+            uploadBtn.title = '本地无原始文件，无法上传';
+          } else if (book.cloudMissing) {
+            uploadBtn.title = `云端已删除，重新上传到云仓库「${book.shelf}」`;
           } else {
-            openBook(book);
+            uploadBtn.title = `上传到云端书架「${book.shelf}」`;
           }
-        };
-        card.querySelector('.cover-box').onclick = onOpen;
-        card.querySelector('.title-box').onclick = onOpen;
-        card.querySelector('.more-btn').onclick = e => {
-          e.stopPropagation();
-          state.activeMenuBookId = book.id;
-          updateCloudIndicator();
-          const uploadBtn = $('book-act-cloud-upload');
-          const uploadLabel = $('book-act-cloud-upload-label');
-          const inShelfView = state.currentNav.startsWith('shelf:') && Boolean(book.shelf && state.shelves.includes(book.shelf));
-          const alreadyCloud = Boolean(book.cloudPath || book.cloudSha);
-          if (uploadBtn && uploadLabel) {
-            uploadLabel.textContent = alreadyCloud ? '已存云仓库' : (book.cloudMissing ? '重新上传云端' : '云仓库');
-            uploadBtn.disabled = !isCloudConnected() || !inShelfView || alreadyCloud || !book.fileBytes;
-            if (!isCloudConnected()) {
-              uploadBtn.title = '请先连接私有仓';
-            } else if (!inShelfView) {
-              uploadBtn.title = '仅可在具体书架中使用（本地图书不可直接上传）';
-            } else if (alreadyCloud) {
-              uploadBtn.title = '该书已在云仓库中';
-            } else if (!book.fileBytes) {
-              uploadBtn.title = '本地无原始文件，无法上传';
-            } else if (book.cloudMissing) {
-              uploadBtn.title = `云端已删除，重新上传到云仓库「${book.shelf}」`;
-            } else {
-              uploadBtn.title = `上传到云端书架「${book.shelf}」`;
-            }
-          }
-          const pop = $('book-action-popover');
-          pop.classList.remove('hidden');
-          $('book-action-backdrop').classList.remove('hidden');
-          const r = e.currentTarget.getBoundingClientRect();
-          pop.style.left = `${Math.max(12, Math.min(window.innerWidth - 200, r.right - 186))}px`;
-          pop.style.top = `${Math.min(window.innerHeight - 260, r.bottom + 6)}px`;
-        };
-        grid.appendChild(card);
-      });
-      updateStorageUsageDisplay();
+        }
+        const pop = $('book-action-popover');
+        pop.classList.remove('hidden');
+        $('book-action-backdrop').classList.remove('hidden');
+        const r = e.currentTarget.getBoundingClientRect();
+        pop.style.left = `${Math.max(12, Math.min(window.innerWidth - 200, r.right - 186))}px`;
+        pop.style.top = `${Math.min(window.innerHeight - 260, r.bottom + 6)}px`;
+      };
     }
 
     function blobToDataUrl(blob) {
@@ -3413,9 +3698,8 @@
           } else {
             try {
               showToast(`正在上传《${newBook.title}》到书架「${newBook.shelf}」...`);
-              await uploadBookToCloud(newBook);
+              await uploadBookWithProgress(newBook);
               await saveBookDB(newBook);
-              renderLibrary();
               showToast(`已导入并上传《${newBook.title}》到云端「${newBook.shelf}」`);
             } catch (e) {
               showToast(`上传失败：${e.message || '请检查仓库权限'}`);
@@ -4822,7 +5106,7 @@
         }
         try {
           showToast(`正在上传《${bk.title}》到云仓库「${bk.shelf}」...`);
-          await uploadBookToCloud(bk);
+          await uploadBookWithProgress(bk);
           await saveBookDB(bk);
           renderLibrary();
           showToast(`已上传《${bk.title}》到云端「${bk.shelf}」`);
