@@ -1479,23 +1479,72 @@
         progBar.style.width = '75%';
         progTxt.textContent = `索引 ${bookEntries.length} 本云端图书...`;
 
+        // ========================= 拉取规则 =========================
+        // 规则 1：云端每一本都无条件映射到本地。
+        //         - 本地已有对应记录 → 补上/刷新云标志
+        //         - 本地没有 → 新建「占位书」（只有书目信息 + cloudPath，点开才下载）
+        // 规则 2：本地有、云端没有的书完全不动：
+        //         - 原本有云标志的 → 失去云标志，转为本地临时阅读
+        //         - 原本就没云标志（普通导入）→ 不受任何影响
+        // 唯一例外：纯占位书（本地从没下载过内容）在云端消失 → 直接移除，
+        //         因为它没有任何可读内容，留着一张点不开的卡片只会误导。
+        // ============================================================
         const toSave = [];
-        // 本次云端树里实际命中的本地书记录 id，用于回收已失效的云端标志
-        const matchedIds = new Set();
-        for (let i = 0; i < bookEntries.length; i++) {
-          const entry = bookEntries[i];
+        // 本轮已被认领的本地记录；一条记录只对应一本云端书，避免同名条目互相挤占
+        const claimedIds = new Set();
+
+        const findMatchForEntry = (entry, fileName, title) => {
+          const free = state.books.filter(b => b && !claimedIds.has(b.id));
+          return free.find(b => b.cloudSha && b.cloudSha === entry.sha)
+            || free.find(b => b.cloudPath && b.cloudPath === entry.path)
+            || free.find(b => b.fileName && b.fileName === fileName)
+            || free.find(b => String(b.title || '') === title)
+            || null;
+        };
+
+        // 占位书 id 由云路径派生，保证反复同步不会重复建卡
+        const placeholderIdFor = p => {
+          let h = 0;
+          const s = String(p || '');
+          for (let k = 0; k < s.length; k++) h = (h * 31 + s.charCodeAt(k)) | 0;
+          return 'cloud-' + (h >>> 0).toString(36) + '-' + s.length.toString(36);
+        };
+
+        let createdCount = 0;
+        let linkedCount = 0;
+
+        for (const entry of bookEntries) {
           const parts = entry.path.split('/');
           const fileName = parts[parts.length - 1];
           const folderShelf = (parts.length >= 2 && parts[0] !== 'data' && !parts[0].startsWith('.')) ? parts[0] : '';
           const title = fileName.replace(/\.epub$/i, '');
 
-          // 匹配键与云端索引保持一致；可能同时命中多条（不同书架同名书），一并登记
-          const matches = state.books.filter(b => b.cloudSha === entry.sha || b.fileName === fileName || b.title === title);
-          matches.forEach(b => matchedIds.add(b.id));
-          const exist = matches[0];
-          if (!exist) {
+          const exist = findMatchForEntry(entry, fileName, title);
+          if (exist) {
+            // 命中已有记录：刷新云标志（本地内容保持原样，不做任何下载）
+            claimedIds.add(exist.id);
+            exist.cloudPath = entry.path;
+            exist.cloudSha = entry.sha;
+            exist.shelf = folderShelf;
+            exist.cloudMissing = false;
+            toSave.push(exist);
+            linkedCount++;
+          } else {
+            const pid = placeholderIdFor(entry.path);
+            const sameId = state.books.find(b => b.id === pid);
+            if (sameId) {
+              // 同一路径的占位书已存在（例如上次被标记过），就地复活
+              sameId.cloudPath = entry.path;
+              sameId.cloudSha = entry.sha;
+              sameId.shelf = folderShelf;
+              sameId.cloudMissing = false;
+              claimedIds.add(sameId.id);
+              toSave.push(sameId);
+              linkedCount++;
+              continue;
+            }
             const newCloudBook = {
-              id: 'cloud-' + entry.sha.slice(0, 10) + '-' + i,
+              id: pid,
               title,
               fileName,
               format: 'EPUB',
@@ -1511,40 +1560,44 @@
               isCloudOnly: true
             };
             state.books.push(newCloudBook);
+            claimedIds.add(newCloudBook.id);
             toSave.push(newCloudBook);
-          } else {
-            exist.cloudPath = entry.path;
-            exist.cloudSha = entry.sha;
-            exist.shelf = folderShelf;
-            exist.cloudMissing = false;
-            toSave.push(exist);
+            createdCount++;
           }
         }
 
-        // ==================== 云标志回收 ====================
-        // 本地记录标着「已在云端」，但这次云端树里找不到它 —— 说明它已在别的设备上被删除
-        // （云删除会连仓库文件一起删）。不回收的话云标志会永久停留，误导人以为云端仍有这本书。
-        const reclaimed = [];
-        const droppedPlaceholders = [];
-        state.books.slice().forEach(bk => {
-          if (matchedIds.has(bk.id)) return;
-          if (!bk.cloudPath && !bk.cloudSha) return;
-          const hasLocalContent = Boolean(bk.fileBytes) || (Array.isArray(bk.rawBlocks) && bk.rawBlocks.length > 0);
-          // 纯云端占位书（本地从没下载过、也没缓存解析结果）：云端没了就没有任何可读内容，直接移除
-          if (bk.isCloudOnly && !hasLocalContent) {
-            droppedPlaceholders.push(bk);
-            return;
-          }
-          // 本地有内容：保留可读，只回收云标志，并打标记以便界面提示「云端已删」
-          bk.cloudPath = '';
-          bk.cloudSha = '';
-          bk.cloudMissing = true;
-          reclaimed.push(bk);
-          toSave.push(bk);
-        });
+        // GitHub 对超大仓库的 recursive tree 会截断，此时目录树不完整。
+        // 这种时候不能反推「云端没有」，否则会把一大片书误判成已删除。
+        const treeTruncated = Boolean(treeData.truncated);
+
+        // ==================== 规则 2：云端没有的本地书 ====================
+        const lostCloudFlags = [];   // 失去云标志，转本地阅读，并打「云端已放弃」标记
+        const removedPlaceholders = []; // 纯占位书 → 移除
+        if (!treeTruncated) {
+          state.books.slice().forEach(bk => {
+            if (claimedIds.has(bk.id)) return;
+            // 从未有过云标志的本地书（普通导入）→ 完全不受影响
+            if (!bk.cloudPath && !bk.cloudSha && !bk.cloudMissing) return;
+
+            const hasLocalContent = Boolean(bk.fileBytes) || (Array.isArray(bk.rawBlocks) && bk.rawBlocks.length > 0);
+            if (!hasLocalContent) {
+              // 纯占位书：没有任何可读内容，云端也没了 → 移除，不留点不开的空卡
+              removedPlaceholders.push(bk);
+              return;
+            }
+            // 本地有内容：摘掉云标志，继续当本地书读。
+            // cloudMissing 保留为 true —— 卡片上会显示「云朵打斜杠」的灰云标记，
+            // 表示这本书云端已经放弃了，和从未上过云的普通导入书区分开。
+            bk.cloudPath = '';
+            bk.cloudSha = '';
+            bk.cloudMissing = true;
+            lostCloudFlags.push(bk);
+            toSave.push(bk);
+          });
+        }
 
         if (toSave.length) await saveBooksBatchDB(toSave);
-        for (const bk of droppedPlaceholders) {
+        for (const bk of removedPlaceholders) {
           const idx = state.books.findIndex(b => b.id === bk.id);
           if (idx !== -1) state.books.splice(idx, 1);
           await deleteBookDB(bk.id);
@@ -1555,9 +1608,11 @@
         renderLibrary();
         progBox.classList.add('hidden');
         $('cloud-hub-modal').classList.add('hidden');
-        const doneBits = [`同步完成：已索引 ${bookEntries.length} 本云端图书`];
-        if (reclaimed.length) doneBits.push(`回收 ${reclaimed.length} 个失效云标志`);
-        if (droppedPlaceholders.length) doneBits.push(`移除 ${droppedPlaceholders.length} 本云端已删的占位书`);
+        const doneBits = [`同步完成：云端 ${bookEntries.length} 本已全部映射到本地`];
+        if (createdCount) doneBits.push(`新增 ${createdCount} 本占位书`);
+        if (lostCloudFlags.length) doneBits.push(`${lostCloudFlags.length} 本失去云标志转为本地阅读`);
+        if (removedPlaceholders.length) doneBits.push(`移除 ${removedPlaceholders.length} 本云端已删的空占位书`);
+        if (treeTruncated) doneBits.push('仓库过大目录树被截断，本次未清理云端已删的书');
         showToast(doneBits.join('，'));
       } catch (err) {
         console.error(err);
@@ -2804,8 +2859,10 @@
       const selected = state.selectedBookIds.has(book.id);
       const pct = !book.hasBeenRead ? 'New' : (book.progressPercent < 1 ? Math.max(0.05, Number(book.progressPercent || 0)).toFixed(2) + '%' : Math.round(book.progressPercent) + '%');
       const hasCloud = Boolean(book.cloudPath || book.cloudSha);
-      // 云端已删除：本地还能读，但仓库里那份已经不在了（在别的设备上云删除）
+      // 云端已放弃：本次同步在仓库里没找到它，云标志已被摘掉，但本地仍有内容可读。
+      // 卡片上打「云朵斜杠」灰标，用来和从未上过云的普通导入书区分开。
       const cloudLost = Boolean(book.cloudMissing) && !hasCloud;
+      // 有云标志 + 本地无内容 = 占位书（点开才下载）；有云标志 + 本地有内容 = 已下载
       const isLocalReady = Boolean(book.fileBytes || !book.isCloudOnly);
       const up = uploadProgress.get(book.id) || null;
       const uploading = Boolean(up && up.phase === 'uploading');
@@ -4182,11 +4239,13 @@
       const healed = await healStaleImages(book);
       if (healed) showToast('已修复本书图片显示');
 
-      // 无本地内容的占位书，且云端那份已不存在 —— 没有可读的东西，直接提示删除
-      if (book.isCloudOnly && !book.cloudPath && (book.cloudMissing || !book.fileBytes)) {
+      // 占位书且没有云端路径 —— 没有任何可读内容（同步时云端已删的空占位书会被直接移除，
+      // 走到这里只可能是异常残留），提示移除
+      if (book.isCloudOnly && !book.cloudPath && !book.cloudSha) {
         return showToast('该书云端已被删除，本地无缓存，请从书架移除');
       }
 
+      // 占位书：点开时才下载
       if (book.isCloudOnly && book.cloudPath) {
         const { owner, repo, branch, token } = state.github;
         if (!owner || !repo || !token) {
@@ -4208,7 +4267,10 @@
           book.isCloudOnly = false;
           await saveBookDB(book);
         } catch (e) {
-          return showToast('云端图书下载失败');
+          if (/HTTP 404/.test(String(e && e.message))) {
+            return showToast('该书的云端文件已不存在');
+          }
+          return showToast('云端图书下载失败，请检查网络或仓库权限');
         }
       }
 
