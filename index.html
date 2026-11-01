@@ -13,7 +13,6 @@
       --reader-bg: #fdf6e3;
       --reader-text: #2f251e;
       --reader-font-size: 22px;
-      --reader-margin: 0px;
       --reader-letter-spacing: 0px;
       --reader-para-spacing: 15px;
       --reader-brightness: 1;
@@ -430,7 +429,7 @@
         </div>
 
         <!-- 左侧中心：目录 / 书签 -->
-        <div id="toc-sense-zone" class="group absolute top-1/2 left-0 -translate-y-1/2 w-14 h-28 z-30 flex items-center justify-start pl-2">
+        <div class="group absolute top-1/2 left-0 -translate-y-1/2 w-14 h-28 z-30 flex items-center justify-start pl-2">
           <button id="reader-toc-trigger" type="button" title="目录与书签" class="corner-float-btn opacity-0 group-hover:opacity-100 transition w-10 h-10 rounded-full bg-black/[0.05] hover:bg-black/[0.12] flex items-center justify-center text-[#59524c] hover:text-[#2f2a25] shadow-[0_1px_4px_rgba(0,0,0,0.08)] border border-black/[0.04] cursor-pointer">
             <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M4 5.5A1.5 1.5 0 015.5 4H9v16H5.5A1.5 1.5 0 014 18.5v-13z"/><path d="M9 4h9.5A1.5 1.5 0 0120 5.5v13a1.5 1.5 0 01-1.5 1.5H9"/><path d="M12.5 9h4M12.5 13h4"/></svg>
           </button>
@@ -573,7 +572,7 @@
         </div>
         <textarea id="note-editor-content" placeholder="写点想法…（可留空）" class="mt-5 w-full h-[130px] resize-none rounded-xl bg-[#f2f8f5] border border-transparent focus:border-[#cfe5d9] focus:outline-none px-4 py-3 text-[15px] leading-relaxed text-[#2f2f2f]"></textarea>
         <div id="note-editor-colors" class="mt-4 flex items-center gap-2.5"></div>
-        <div id="note-editor-actions" class="mt-5 flex items-center justify-end gap-5 text-[15px]">
+        <div class="mt-5 flex items-center justify-end gap-5 text-[15px]">
           <button id="note-editor-delete" type="button" class="text-neutral-600 hover:text-red-600 cursor-pointer">删除</button>
           <button id="note-editor-cancel" type="button" class="text-neutral-600 hover:text-black cursor-pointer">取消</button>
           <button id="note-editor-confirm" type="button" class="text-[#2f2f2f] font-medium hover:text-black cursor-pointer">确认</button>
@@ -634,6 +633,7 @@
     const PREFS_VER = 2;
     const DB_NAME = 'OneReaderDB_v4';
     const FONT_DB_NAME = 'OneReaderFonts_v1';
+    const NOTES_STORE = 'notes';
     // v6：正文改用 XML(XHTML) 优先解析，修复 <title/> 自闭合标签吞掉整篇内容
     // 导致解析出 0 个块的问题。提升后，已导入的旧书打开时会自动重新解析。
     const PARSE_VERSION = 6;
@@ -745,20 +745,41 @@
       } catch (e) {}
     }
 
-    // ==================== IndexedDB 本地长期存储 ====================
-    function openDB() {
-      return new Promise(res => {
-        if (!window.indexedDB) return res(null);
-        const r = indexedDB.open(DB_NAME, 1);
-        r.onupgradeneeded = e => {
-          if (!e.target.result.objectStoreNames.contains('books')) {
-            e.target.result.createObjectStore('books', { keyPath: 'id' });
-          }
+    // ==================== IndexedDB 连接管理 ====================
+    // 按逻辑库名复用连接；升级或打开失败时自动清除缓存。
+    const dbConnections = new Map();
+
+    function openDatabase(key, name, storeName) {
+      if (!window.indexedDB) return Promise.resolve(null);
+      const cached = dbConnections.get(key);
+      if (cached) return cached;
+
+      let resolveConnection;
+      const connection = new Promise(resolve => { resolveConnection = resolve; });
+      dbConnections.set(key, connection);
+      const clearCache = () => {
+        if (dbConnections.get(key) === connection) dbConnections.delete(key);
+      };
+      try {
+        const request = indexedDB.open(name, 1);
+        request.onupgradeneeded = event => {
+          const db = event.target.result;
+          if (!db.objectStoreNames.contains(storeName)) db.createObjectStore(storeName, { keyPath: 'id' });
         };
-        r.onsuccess = () => res(r.result);
-        r.onerror = () => res(null);
-      });
+        request.onsuccess = () => {
+          const db = request.result;
+          db.onversionchange = () => { db.close(); clearCache(); };
+          resolveConnection(db);
+        };
+        request.onerror = () => { clearCache(); resolveConnection(null); };
+      } catch (error) {
+        clearCache();
+        resolveConnection(null);
+      }
+      return connection;
     }
+
+    function openDB() { return openDatabase('books', DB_NAME, 'books'); }
 
     async function saveBookDB(b) {
       const db = await openDB();
@@ -800,7 +821,6 @@
     }
 
     // ==================== 笔记：数据层 ====================
-    const NOTES_STORE = 'notes';
     const HIGHLIGHT_COLORS = [
       { key: 'pink',   label: '粉', bg: '#f6c9c9' },
       { key: 'yellow', label: '黄', bg: '#f7e7a6' },
@@ -826,19 +846,7 @@
       return 'n_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     }
 
-    function openNotesDB() {
-      return new Promise(res => {
-        if (!window.indexedDB) return res(null);
-        const r = indexedDB.open('OneReaderNotes_v1', 1);
-        r.onupgradeneeded = e => {
-          if (!e.target.result.objectStoreNames.contains(NOTES_STORE)) {
-            e.target.result.createObjectStore(NOTES_STORE, { keyPath: 'id' });
-          }
-        };
-        r.onsuccess = () => res(r.result);
-        r.onerror = () => res(null);
-      });
-    }
+    function openNotesDB() { return openDatabase('notes', 'OneReaderNotes_v1', NOTES_STORE); }
 
     async function loadAllNotesDB() {
       const db = await openNotesDB();
@@ -868,19 +876,7 @@
     }
 
     // ==================== 本地字体 ====================
-    function openFontDB() {
-      return new Promise(res => {
-        if (!window.indexedDB) return res(null);
-        const r = indexedDB.open(FONT_DB_NAME, 1);
-        r.onupgradeneeded = e => {
-          if (!e.target.result.objectStoreNames.contains('fonts')) {
-            e.target.result.createObjectStore('fonts', { keyPath: 'id' });
-          }
-        };
-        r.onsuccess = () => res(r.result);
-        r.onerror = () => res(null);
-      });
-    }
+    function openFontDB() { return openDatabase('fonts', FONT_DB_NAME, 'fonts'); }
 
     async function loadAllLocalFonts() {
       const db = await openFontDB();
@@ -1069,12 +1065,14 @@
         }
       }
       if (state.currentBook) {
-        setTimeout(() => {
+        setTimeout(async () => {
+          const book = state.currentBook;
           const anchor = getCurrentReadingBlockIndex();
           applyLayoutStyles();
-          repaginate();
+          const completed = await repaginate();
+          if (!completed || state.currentBook !== book) return;
           if (anchor >= 0 && state.readerConfig.viewMode !== 'scroll') {
-            state.currentPageIndex = alignPageForMode(findPageOfBlock(state.currentBook, anchor));
+            state.currentPageIndex = alignPageForMode(findPageOfBlock(book, anchor));
           }
           renderReaderPages({ skipDbSave: true });
         }, 120);
@@ -1127,12 +1125,14 @@
     window.addEventListener('resize', () => {
       if (!state.currentBook) return;
       clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
+      resizeTimer = setTimeout(async () => {
+        const book = state.currentBook;
         const anchor = getCurrentReadingBlockIndex();
         applyLayoutStyles();
-        repaginate();
+        const completed = await repaginate();
+        if (!completed || state.currentBook !== book) return;
         if (anchor >= 0 && state.readerConfig.viewMode !== 'scroll') {
-          state.currentPageIndex = alignPageForMode(findPageOfBlock(state.currentBook, anchor));
+          state.currentPageIndex = alignPageForMode(findPageOfBlock(book, anchor));
         }
         renderReaderPages({ skipDbSave: true });
       }, 200);
@@ -1177,16 +1177,6 @@
 
     function encodeRepoPath(p) {
       return String(p || '').split('/').filter(Boolean).map(encodeURIComponent).join('/');
-    }
-
-    function arrayBufferToBase64(buf) {
-      const bytes = new Uint8Array(buf);
-      let binary = '';
-      const chunk = 0x8000;
-      for (let i = 0; i < bytes.length; i += chunk) {
-        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
-      }
-      return btoa(binary);
     }
 
     // 异步版：几十 MB 的书一次编码会长时间占住主线程，进度条会整段卡死。
@@ -2306,7 +2296,8 @@
       $('library-view').classList.add('hidden');
       applyThemeColors();
       applyLayoutStyles();
-      repaginate();
+      const completed = await repaginate();
+      if (!completed) return;
 
       if (blockIdx >= 0) {
         await jumpToBookLocation({ blockIndex: blockIdx });
@@ -3838,12 +3829,18 @@
       return fallback;
     }
 
+    const pageIndexCache = new WeakMap();
     function findPageOfBlock(book, blockIndex) {
       if (!book) return 0;
       const pages = book.pages || [];
       if (!pages.length) return 0;
       const targetBi = Number(blockIndex);
       if (isNaN(targetBi) || targetBi < 0) return 0;
+
+      const cached = pageIndexCache.get(book);
+      if (cached && cached.pages === pages && cached.byBlock.has(targetBi)) {
+        return cached.byBlock.get(targetBi);
+      }
 
       for (let i = 0; i < pages.length; i++) {
         const pg = pages[i];
@@ -3963,7 +3960,10 @@
           saveBookProgressDebounced(book);
         });
       } else {
-        if (!book.pages || !book.pages.length) repaginate();
+        if (!book.pages || !book.pages.length) {
+          const completed = await repaginate();
+          if (!completed) return;
+        }
         const pageIdx = findPageOfBlock(book, blockIdx);
         state.currentPageIndex = alignPageForMode(pageIdx);
         await renderReaderPages();
@@ -4291,8 +4291,10 @@
 
       applyThemeColors();
       applyLayoutStyles();
-      requestAnimationFrame(() => {
-        repaginate();
+      requestAnimationFrame(async () => {
+        if (state.currentBook !== book) return;
+        const completed = await repaginate();
+        if (!completed || state.currentBook !== book) return;
         if (typeof book.lastBlockIndex === 'number' && book.lastBlockIndex > 0) {
           if (state.readerConfig.viewMode === 'scroll') {
             jumpToBookLocation({ blockIndex: book.lastBlockIndex });
@@ -4313,6 +4315,8 @@
     }
 
     function applyLayoutStyles() {
+      // 版式变化会使当前分页任务和待执行的延迟任务同时失效。
+      paginationTasks.cancel();
       const c = state.readerConfig;
       const root = document.documentElement;
       root.style.setProperty('--reader-font-size', c.fontSize + 'px');
@@ -4357,7 +4361,7 @@
       });
     }
 
-    function imgBlockHtml(item, biAttr = '', miAttr = '') {
+    function imgBlockHtml(item, biAttr = '') {
       const alt = esc(item.alt || '');
       const w = Number(item.w) || 0;
       const h = Number(item.h) || 0;
@@ -4365,13 +4369,12 @@
       const sizeStyle = (w > 0 && h > 0)
         ? `width:100%;max-width:min(100%, ${Math.round(w)}px);${ratio}`
         : 'width:100%;';
-      return `<div${biAttr}${miAttr} class="fig-wrap my-3 flex justify-center"><img src="${esc(item.src)}" alt="${alt}" style="${sizeStyle}height:auto;max-height:45vh;object-fit:contain;border-radius:6px;" class="object-contain" loading="eager" decoding="sync" /></div>`;
+      return `<div${biAttr} class="fig-wrap flex justify-center" style="margin:0.75rem 0;"><img src="${esc(item.src)}" alt="${alt}" style="${sizeStyle}height:auto;max-height:45vh;object-fit:contain;border-radius:6px;" class="object-contain" loading="eager" decoding="sync" /></div>`;
     }
 
     function blockHtml(item) {
       if (!item) return '';
       const biAttr = typeof item._bi === 'number' ? ` data-bi="${item._bi}"` : '';
-      const miAttr = typeof item._mi === 'number' ? ` data-mi="${item._mi}"` : '';
       const colorStyle = item.color ? `color:${esc(item.color)};` : '';
       const boldStyle = item.bold ? 'font-weight:600;' : '';
 
@@ -4386,10 +4389,10 @@
       };
 
       if (item.type === 'heading') {
-        return `<h2${biAttr}${miAttr} class="font-semibold mt-3" style="margin-bottom:var(--reader-para-spacing);font-size:calc(var(--reader-font-size)*1.22);${colorStyle}">${renderInner(item)}</h2>`;
+        return `<h2${biAttr} class="font-semibold" style="margin-top:0.75rem;margin-bottom:var(--reader-para-spacing);font-size:calc(var(--reader-font-size)*1.22);${colorStyle}">${renderInner(item)}</h2>`;
       }
-      if (item.type === 'img') return item.dead ? '' : imgBlockHtml(item, biAttr, miAttr);
-      return `<p${biAttr}${miAttr} style="margin-bottom:var(--reader-para-spacing);text-align:justify;${colorStyle}${boldStyle}">${renderInner(item)}</p>`;
+      if (item.type === 'img') return item.dead ? '' : imgBlockHtml(item, biAttr);
+      return `<p${biAttr} style="margin-bottom:var(--reader-para-spacing);text-align:justify;${colorStyle}${boldStyle}">${renderInner(item)}</p>`;
     }
 
     let imgFailHandlerBound = false;
@@ -4451,86 +4454,281 @@
 
     // ==================== 分页 ====================
 
-    function repaginate() {
+    // 统一管理分页任务：开始新任务、布局失效、延迟重排和 UI 让出均走同一入口。
+    const paginationTasks = {
+      id: 0, timer: 0,
+      cancel() { this.id++; clearTimeout(this.timer); this.timer = 0; },
+      start(book) { this.cancel(); return { id: this.id, book }; },
+      current(task) { return !!task && task.id === this.id && task.book === state.currentBook; },
+      yield(task) { return yieldToUI().then(() => this.current(task)); },
+      debounce(callback, delay = 60) {
+        this.cancel();
+        this.timer = setTimeout(() => { this.timer = 0; callback(); }, delay);
+      }
+    };
+
+    async function repaginate() {
       const book = state.currentBook;
-      if (!book) return;
+      if (!book) return false;
+      const task = paginationTasks.start(book);
       ensureBlockIndices(book);
+
       const blocks = book.rawBlocks || [];
       const pageLeft = $('page-left');
       const measure = $('page-measure-box');
-      if (!pageLeft || !measure) return;
+      if (!pageLeft || !measure) return false;
 
       const cs = getComputedStyle(pageLeft);
       const availW = Math.max(160, pageLeft.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
       const availH = Math.max(140, pageLeft.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom));
       const isDual = state.readerConfig.viewMode === 'dual';
-
-      // ---------- 真实 DOM 测量：把这一页的块渲染进离屏测量盒，读实际高度 ----------
-      // 之前用「字符数 ÷ 每行字数」估算高度，误差会沿页面累积：估多了提前翻页，
-      // 每页底部就会空出一大截。这里改成真实渲染后量取，量不准的分页全部消失。
-      book.pages = book.pages || [];
-      measure.style.width = availW + 'px';
-      const measureRow = (() => {
-        measure.innerHTML = `<div id="m-row" style="width:${availW}px;font-size:var(--reader-font-size);letter-spacing:var(--reader-letter-spacing);line-height:1.72;"></div>`;
-        return $('m-row');
-      })();
-
       const fontSize = Number(state.readerConfig.fontSize) || 22;
       const lineH = fontSize * 1.72;
+      const paraSpacing = Number(state.readerConfig.paraSpacing) || 0;
+      const letterSpacing = Number(state.readerConfig.letterSpacing) || 0;
+      const blockMargin = (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) * 0.75;
+      const fontFamily = cs.fontFamily || getComputedStyle(document.documentElement).getPropertyValue('--reader-font-family');
+      const fontLoadState = document.fonts ? document.fonts.status : 'unavailable';
 
-      // 渲染一批块到测量行，返回每块连带下边距的总高
+      // 测量区复用真实页面的内容宽度、字体、字距和行高。
+      measure.style.width = availW + 'px';
+      measure.innerHTML = `<div style="width:${availW}px;"><div id="m-row" style="width:${availW}px;font-size:var(--reader-font-size);letter-spacing:var(--reader-letter-spacing);line-height:1.72;"></div></div>`;
+      const measureRow = $('m-row');
+      if (!measureRow) return false;
+
       const measureBlocks = items => {
-        measureRow.innerHTML = items.map((it, i) => blockHtml({ ...it, _mi: i })).join('');
-        const nodes = [...measureRow.children];
-        return nodes.map(el => {
-          const st = getComputedStyle(el);
-          const mt = parseFloat(st.marginTop) || 0;
-          const mb = parseFloat(st.marginBottom) || 0;
-          const h = el.getBoundingClientRect().height;
-          return { h, mt, mb, outer: mt + h + mb };
+        if (!items.length) return [];
+        measureRow.innerHTML = items.map(it => blockHtml(it)).join('');
+        const nodes = measureRow.children;
+        const out = new Array(nodes.length);
+        for (let i = 0; i < nodes.length; i++) {
+          const rect = nodes[i].getBoundingClientRect();
+          // blockHtml 为标题/段落显式定义了边距；避免每个节点再调用一次 getComputedStyle。
+          out[i] = {
+            h: rect.height,
+            mt: items[i] && items[i].type === 'heading' ? blockMargin : 0,
+            mb: paraSpacing
+          };
+        }
+        return out;
+      };
+
+      // 缓存按块对象身份保存，并校验文本/样式版本；字体、字号、字距、段距或栏宽变化后自动失效。
+      const layoutKey = [
+        availW.toFixed(2), fontSize, letterSpacing, paraSpacing, fontFamily, fontLoadState
+      ].join('|');
+      const geoCache = repaginate.geoCache || (repaginate.geoCache = new WeakMap());
+      const readCachedGeo = b => {
+        if (!b || typeof b !== 'object') return null;
+        const hit = geoCache.get(b);
+        if (!hit || hit.layoutKey !== layoutKey || hit.text !== b.text ||
+            hit.type !== b.type || hit.bold !== !!b.bold || hit.spans !== b.spans) return null;
+        return hit.geo;
+      };
+      const writeCachedGeo = (b, geo) => {
+        if (!b || typeof b !== 'object') return;
+        geoCache.set(b, {
+          layoutKey,
+          text: b.text,
+          type: b.type,
+          bold: !!b.bold,
+          spans: b.spans,
+          geo
         });
       };
 
-      // 整页高度：把这一页的块整体渲染一次量总高，避免逐块累加的舍入误差
-      // （单块 rect 会被舍入到整数，一页十几块累计能差 5px，最后一块就被裁掉几个像素）。
-      const measurePageHeight = () => {
-        if (!cur.length) return 0;
-        measureRow.innerHTML = cur.map(it => blockHtml(it)).join('');
-        const nodes = [...measureRow.children];
-        if (!nodes.length) return 0;
-        const top = nodes[0].getBoundingClientRect().top;
-        const last = nodes[nodes.length - 1];
-        return last.getBoundingClientRect().bottom - top;
+      // 图片按 EPUB 尺寸单独计算；文本块按批次测量并缓存。
+      const missing = [];
+      for (const b of blocks) {
+        if (!b || b.type === 'img' || readCachedGeo(b)) continue;
+        missing.push(b);
+      }
+      const MEASURE_BATCH_SIZE = 160;
+      const YIELD_EVERY_BLOCKS = MEASURE_BATCH_SIZE * 4;
+      for (let i = 0; i < missing.length; i += MEASURE_BATCH_SIZE) {
+        if (!paginationTasks.current(task)) return false;
+        const batch = missing.slice(i, i + MEASURE_BATCH_SIZE);
+        const geos = measureBlocks(batch);
+        for (let j = 0; j < batch.length; j++) {
+          writeCachedGeo(batch[j], geos[j] || { h: lineH, mt: 0, mb: paraSpacing });
+        }
+        // 每处理 640 个块让出主线程，并检查任务是否仍有效。
+        if (i + batch.length < missing.length && (i + batch.length) % YIELD_EVERY_BLOCKS === 0) {
+          if (!(await paginationTasks.yield(task))) return false;
+        }
+      }
+
+      const getGeo = b => {
+        const hit = readCachedGeo(b);
+        if (hit) return hit;
+        const geo = measureBlocks([b])[0] || { h: lineH, mt: 0, mb: paraSpacing };
+        writeCachedGeo(b, geo);
+        return geo;
       };
 
-      // 整块高度只跟「宽度 + 字体 + 内容」有关，同一块反复量结果一致。
-      // 已实测过的块直接命中缓存，避免每次翻页都重新渲染一遍。
-      // 键里同时带上 availH：不同行高/边距组合下判定阈值不同，混用会让分页结果对不上。
-      const geoCache = repaginate.geoCache || (repaginate.geoCache = new Map());
-      const geoKey = b => {
-        const t = b.text || '';
-        return `${availW}x${availH}|${fontSize}|${b.type}|${b.color || ''}|${b.bold ? 1 : 0}|${t.length}|${t.slice(0, 24)}|${t.slice(-24)}`;
+      // 对带颜色/粗体 span 的段落切片，避免跨页后前半段仍渲染整段原始 spans。
+      const sliceSpans = (spans, start, end, fullText) => {
+        if (!Array.isArray(spans) || !spans.length) return undefined;
+        if (spans.map(sp => String(sp.text || '')).join('') !== fullText) return undefined;
+        const result = [];
+        let offset = 0;
+        for (const sp of spans) {
+          const value = String(sp.text || '');
+          const from = Math.max(0, start - offset);
+          const to = Math.min(value.length, end - offset);
+          if (to > from) result.push({ ...sp, text: value.slice(from, to) });
+          offset += value.length;
+          if (offset >= end) break;
+        }
+        return result;
       };
-      const getGeo = b => {
-        const k = geoKey(b);
-        const hit = geoCache.get(k);
-        if (hit) return hit;
-        const [g] = measureBlocks([b]);
-        // 长书逐页翻下来条目会很多，超过上限就整体丢弃重来（重建成本远低于内存泄漏）
-        if (geoCache.size > 4000) geoCache.clear();
-        geoCache.set(k, g);
-        return g;
+      const paragraphFragment = (b, start, end) => {
+        const fullText = String(b.text || '');
+        const text = fullText.slice(start, end);
+        const spans = sliceSpans(b.spans, start, end, fullText);
+        return {
+          ...b,
+          type: 'p',
+          text,
+          spans,
+          splitFrom: false,
+          forceNewPage: start === 0 ? !!b.forceNewPage : false
+        };
+      };
+
+      // 为需要拆分的段落只渲染一次完整 DOM，再通过 Range 读取不同前缀的实际排版高度。
+      // 二分搜索期间不再反复 innerHTML + layout，避免双页遇到大量长段落时卡顿。
+      const createPrefixHeightReader = b => {
+        measureRow.innerHTML = blockHtml(b);
+        const el = measureRow.firstElementChild;
+        if (!el) return null;
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        const parts = [];
+        let total = 0;
+        let node;
+        while ((node = walker.nextNode())) {
+          if (!node.nodeValue) continue;
+          parts.push({ node, start: total, end: total + node.nodeValue.length });
+          total += node.nodeValue.length;
+        }
+        if (!parts.length || total !== String(b.text || '').length) return null;
+
+        const range = document.createRange();
+        return cut => {
+          let lo = 0, hi = parts.length - 1;
+          while (lo <= hi) {
+            const mid = (lo + hi) >> 1;
+            const part = parts[mid];
+            if (cut > part.end) lo = mid + 1;
+            else if (cut <= part.start) hi = mid - 1;
+            else {
+              range.setStart(parts[0].node, 0);
+              range.setEnd(part.node, cut - part.start);
+              // Range 的文字矩形通常小于 CSS line-height；按垂直不重叠的文字行计数，
+              // 再乘实际行高，避免把行高估小而导致页底裁字。
+              const rects = range.getClientRects();
+              let lines = 0;
+              let lastBottom = -Infinity;
+              for (let ri = 0; ri < rects.length; ri++) {
+                const r = rects[ri];
+                if (r.width <= 0 || r.height <= 0) continue;
+                if (!lines || r.top >= lastBottom - 0.5) {
+                  lines++;
+                  lastBottom = r.bottom;
+                } else {
+                  lastBottom = Math.max(lastBottom, r.bottom);
+                }
+              }
+              return lines * lineH;
+            }
+          }
+          return 0;
+        };
+      };
+
+      // 找到当前剩余高度内能容纳的最大段落前缀。实际文字只布局一次，二分过程只读 Range 几何信息。
+      const fitParagraphHead = (b, maxPx, fullGeo) => {
+        const text = String(b.text || '');
+        const n = text.length;
+        if (n < 2 || maxPx < lineH * 0.85) return 0;
+
+        const lineCount = Math.max(1, Math.ceil(fullGeo.h / lineH));
+        const charsPerLine = Math.max(1, Math.round(n / lineCount));
+        const guess = Math.min(n - 1, Math.max(1, Math.round((maxPx / lineH) * charsPerLine)));
+        const span = Math.max(4, charsPerLine * 2);
+        let readPrefixHeight = createPrefixHeightReader(b);
+        const fallbackHeights = new Map();
+        const heightAt = cut => {
+          if (readPrefixHeight) {
+            const h = readPrefixHeight(cut);
+            if (Number.isFinite(h) && h > 0) return h;
+            readPrefixHeight = null;
+          }
+          if (fallbackHeights.has(cut)) return fallbackHeights.get(cut);
+          const fragment = paragraphFragment(b, 0, cut);
+          const geo = measureBlocks([fragment])[0] || { h: Infinity };
+          fallbackHeights.set(cut, geo.h);
+          return geo.h;
+        };
+
+        let lo, hi, best = 0;
+        if (heightAt(guess) <= maxPx + 0.25) {
+          best = guess;
+          lo = guess + 1;
+          hi = Math.min(n - 1, guess + span);
+          while (hi < n - 1 && heightAt(hi) <= maxPx + 0.25) {
+            best = hi;
+            lo = hi + 1;
+            hi = Math.min(n - 1, hi + span);
+          }
+          if (heightAt(hi) <= maxPx + 0.25) return hi;
+        } else {
+          hi = guess - 1;
+          lo = Math.max(1, guess - span);
+          while (lo > 1 && heightAt(lo) > maxPx + 0.25) {
+            hi = lo - 1;
+            lo = Math.max(1, lo - span);
+          }
+          if (heightAt(lo) > maxPx + 0.25) return 0;
+          best = lo;
+        }
+
+        while (lo <= hi) {
+          const mid = (lo + hi) >> 1;
+          if (heightAt(mid) <= maxPx + 0.25) {
+            best = mid;
+            lo = mid + 1;
+          } else {
+            hi = mid - 1;
+          }
+        }
+        return best;
+      };
+
+      // 分页断点由实际可容纳的文字位置决定，不再回退到逗号/句号。
+      // 中文可以在任意字符之间自然续页；只避免切开 Unicode 代理对和 CRLF。
+      const chooseNaturalBreak = (text, maxChars) => {
+        let cut = Math.max(1, Math.min(text.length - 1, maxChars | 0));
+        const before = text.charCodeAt(cut - 1);
+        const after = text.charCodeAt(cut);
+        const isHighSurrogate = before >= 0xD800 && before <= 0xDBFF;
+        const isLowSurrogate = after >= 0xDC00 && after <= 0xDFFF;
+        if (isHighSurrogate && isLowSurrogate) cut--;
+        if (text[cut - 1] === '\r' && text[cut] === '\n') cut--;
+        return cut;
       };
 
       const pages = [];
       let cur = [];
-      let used = 0; // 已占用的高度（含块的下边距，页尾块的下边距最后会抹掉）
+      let used = 0; // 从页首到最后一个块下沿，再加上最后一块的下外边距
+      let lastGeo = null;
 
       const flush = () => {
         if (!cur.length) return;
         pages.push(cur);
         cur = [];
         used = 0;
+        lastGeo = null;
       };
 
       const forceChapterStart = () => {
@@ -4538,184 +4736,142 @@
         if (isDual && pages.length % 2 === 1) pages.push([]);
       };
 
-      const queue = blocks.slice();
+      // CSS 相邻块的垂直外边距会折叠，实际间距取两者较大值，而不是简单相加。
+      // 页首上边距与页尾下边距由 .paged-leaf 归零，因此这里同步按相同规则计算。
+      const placement = geo => {
+        const base = cur.length
+          ? used - lastGeo.mb + Math.max(lastGeo.mb, geo.mt)
+          : 0;
+        return {
+          base,
+          withMargin: base + geo.h + geo.mb,
+          asLast: base + geo.h
+        };
+      };
+      const place = (b, geo) => {
+        const pos = placement(geo);
+        cur.push(b);
+        used = pos.withMargin;
+        lastGeo = geo;
+      };
+
+      // 原始块只顺序读取；需要拆段时把尾片段压栈，下一轮优先处理。
+      // 避免在长书上反复移动后续数万个数组元素。
+      let sourceIndex = 0;
+      const fragmentStack = [];
       let guard = 0;
 
-      const fits = (mt, h, mb) => {
-        // 页内第一块：上外边距会被 .paged-leaf 的 CSS 抹掉，不计入
-        const topPad = cur.length ? mt : 0;
-        return used + topPad + h + mb <= availH + 0.5;
-      };
-
-      const place = (b, mt, h, mb) => {
-        const topPad = cur.length ? mt : 0;
-        cur.push(b);
-        used += topPad + h + mb;
-      };
-
-      for (let qi = 0; qi < queue.length; qi++) {
+      while (sourceIndex < blocks.length || fragmentStack.length) {
         if (++guard > 200000) break;
-        const b = queue[qi];
+        if (guard % 2048 === 0) {
+          if (!(await paginationTasks.yield(task))) return false;
+        }
+        const b = fragmentStack.length ? fragmentStack.pop() : blocks[sourceIndex++];
+        if (!b) continue;
         if (b.forceNewPage) forceChapterStart();
         if (b.type === 'img' && b.dead) continue;
 
-        // 图片按容器约束算出实际高度，避免超大图撑破页面
+        let geo;
         if (b.type === 'img') {
           const w = Number(b.w) || availW * 0.8;
           const h = Number(b.h) || availH * 0.4;
           const scale = Math.min(1, availW / Math.max(1, w));
           const shown = Math.min(availH * 0.45, h * scale);
-          if (!fits(24, shown, 24)) flush();
-          place(b, 24, shown, 24);
+          // 图片容器使用与 CSS 相同的 0.75rem 上下边距。
+          geo = { h: shown, mt: blockMargin, mb: blockMargin };
+        } else {
+          geo = getGeo(b);
+        }
+
+        let pos = placement(geo);
+        if (pos.withMargin <= availH + 0.5) {
+          place(b, geo);
+          continue;
+        }
+        if (pos.asLast <= availH + 0.5) {
+          place(b, geo);
+          flush();
           continue;
         }
 
-        // 文本类块需要真实测量，但首块的上边距会被抹掉，所以先按「页内第一块」量一次；
-        // 若当前页已有内容，再用真实上边距量一次。
-        const inPage = cur.length > 0;
-        const m = getGeo(b);
-        const mt = inPage ? m.mt : 0;
-
-        // 分两种「放得下」：
-        //  1) 带下边距也放得下 —— 后面还能继续接块；
-        //  2) 只有抹掉下边距才放得下 —— 它能做本页最后一块（.paged-leaf 的 CSS 会抹掉页尾块的下边距），
-        //     这种情况必须收下再翻页，否则每页底部会白白空出一整个段距（实测 91~131px 的抖动就来自这里）。
-        const topPad = inPage ? mt : 0;
-        const fitsWithMb = used + topPad + m.h + m.mb <= availH + 0.5;
-        const fitsAsLast = used + topPad + m.h <= availH + 0.5;
-        // 只有接近满页时才需要整页实测校验（逐块累加在临界处会有亚像素漂移）；
-        // 远离满页时直接相信累加值，避免每块都重排整页。
-        const nearFull = used + topPad + m.h + m.mb > availH - lineH * 2;
-
-        if (fitsWithMb) {
-          if (nearFull && measurePageHeight() > availH + 0.5) {
-            // 实测放不下，退回去交给拆分/换页
-          } else {
-            place(b, mt, m.h, m.mb);
-            continue;
-          }
-        } else if (fitsAsLast && cur.length > 0) {
-          cur.push(b);
-          if (measurePageHeight() <= availH + 0.5) { flush(); continue; }
-          cur.pop();
-        }
-
-        // 放不下：若是普通段落且当前页还有足够空间，就把它拆开，前半留在本页
-        const remain = availH - used;
-        const minTailH = lineH * 1.5;
-        const isSplittable = b.type === 'p' && typeof b.text === 'string' && b.text.length >= 40;
-
-        if (isSplittable && remain > minTailH) {
-          // 用行高估出能放几行，把二分区间收窄到「估计字数 ± 3 行」，再做标准二分。
-          // 高度随字数呈阶梯变化（每满一行才跳一档），比例插值容易卡在阶梯平台上
-          // 过早收敛（实测会停在 119 字，而真正还能放 118 字，白丢一整行）。
-          const fitHead = maxPx => {
-            const n = b.text.length;
-            const linesFit = Math.max(1, Math.floor(maxPx / lineH));
-            const perLine = Math.max(1, Math.round(n / Math.max(1, Math.ceil(m.h / lineH))));
-            const guess = Math.min(n - 1, Math.max(1, linesFit * perLine));
-            const span = perLine * 3;
-            let lo = Math.max(1, Math.floor(guess - span));
-            let hi = Math.min(n - 1, Math.ceil(guess + span));
-            let best = 0;
-            // 先确认上界真的放得下，否则向右扩展
-            let guard = 0;
-            while (hi < n - 1 && guard++ < 6) {
-              const [gh] = measureBlocks([{ ...b, text: b.text.slice(0, hi) }]);
-              if (gh.h <= maxPx) break;
-              hi = Math.min(n - 1, hi + span);
-            }
-            while (lo <= hi) {
-              const mid = (lo + hi) >> 1;
-              const [mm] = measureBlocks([{ ...b, text: b.text.slice(0, mid) }]);
-              if (mm.h <= maxPx) { best = mid; lo = mid + 1; } else { hi = mid - 1; }
-            }
-            return best;
-          };
-          const headChars = fitHead(Math.max(0, remain - 0.5));
-          // 断点只要不是无意义残片就该采用。之前要求「头尾各 ≥12 字」，会出现
-          // 「只差 1.7px 就放得下、切出来尾巴剩 10 字」被判不合格而整块换页，
-          // 结果整页底部空出 314px 的大洞（用户截图里的左页就是这样来的）。
-          if (headChars >= 4 && b.text.length - headChars >= 4) {
-            // 尽量在标点后断开，避免把一个词/一句话从中间劈开
-            let cut = headChars;
-            const head = b.text.slice(0, cut);
-            const m2 = head.match(/[\s，。、；：！？,.;:!?）》」』】—…](?![\s\S]*[\s，。、；：！？,.;:!?）》」』】—…])/);
-            if (m2 && m2.index > cut * 0.6) cut = m2.index + 1;
-            const headText = b.text.slice(0, cut);
-            const tailText = b.text.slice(cut);
-            if (headText.length >= 2 && tailText.length >= 2) {
-              cur.push({ _bi: b._bi, type: 'p', text: headText, color: b.color, bold: b.bold, spans: b.spans });
+        const isSplittable = b.type === 'p' && typeof b.text === 'string' && b.text.length >= 2;
+        if (isSplittable) {
+          const remaining = availH - pos.base;
+          const headChars = fitParagraphHead(b, remaining, geo);
+          if (headChars >= 2 && b.text.length - headChars >= 2) {
+            const cut = chooseNaturalBreak(b.text, headChars);
+            if (cut >= 2 && b.text.length - cut >= 2) {
+              cur.push(paragraphFragment(b, 0, cut));
               flush();
-              queue.splice(qi + 1, 0, { ...b, text: tailText, splitFrom: true, forceNewPage: false });
+              fragmentStack.push(paragraphFragment(b, cut, b.text.length));
               continue;
             }
           }
         }
 
-        flush();
-        // 换新页后重新按「页内第一块」量一次（上边距被抹掉）。
-        // 独占一页的块同样按「页尾块」算，不带下边距。
-        const m0 = getGeo(b);
-        // 极端排版（超大字号 + 超大边距）下，整段本身就比一页还高，
-        // 这时必须按字符硬切，否则底部会被裁掉。切完把余下部分塞回队列继续排。
-        if (m0.h > availH && b.type === 'p' && typeof b.text === 'string' && b.text.length > 1) {
-          const n = b.text.length;
-          let lo = 1, hi = n - 1, headChars = 0;
-          while (lo <= hi) {
-            const mid = (lo + hi) >> 1;
-            const [g] = measureBlocks([{ ...b, text: b.text.slice(0, mid) }]);
-            if (g.h <= availH) { headChars = mid; lo = mid + 1; } else { hi = mid - 1; }
-          }
-          if (headChars >= 1 && n - headChars >= 1) {
-            cur.push({ _bi: b._bi, type: 'p', text: b.text.slice(0, headChars), color: b.color, bold: b.bold, spans: b.spans });
-            flush();
-            queue.splice(qi + 1, 0, { ...b, text: b.text.slice(headChars), splitFrom: true, forceNewPage: false });
-            continue;
+        // 当前页剩余空间不足以容纳该块：先翻页，再按整页高度重新尝试。
+        if (cur.length) {
+          flush();
+          pos = placement(geo);
+        }
+
+        // 单个段落本身高于整页时，也按可容纳的最大前缀拆页，避免内容被页底裁切。
+        if (isSplittable && pos.asLast > availH + 0.5) {
+          const headChars = fitParagraphHead(b, availH, geo);
+          if (headChars >= 2 && b.text.length - headChars >= 2) {
+            const cut = chooseNaturalBreak(b.text, headChars);
+            if (cut >= 2 && b.text.length - cut >= 2) {
+              cur.push(paragraphFragment(b, 0, cut));
+              flush();
+              fragmentStack.push(paragraphFragment(b, cut, b.text.length));
+              continue;
+            }
           }
         }
-        cur.push(b);
-        used = m0.h;
-        if (used > availH) flush();
+
+        // 标题等不可拆块整体移到新页；图片在前面已按容器比例限高。
+        place(b, geo);
+        if (used > availH + 0.5) flush();
       }
+
       if (cur.length) pages.push(cur);
       measure.innerHTML = '';
 
-      const merged = [];
-      for (const pg of pages) {
-        if (!pg.length) { merged.push([]); continue; }
-        const onlyImgs = pg.every(b => b.type === 'img');
-        const last = merged[merged.length - 1];
-        if (onlyImgs && last && last.length && last.every(b => b.type === 'img')) {
-          last.push(...pg);
-        } else {
-          merged.push(pg.slice());
-        }
-      }
+      // 不合并连续的纯图片页：原分页器已按可用高度拆页，合并会重新制造超高页，
+      // 而页面容器 overflow:hidden，超出部分可能被静默裁切。
+      const merged = pages.map(pg => pg.slice());
 
       if (isDual) {
         for (let i = 0; i < merged.length; i++) {
           const pg = merged[i];
-          if (!pg.length) continue;
-          if (!pg[0] || !pg[0].forceNewPage) continue;
+          if (!pg.length || !pg[0] || !pg[0].forceNewPage) continue;
           if (i % 2 === 1) merged.splice(i, 0, []);
         }
       }
 
       book.pages = merged.length ? merged : [[{ _bi: 0, type: 'p', text: '暂无内容' }]];
+      const byBlock = new Map();
+      for (let pageIndex = 0; pageIndex < book.pages.length; pageIndex++) {
+        for (const item of book.pages[pageIndex]) {
+          if (item && typeof item._bi === 'number' && !byBlock.has(item._bi)) {
+            byBlock.set(item._bi, pageIndex);
+          }
+        }
+      }
+      pageIndexCache.set(book, { pages: book.pages, byBlock });
+      return paginationTasks.current(task);
     }
 
-    let repaginateTimer = null;
     function repaginateDebounced() {
-      clearTimeout(repaginateTimer);
-      repaginateTimer = setTimeout(() => {
+      paginationTasks.debounce(async () => {
         const book = state.currentBook;
         if (!book) return;
         const anchor = getAnchorBlock(book);
-        repaginate();
+        const completed = await repaginate();
+        if (!completed || state.currentBook !== book) return;
         restorePageIndexByAnchor(book, anchor);
         renderReaderPages({ skipDbSave: true });
-      }, 60);
+      });
     }
 
     async function renderReaderPages(opts = {}) {
@@ -4749,12 +4905,21 @@
         applyNoteHighlights(pL);
       } else {
         const renderLeaf = idx => `<div style="font-size:var(--reader-font-size);letter-spacing:var(--reader-letter-spacing);line-height:1.72;">${((book.pages && book.pages[idx]) || []).map(blockHtml).join('')}</div>`;
-        pL.innerHTML = renderLeaf(state.currentPageIndex);
+        // 先生成左右两页的 HTML，再一次性提交。任一页内容生成失败时，
+        // 不会出现左页已更新而右页仍停留在上一组页面的不同步状态。
+        try {
+          const leftHtml = renderLeaf(state.currentPageIndex);
+          const rightHtml = mode === 'dual' ? renderLeaf(state.currentPageIndex + 1) : '';
+          pL.innerHTML = leftHtml;
+          pR.innerHTML = rightHtml;
+        } catch (error) {
+          console.error('[OneReader] 页面渲染失败，已保留当前页内容：', error);
+          showToast('页面渲染遇到异常，请重新翻页');
+          return;
+        }
         if (mode === 'dual') {
-          pR.innerHTML = renderLeaf(state.currentPageIndex + 1);
           applyNoteHighlights($('reader-content-viewport'));
         } else {
-          pR.innerHTML = '';
           applyNoteHighlights(pL);
         }
       }
@@ -4872,11 +5037,12 @@
         div.querySelector('input').onchange = () => {
           savePrefs();
           if (!d.isLayout) return;
-          requestAnimationFrame(() => {
+          requestAnimationFrame(async () => {
             const book = state.currentBook;
             if (!book) return;
             const anchor = getAnchorBlock(book);
-            repaginate();
+            const completed = await repaginate();
+            if (!completed || state.currentBook !== book) return;
             restorePageIndexByAnchor(book, anchor);
             renderReaderPages({ skipDbSave: true });
           });
@@ -5417,7 +5583,8 @@
           state.readerConfig.viewMode = b.dataset.mode;
           savePrefs();
           applyLayoutStyles();
-          repaginate();
+          const completed = await repaginate();
+          if (!completed || (book && state.currentBook !== book)) return;
           if (book && anchorBi >= 0) {
             await jumpToBookLocation({ blockIndex: anchorBi });
           } else {
@@ -5455,11 +5622,12 @@
         state.readerConfig.fontFamily = e.target.value;
         savePrefs();
         applyLayoutStyles();
-        requestAnimationFrame(() => {
+        requestAnimationFrame(async () => {
           const book = state.currentBook;
           if (!book) return;
           const anchor = getAnchorBlock(book);
-          repaginate();
+          const completed = await repaginate();
+          if (!completed || state.currentBook !== book) return;
           restorePageIndexByAnchor(book, anchor);
           renderReaderPages({ skipDbSave: true });
         });
