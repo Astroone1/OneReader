@@ -27,6 +27,11 @@
     .swatch-selected { box-shadow: 0 0 0 3px #fafafa, 0 0 0 5px #443c35; }
     .paginated-leaf { overflow: hidden !important; }
     .paginated-leaf::-webkit-scrollbar { display: none !important; }
+    /* 分页模式：页首块抹掉上外边距、页尾块抹掉下外边距。
+       否则标题自带的 mt-3 会让某些页的第一行比别的页低 12px，
+       页尾段落自带的 margin-bottom 也会让下边距比上边距多出一个段距。 */
+    .paged-leaf > div > :first-child { margin-top: 0 !important; }
+    .paged-leaf > div > :last-child { margin-bottom: 0 !important; }
     #reader-view.mobile-controls-active .corner-float-btn { opacity: 1 !important; pointer-events: auto !important; }
     @media (hover: none) {
       #fs-sense-zone { pointer-events: none !important; }
@@ -4326,6 +4331,8 @@
       const isScroll = c.viewMode === 'scroll';
       const leftLeaf = $('page-left');
       const leftWrap = $('page-left-wrapper');
+      leftLeaf.classList.toggle('paged-leaf', !isScroll);
+      $('page-right').classList.toggle('paged-leaf', !isScroll);
       if (isScroll) {
         leftWrap.style.overflowY = 'auto';
         leftWrap.style.overflowX = 'hidden';
@@ -4350,7 +4357,7 @@
       });
     }
 
-    function imgBlockHtml(item, biAttr = '') {
+    function imgBlockHtml(item, biAttr = '', miAttr = '') {
       const alt = esc(item.alt || '');
       const w = Number(item.w) || 0;
       const h = Number(item.h) || 0;
@@ -4358,12 +4365,13 @@
       const sizeStyle = (w > 0 && h > 0)
         ? `width:100%;max-width:min(100%, ${Math.round(w)}px);${ratio}`
         : 'width:100%;';
-      return `<div${biAttr} class="fig-wrap my-3 flex justify-center"><img src="${esc(item.src)}" alt="${alt}" style="${sizeStyle}height:auto;max-height:45vh;object-fit:contain;border-radius:6px;" class="object-contain" loading="eager" decoding="sync" /></div>`;
+      return `<div${biAttr}${miAttr} class="fig-wrap my-3 flex justify-center"><img src="${esc(item.src)}" alt="${alt}" style="${sizeStyle}height:auto;max-height:45vh;object-fit:contain;border-radius:6px;" class="object-contain" loading="eager" decoding="sync" /></div>`;
     }
 
     function blockHtml(item) {
       if (!item) return '';
       const biAttr = typeof item._bi === 'number' ? ` data-bi="${item._bi}"` : '';
+      const miAttr = typeof item._mi === 'number' ? ` data-mi="${item._mi}"` : '';
       const colorStyle = item.color ? `color:${esc(item.color)};` : '';
       const boldStyle = item.bold ? 'font-weight:600;' : '';
 
@@ -4378,10 +4386,10 @@
       };
 
       if (item.type === 'heading') {
-        return `<h2${biAttr} class="font-semibold mt-3" style="margin-bottom:var(--reader-para-spacing);font-size:calc(var(--reader-font-size)*1.22);${colorStyle}">${renderInner(item)}</h2>`;
+        return `<h2${biAttr}${miAttr} class="font-semibold mt-3" style="margin-bottom:var(--reader-para-spacing);font-size:calc(var(--reader-font-size)*1.22);${colorStyle}">${renderInner(item)}</h2>`;
       }
-      if (item.type === 'img') return item.dead ? '' : imgBlockHtml(item, biAttr);
-      return `<p${biAttr} style="margin-bottom:var(--reader-para-spacing);text-align:justify;${colorStyle}${boldStyle}">${renderInner(item)}</p>`;
+      if (item.type === 'img') return item.dead ? '' : imgBlockHtml(item, biAttr, miAttr);
+      return `<p${biAttr}${miAttr} style="margin-bottom:var(--reader-para-spacing);text-align:justify;${colorStyle}${boldStyle}">${renderInner(item)}</p>`;
     }
 
     let imgFailHandlerBound = false;
@@ -4441,33 +4449,7 @@
       }
     }
 
-    function calcVisualUnits(text) {
-      if (!text) return 0;
-      let units = 0;
-      for (let i = 0; i < text.length; i++) {
-        const code = text.charCodeAt(i);
-        units += (code <= 0x00ff) ? 0.56 : 1;
-      }
-      return units;
-    }
-
-    function splitTextByVisualUnits(text, maxUnits) {
-      if (!text || maxUnits <= 0) return ['', text];
-      let acc = 0;
-      let cut = 0;
-      for (let i = 0; i < text.length; i++) {
-        const u = (text.charCodeAt(i) <= 0x00ff) ? 0.56 : 1;
-        if (acc + u > maxUnits) break;
-        acc += u;
-        cut = i + 1;
-      }
-      if (cut <= 0) return ['', text];
-      if (cut >= text.length) return [text, ''];
-      const head = text.slice(0, cut);
-      const m = head.match(/[\s，。、；：！？,.;:!?）》」』】—…](?![\s\S]*[\s，。、；：！？,.;:!?）》」』】—…])/);
-      if (m && m.index > cut * 0.6) cut = m.index + 1;
-      return [text.slice(0, cut), text.slice(cut)];
-    }
+    // ==================== 分页 ====================
 
     function repaginate() {
       const book = state.currentBook;
@@ -4480,33 +4462,75 @@
 
       const cs = getComputedStyle(pageLeft);
       const availW = Math.max(160, pageLeft.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
-      const availH = Math.max(140, pageLeft.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 6);
-      const fontSize = Number(state.readerConfig.fontSize) || 22;
-      const letterSpacing = Number(state.readerConfig.letterSpacing) || 0;
-      const paraSpacing = Number(state.readerConfig.paraSpacing) || 15;
+      const availH = Math.max(140, pageLeft.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom));
+      const isDual = state.readerConfig.viewMode === 'dual';
 
+      // ---------- 真实 DOM 测量：把这一页的块渲染进离屏测量盒，读实际高度 ----------
+      // 之前用「字符数 ÷ 每行字数」估算高度，误差会沿页面累积：估多了提前翻页，
+      // 每页底部就会空出一大截。这里改成真实渲染后量取，量不准的分页全部消失。
+      book.pages = book.pages || [];
       measure.style.width = availW + 'px';
-      measure.innerHTML = `<div id="m-probe" style="width:100%;font-family:var(--reader-font-family);font-size:${fontSize}px;letter-spacing:${letterSpacing}px;line-height:1.72;"><span id="m-span">测试中文字符宽度校准探针十个字</span></div>`;
-      const probeEl = $('m-probe');
-      const spanEl = $('m-span');
-      const lineH = (probeEl && parseFloat(getComputedStyle(probeEl).lineHeight)) || (fontSize * 1.72);
-      const spanW = (spanEl && spanEl.getBoundingClientRect().width) || (15 * (fontSize + letterSpacing));
-      const singleCharW = Math.max(8, spanW / 15);
-      const charsPerLine = Math.max(5, (availW / singleCharW) * 0.96);
-      const headingCharsPerLine = Math.max(4, charsPerLine / 1.22);
-      const headingLineH = fontSize * 1.22 * 1.48;
-      measure.innerHTML = '';
+      const measureRow = (() => {
+        measure.innerHTML = `<div id="m-row" style="width:${availW}px;font-size:var(--reader-font-size);letter-spacing:var(--reader-letter-spacing);line-height:1.72;"></div>`;
+        return $('m-row');
+      })();
+
+      const fontSize = Number(state.readerConfig.fontSize) || 22;
+      const lineH = fontSize * 1.72;
+
+      // 渲染一批块到测量行，返回每块连带下边距的总高
+      const measureBlocks = items => {
+        measureRow.innerHTML = items.map((it, i) => blockHtml({ ...it, _mi: i })).join('');
+        const nodes = [...measureRow.children];
+        return nodes.map(el => {
+          const st = getComputedStyle(el);
+          const mt = parseFloat(st.marginTop) || 0;
+          const mb = parseFloat(st.marginBottom) || 0;
+          const h = el.getBoundingClientRect().height;
+          return { h, mt, mb, outer: mt + h + mb };
+        });
+      };
+
+      // 整页高度：把这一页的块整体渲染一次量总高，避免逐块累加的舍入误差
+      // （单块 rect 会被舍入到整数，一页十几块累计能差 5px，最后一块就被裁掉几个像素）。
+      const measurePageHeight = () => {
+        if (!cur.length) return 0;
+        measureRow.innerHTML = cur.map(it => blockHtml(it)).join('');
+        const nodes = [...measureRow.children];
+        if (!nodes.length) return 0;
+        const top = nodes[0].getBoundingClientRect().top;
+        const last = nodes[nodes.length - 1];
+        return last.getBoundingClientRect().bottom - top;
+      };
+
+      // 整块高度只跟「宽度 + 字体 + 内容」有关，同一块反复量结果一致。
+      // 已实测过的块直接命中缓存，避免每次翻页都重新渲染一遍。
+      // 键里同时带上 availH：不同行高/边距组合下判定阈值不同，混用会让分页结果对不上。
+      const geoCache = repaginate.geoCache || (repaginate.geoCache = new Map());
+      const geoKey = b => {
+        const t = b.text || '';
+        return `${availW}x${availH}|${fontSize}|${b.type}|${b.color || ''}|${b.bold ? 1 : 0}|${t.length}|${t.slice(0, 24)}|${t.slice(-24)}`;
+      };
+      const getGeo = b => {
+        const k = geoKey(b);
+        const hit = geoCache.get(k);
+        if (hit) return hit;
+        const [g] = measureBlocks([b]);
+        // 长书逐页翻下来条目会很多，超过上限就整体丢弃重来（重建成本远低于内存泄漏）
+        if (geoCache.size > 4000) geoCache.clear();
+        geoCache.set(k, g);
+        return g;
+      };
 
       const pages = [];
       let cur = [];
-      let curH = 0;
-      const isDual = state.readerConfig.viewMode === 'dual';
+      let used = 0; // 已占用的高度（含块的下边距，页尾块的下边距最后会抹掉）
 
       const flush = () => {
         if (!cur.length) return;
         pages.push(cur);
         cur = [];
-        curH = 0;
+        used = 0;
       };
 
       const forceChapterStart = () => {
@@ -4517,56 +4541,145 @@
       const queue = blocks.slice();
       let guard = 0;
 
+      const fits = (mt, h, mb) => {
+        // 页内第一块：上外边距会被 .paged-leaf 的 CSS 抹掉，不计入
+        const topPad = cur.length ? mt : 0;
+        return used + topPad + h + mb <= availH + 0.5;
+      };
+
+      const place = (b, mt, h, mb) => {
+        const topPad = cur.length ? mt : 0;
+        cur.push(b);
+        used += topPad + h + mb;
+      };
+
       for (let qi = 0; qi < queue.length; qi++) {
         if (++guard > 200000) break;
         const b = queue[qi];
         if (b.forceNewPage) forceChapterStart();
         if (b.type === 'img' && b.dead) continue;
 
-        let blockH = 0;
+        // 图片按容器约束算出实际高度，避免超大图撑破页面
         if (b.type === 'img') {
           const w = Number(b.w) || availW * 0.8;
           const h = Number(b.h) || availH * 0.4;
           const scale = Math.min(1, availW / Math.max(1, w));
-          blockH = Math.min(availH * 0.45, h * scale) + 24;
-        } else if (b.type === 'heading') {
-          const units = calcVisualUnits(b.text || '');
-          const lines = Math.max(1, Math.ceil(units / headingCharsPerLine));
-          blockH = 12 + lines * headingLineH + paraSpacing;
-        } else {
-          const units = calcVisualUnits(b.text || '');
-          const lines = Math.max(1, Math.ceil(units / charsPerLine));
-          blockH = lines * lineH + paraSpacing;
-        }
-
-        if (curH + blockH <= availH) {
-          cur.push(b);
-          curH += blockH;
+          const shown = Math.min(availH * 0.45, h * scale);
+          if (!fits(24, shown, 24)) flush();
+          place(b, 24, shown, 24);
           continue;
         }
 
-        const remainH = availH - curH;
-        const isPlainText = b.type === 'p' && typeof b.text === 'string' && b.text.length > 0;
+        // 文本类块需要真实测量，但首块的上边距会被抹掉，所以先按「页内第一块」量一次；
+        // 若当前页已有内容，再用真实上边距量一次。
+        const inPage = cur.length > 0;
+        const m = getGeo(b);
+        const mt = inPage ? m.mt : 0;
 
-        if (isPlainText && !b.splitFrom && remainH >= lineH * 2) {
-          const fitLines = Math.floor(Math.max(0, remainH - 4) / lineH);
-          if (fitLines >= 2) {
-            const maxUnits = fitLines * charsPerLine;
-            const [head, tail] = splitTextByVisualUnits(b.text, maxUnits);
-            if (head && head.length >= 8 && tail && tail.length >= 8) {
-              cur.push({ _bi: b._bi, type: 'p', text: head, color: b.color, bold: b.bold });
+        // 分两种「放得下」：
+        //  1) 带下边距也放得下 —— 后面还能继续接块；
+        //  2) 只有抹掉下边距才放得下 —— 它能做本页最后一块（.paged-leaf 的 CSS 会抹掉页尾块的下边距），
+        //     这种情况必须收下再翻页，否则每页底部会白白空出一整个段距（实测 91~131px 的抖动就来自这里）。
+        const topPad = inPage ? mt : 0;
+        const fitsWithMb = used + topPad + m.h + m.mb <= availH + 0.5;
+        const fitsAsLast = used + topPad + m.h <= availH + 0.5;
+        // 只有接近满页时才需要整页实测校验（逐块累加在临界处会有亚像素漂移）；
+        // 远离满页时直接相信累加值，避免每块都重排整页。
+        const nearFull = used + topPad + m.h + m.mb > availH - lineH * 2;
+
+        if (fitsWithMb) {
+          if (nearFull && measurePageHeight() > availH + 0.5) {
+            // 实测放不下，退回去交给拆分/换页
+          } else {
+            place(b, mt, m.h, m.mb);
+            continue;
+          }
+        } else if (fitsAsLast && cur.length > 0) {
+          cur.push(b);
+          if (measurePageHeight() <= availH + 0.5) { flush(); continue; }
+          cur.pop();
+        }
+
+        // 放不下：若是普通段落且当前页还有足够空间，就把它拆开，前半留在本页
+        const remain = availH - used;
+        const minTailH = lineH * 1.5;
+        const isSplittable = b.type === 'p' && typeof b.text === 'string' && b.text.length >= 40;
+
+        if (isSplittable && remain > minTailH) {
+          // 用行高估出能放几行，把二分区间收窄到「估计字数 ± 3 行」，再做标准二分。
+          // 高度随字数呈阶梯变化（每满一行才跳一档），比例插值容易卡在阶梯平台上
+          // 过早收敛（实测会停在 119 字，而真正还能放 118 字，白丢一整行）。
+          const fitHead = maxPx => {
+            const n = b.text.length;
+            const linesFit = Math.max(1, Math.floor(maxPx / lineH));
+            const perLine = Math.max(1, Math.round(n / Math.max(1, Math.ceil(m.h / lineH))));
+            const guess = Math.min(n - 1, Math.max(1, linesFit * perLine));
+            const span = perLine * 3;
+            let lo = Math.max(1, Math.floor(guess - span));
+            let hi = Math.min(n - 1, Math.ceil(guess + span));
+            let best = 0;
+            // 先确认上界真的放得下，否则向右扩展
+            let guard = 0;
+            while (hi < n - 1 && guard++ < 6) {
+              const [gh] = measureBlocks([{ ...b, text: b.text.slice(0, hi) }]);
+              if (gh.h <= maxPx) break;
+              hi = Math.min(n - 1, hi + span);
+            }
+            while (lo <= hi) {
+              const mid = (lo + hi) >> 1;
+              const [mm] = measureBlocks([{ ...b, text: b.text.slice(0, mid) }]);
+              if (mm.h <= maxPx) { best = mid; lo = mid + 1; } else { hi = mid - 1; }
+            }
+            return best;
+          };
+          const headChars = fitHead(Math.max(0, remain - 0.5));
+          // 断点只要不是无意义残片就该采用。之前要求「头尾各 ≥12 字」，会出现
+          // 「只差 1.7px 就放得下、切出来尾巴剩 10 字」被判不合格而整块换页，
+          // 结果整页底部空出 314px 的大洞（用户截图里的左页就是这样来的）。
+          if (headChars >= 4 && b.text.length - headChars >= 4) {
+            // 尽量在标点后断开，避免把一个词/一句话从中间劈开
+            let cut = headChars;
+            const head = b.text.slice(0, cut);
+            const m2 = head.match(/[\s，。、；：！？,.;:!?）》」』】—…](?![\s\S]*[\s，。、；：！？,.;:!?）》」』】—…])/);
+            if (m2 && m2.index > cut * 0.6) cut = m2.index + 1;
+            const headText = b.text.slice(0, cut);
+            const tailText = b.text.slice(cut);
+            if (headText.length >= 2 && tailText.length >= 2) {
+              cur.push({ _bi: b._bi, type: 'p', text: headText, color: b.color, bold: b.bold, spans: b.spans });
               flush();
-              queue.splice(qi + 1, 0, { ...b, _bi: b._bi, text: tail, splitFrom: true, forceNewPage: false });
+              queue.splice(qi + 1, 0, { ...b, text: tailText, splitFrom: true, forceNewPage: false });
               continue;
             }
           }
         }
 
         flush();
+        // 换新页后重新按「页内第一块」量一次（上边距被抹掉）。
+        // 独占一页的块同样按「页尾块」算，不带下边距。
+        const m0 = getGeo(b);
+        // 极端排版（超大字号 + 超大边距）下，整段本身就比一页还高，
+        // 这时必须按字符硬切，否则底部会被裁掉。切完把余下部分塞回队列继续排。
+        if (m0.h > availH && b.type === 'p' && typeof b.text === 'string' && b.text.length > 1) {
+          const n = b.text.length;
+          let lo = 1, hi = n - 1, headChars = 0;
+          while (lo <= hi) {
+            const mid = (lo + hi) >> 1;
+            const [g] = measureBlocks([{ ...b, text: b.text.slice(0, mid) }]);
+            if (g.h <= availH) { headChars = mid; lo = mid + 1; } else { hi = mid - 1; }
+          }
+          if (headChars >= 1 && n - headChars >= 1) {
+            cur.push({ _bi: b._bi, type: 'p', text: b.text.slice(0, headChars), color: b.color, bold: b.bold, spans: b.spans });
+            flush();
+            queue.splice(qi + 1, 0, { ...b, text: b.text.slice(headChars), splitFrom: true, forceNewPage: false });
+            continue;
+          }
+        }
         cur.push(b);
-        curH = Math.min(availH, blockH);
+        used = m0.h;
+        if (used > availH) flush();
       }
       if (cur.length) pages.push(cur);
+      measure.innerHTML = '';
 
       const merged = [];
       for (const pg of pages) {
