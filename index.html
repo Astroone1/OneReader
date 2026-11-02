@@ -84,6 +84,20 @@
       #library-sidebar { position: fixed; inset: 0 auto 0 0; z-index: 45; background: #fff; box-shadow: 4px 0 24px rgba(0,0,0,.14); transition: transform .22s ease; }
       #library-sidebar.mobile-closed { transform: translateX(-100%); }
     }
+
+    /* 图片预览层：独立于分页 DOM，不参与正文布局 */
+    #image-lightbox { position: fixed; inset: 0; z-index: 100; display: none; align-items: center; justify-content: center; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); background: rgba(18, 17, 15, .94); color: #fff; touch-action: none; }
+    #image-lightbox.is-open { display: flex; }
+    #image-lightbox-stage { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    #image-lightbox-image { display: block; max-width: min(94vw, 1600px); max-height: 90vh; width: auto; height: auto; object-fit: contain; border-radius: 2px; transform: translate3d(0,0,0) scale(1); transform-origin: center center; transition: transform .12s ease-out; user-select: none; -webkit-user-drag: none; touch-action: none; cursor: zoom-in; }
+    #image-lightbox-image.is-zoomed { transition: none; cursor: grab; }
+    #image-lightbox-image.is-dragging { cursor: grabbing; }
+    .image-lightbox-toolbar { position: absolute; z-index: 2; top: max(14px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); display: flex; align-items: center; gap: 8px; }
+    .image-lightbox-toolbar button { min-width: 42px; height: 42px; padding: 0 12px; border: 1px solid rgba(255,255,255,.22); border-radius: 12px; background: rgba(255,255,255,.10); color: #fff; font-size: 18px; line-height: 1; backdrop-filter: blur(8px); cursor: pointer; }
+    .image-lightbox-toolbar button:hover { background: rgba(255,255,255,.20); }
+    #image-lightbox-zoom-label { min-width: 58px; font-size: 12px; text-align: center; color: rgba(255,255,255,.82); }
+    .image-lightbox-hint { position: absolute; z-index: 2; bottom: max(16px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); padding: 7px 12px; border-radius: 999px; background: rgba(0,0,0,.32); color: rgba(255,255,255,.72); font-size: 12px; white-space: nowrap; pointer-events: none; }
+    @media (prefers-reduced-motion: reduce) { #image-lightbox-image { transition: none; } }
   </style>
 </head>
 <body class="h-screen w-screen overflow-hidden flex flex-col">
@@ -447,6 +461,21 @@
           <div id="page-measure-box" aria-hidden="true" class="pointer-events-none fixed -top-[9999px] -left-[9999px] invisible overflow-hidden"></div>
         </div>
       </div>
+    </div>
+
+    <!-- 图片放大预览：独立浮层，不参与阅读器分页 -->
+    <div id="image-lightbox" role="dialog" aria-modal="true" aria-label="图片预览" aria-hidden="true">
+      <div class="image-lightbox-toolbar">
+        <button id="image-lightbox-zoom-out" type="button" title="缩小" aria-label="缩小">−</button>
+        <span id="image-lightbox-zoom-label">100%</span>
+        <button id="image-lightbox-zoom-in" type="button" title="放大" aria-label="放大">＋</button>
+        <button id="image-lightbox-zoom-reset" type="button" title="适应屏幕" aria-label="适应屏幕">适应</button>
+        <button id="image-lightbox-close" type="button" title="关闭预览" aria-label="关闭预览">×</button>
+      </div>
+      <div id="image-lightbox-stage">
+        <img id="image-lightbox-image" alt="" draggable="false" />
+      </div>
+      <div class="image-lightbox-hint">滚轮或双指缩放 · 放大后拖动查看 · Esc 关闭</div>
     </div>
 
     <!-- 左侧目录 / 书签面板 -->
@@ -4369,7 +4398,7 @@
       const sizeStyle = (w > 0 && h > 0)
         ? `width:100%;max-width:min(100%, ${Math.round(w)}px);${ratio}`
         : 'width:100%;';
-      return `<div${biAttr} class="fig-wrap flex justify-center" style="margin:0.75rem 0;"><img src="${esc(item.src)}" alt="${alt}" style="${sizeStyle}height:auto;max-height:45vh;object-fit:contain;border-radius:6px;" class="object-contain" loading="eager" decoding="sync" /></div>`;
+      return `<div${biAttr} class="fig-wrap flex justify-center" style="margin:0.75rem 0;"><img src="${esc(item.src)}" alt="${alt}" role="button" tabindex="0" aria-label="点击放大图片" title="点击放大" draggable="false" style="${sizeStyle}height:auto;max-height:45vh;object-fit:contain;border-radius:6px;cursor:zoom-in;" class="object-contain" loading="eager" decoding="sync" /></div>`;
     }
 
     function blockHtml(item) {
@@ -4402,6 +4431,7 @@
       document.addEventListener('error', e => {
         const t = e.target;
         if (!t || t.tagName !== 'IMG') return;
+        if (t.id === 'image-lightbox-image') return;
         const wrap = t.closest('.fig-wrap');
         if (wrap) wrap.remove();
         else t.remove();
@@ -4982,8 +5012,175 @@
       buildGroup('text-color-swatches', 'customTextColors', 'textColor', 'native-text-picker', '已取消，恢复原书文字色');
     }
 
+    function setupImageLightbox() {
+      const overlay = $('image-lightbox');
+      const stage = $('image-lightbox-stage');
+      const preview = $('image-lightbox-image');
+      const closeBtn = $('image-lightbox-close');
+      const zoomInBtn = $('image-lightbox-zoom-in');
+      const zoomOutBtn = $('image-lightbox-zoom-out');
+      const zoomResetBtn = $('image-lightbox-zoom-reset');
+      const zoomLabel = $('image-lightbox-zoom-label');
+      const viewport = $('reader-content-viewport');
+      if (!overlay || !stage || !preview || !viewport) return;
+
+      let scale = 1, offsetX = 0, offsetY = 0;
+      let triggerImage = null;
+      let pinchStartDistance = 0, pinchStartScale = 1;
+      let dragStartX = 0, dragStartY = 0, dragOriginX = 0, dragOriginY = 0;
+      const pointers = new Map();
+      const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+      const isOpen = () => overlay.classList.contains('is-open');
+
+      const clampOffsets = () => {
+        const w = preview.offsetWidth || 0;
+        const h = preview.offsetHeight || 0;
+        const maxX = Math.max(0, (w * scale - window.innerWidth + 32) / 2);
+        const maxY = Math.max(0, (h * scale - window.innerHeight + 32) / 2);
+        offsetX = clamp(offsetX, -maxX, maxX);
+        offsetY = clamp(offsetY, -maxY, maxY);
+      };
+      const paint = () => {
+        clampOffsets();
+        preview.style.transform = `translate3d(${offsetX}px,${offsetY}px,0) scale(${scale})`;
+        preview.classList.toggle('is-zoomed', scale > 1.001);
+        preview.classList.toggle('is-dragging', pointers.size === 1 && scale > 1.001);
+        zoomLabel.textContent = `${Math.round(scale * 100)}%`;
+        zoomResetBtn.disabled = scale <= 1.001;
+        zoomResetBtn.style.opacity = scale <= 1.001 ? '.55' : '1';
+      };
+      const setScale = next => {
+        scale = clamp(next, 1, 5);
+        if (scale <= 1.001) { scale = 1; offsetX = 0; offsetY = 0; }
+        paint();
+      };
+      const reset = () => { scale = 1; offsetX = 0; offsetY = 0; pointers.clear(); paint(); };
+      const close = () => {
+        if (!isOpen()) return;
+        overlay.classList.remove('is-open');
+        overlay.setAttribute('aria-hidden', 'true');
+        preview.removeAttribute('src');
+        preview.alt = '';
+        pointers.clear();
+        reset();
+        const previous = triggerImage;
+        triggerImage = null;
+        if (previous && previous.isConnected) previous.focus({ preventScroll: true });
+      };
+      preview.addEventListener('error', () => {
+        if (isOpen()) close();
+      });
+      const open = image => {
+        if (!image) return;
+        triggerImage = image;
+        const src = image.currentSrc || image.src;
+        if (!src) return;
+        preview.src = src;
+        preview.alt = image.alt || '图片预览';
+        reset();
+        overlay.classList.add('is-open');
+        overlay.setAttribute('aria-hidden', 'false');
+        closeBtn.focus({ preventScroll: true });
+      };
+      const stepZoom = factor => setScale(scale * factor);
+      const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+      viewport.addEventListener('click', e => {
+        const image = e.target && e.target.closest ? e.target.closest('.fig-wrap img') : null;
+        if (!image) return;
+        e.preventDefault();
+        open(image);
+      });
+      viewport.addEventListener('keydown', e => {
+        const image = e.target && e.target.closest ? e.target.closest('.fig-wrap img') : null;
+        if (!image || (e.key !== 'Enter' && e.key !== ' ')) return;
+        e.preventDefault();
+        open(image);
+      });
+
+      closeBtn.addEventListener('click', close);
+      zoomInBtn.addEventListener('click', () => stepZoom(1.35));
+      zoomOutBtn.addEventListener('click', () => stepZoom(1 / 1.35));
+      zoomResetBtn.addEventListener('click', reset);
+      overlay.addEventListener('click', e => {
+        if (e.target === overlay || e.target === stage) close();
+      });
+
+      // 预览层独占滚轮，避免触发阅读器翻页。
+      overlay.addEventListener('wheel', e => {
+        if (!isOpen()) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setScale(scale * Math.exp(-e.deltaY * 0.002));
+      }, { passive: false });
+
+      // Pointer Events 同时覆盖鼠标拖动和触屏双指缩放。
+      preview.addEventListener('pointerdown', e => {
+        if (!isOpen() || (e.pointerType === 'mouse' && e.button !== 0)) return;
+        e.preventDefault();
+        preview.setPointerCapture(e.pointerId);
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (pointers.size === 1) {
+          dragStartX = e.clientX;
+          dragStartY = e.clientY;
+          dragOriginX = offsetX;
+          dragOriginY = offsetY;
+        } else if (pointers.size === 2) {
+          const pts = [...pointers.values()];
+          pinchStartDistance = Math.max(1, distance(pts[0], pts[1]));
+          pinchStartScale = scale;
+        }
+        paint();
+      });
+      preview.addEventListener('pointermove', e => {
+        if (!pointers.has(e.pointerId)) return;
+        e.preventDefault();
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (pointers.size >= 2) {
+          const pts = [...pointers.values()];
+          setScale(pinchStartScale * distance(pts[0], pts[1]) / pinchStartDistance);
+        } else if (scale > 1.001) {
+          offsetX = dragOriginX + e.clientX - dragStartX;
+          offsetY = dragOriginY + e.clientY - dragStartY;
+          paint();
+        }
+      });
+      const endPointer = e => {
+        if (!pointers.has(e.pointerId)) return;
+        pointers.delete(e.pointerId);
+        if (pointers.size === 1) {
+          const remaining = [...pointers.values()][0];
+          dragStartX = remaining.x;
+          dragStartY = remaining.y;
+          dragOriginX = offsetX;
+          dragOriginY = offsetY;
+        }
+        paint();
+      };
+      preview.addEventListener('pointerup', endPointer);
+      preview.addEventListener('pointercancel', endPointer);
+      preview.addEventListener('lostpointercapture', endPointer);
+      preview.addEventListener('dblclick', e => {
+        e.preventDefault();
+        setScale(scale > 1.001 ? 1 : 2.5);
+      });
+
+      // 图片预览打开期间，Esc 关闭，其余快捷键不传给阅读器翻页。
+      window.addEventListener('keydown', e => {
+        if (!isOpen()) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (e.key === 'Escape') close();
+        else if (e.key === '+' || e.key === '=') stepZoom(1.25);
+        else if (e.key === '-') stepZoom(1 / 1.25);
+        else if (e.key === '0') reset();
+      }, true);
+      window.addEventListener('resize', () => { if (isOpen()) paint(); });
+    }
+
     window.addEventListener('DOMContentLoaded', async () => {
       bindImageFallback();
+      setupImageLightbox();
       loadPrefs();
       state.books = await loadAllBooksDB();
       mergeQuickProgress(state.books);
@@ -5675,6 +5872,8 @@
       };
 
       window.addEventListener('wheel', e => {
+        const imagePreview = $('image-lightbox');
+        if (imagePreview && imagePreview.classList.contains('is-open')) return;
         if ($('reader-view').classList.contains('hidden')) return;
         if (state.readerConfig.viewMode === 'scroll') return;
 
@@ -5694,6 +5893,8 @@
 
       // 目录/书签或设置面板打开时，键盘翻页也要让位给面板（否则在搜索框里按方向键会翻正文）
       window.addEventListener('keydown', e => {
+        const imagePreview = $('image-lightbox');
+        if (imagePreview && imagePreview.classList.contains('is-open')) return;
         if ($('reader-view').classList.contains('hidden')) return;
         const t = e.target;
         // 正在输入框里打字：方向键属于输入框
@@ -5703,14 +5904,17 @@
         if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(e.key)) turnPage(1);
       });
 
-      let touchStartX = 0, touchStartY = 0, touchStartTime = 0;
+      let touchStartX = 0, touchStartY = 0, touchStartTime = 0, touchStartedOnImage = false;
       $('reader-content-viewport').addEventListener('touchstart', e => {
+        touchStartedOnImage = !!(e.target && e.target.closest && e.target.closest('.fig-wrap img'));
+        if (touchStartedOnImage) return;
         touchStartX = e.touches[0].clientX;
         touchStartY = e.touches[0].clientY;
         touchStartTime = Date.now();
       }, { passive: true });
 
       $('reader-content-viewport').addEventListener('touchend', e => {
+        if (touchStartedOnImage) { touchStartedOnImage = false; return; }
         const held = Date.now() - touchStartTime;
         if (held > 350) return;
         if (window.getSelection().toString()) return;
@@ -5739,6 +5943,7 @@
           }
         }
       }, { passive: true });
+      $('reader-content-viewport').addEventListener('touchcancel', () => { touchStartedOnImage = false; }, { passive: true });
     });
   </script>
 </body>
