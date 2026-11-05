@@ -1236,29 +1236,42 @@
     // 用 XHR 而不是 fetch 发 PUT：fetch 拿不到「已发出多少个字节」，
     // 只能靠假定时器推进度条；XHR 的 upload.onprogress 是真实上传字节数，
     // 所以大文件上传时进度条走的是真正的进度。
-    function putJsonWithProgress(url, payload, headers, onProgress) {
+    function putJsonWithProgress(url, payload, headers, onProgress, opts = {}) {
       return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('PUT', url, true);
+        // 之前从来没设过 timeout：「上传超时」这条分支永远不可能触发，
+        // 链路卡死时只能无限干等，用户看到的就是「没反应」。
+        try { xhr.timeout = opts.timeoutMs || 180000; } catch (e) {}
         Object.entries(headers || {}).forEach(([k, v]) => {
           try { xhr.setRequestHeader(k, v); } catch (e) {}
         });
+        // 记录已发出的比例：失败时用它区分「传到一半被掐」和「发完了等响应时断开」
+        let sentRatio = 0;
         xhr.upload.onprogress = e => {
           if (!e.lengthComputable || !e.total) return;
-          try { onProgress && onProgress(e.loaded / e.total); } catch (err) {}
+          sentRatio = e.loaded / e.total;
+          try { onProgress && onProgress(sentRatio); } catch (err) {}
         };
         xhr.onload = () => {
           const ok = xhr.status >= 200 && xhr.status < 300;
           let data = null;
           try { data = xhr.responseText ? JSON.parse(xhr.responseText) : null; } catch (e) { data = null; }
           if (!ok) {
-            reject(new Error(`HTTP ${xhr.status} ${String(xhr.responseText || '').slice(0, 120)}`));
+            reject(new Error(`HTTP ${xhr.status} ${String(xhr.responseText || '').slice(0, 200)}`));
             return;
           }
           resolve(data);
         };
-        xhr.onerror = () => reject(new Error('网络中断，请检查连接'));
-        xhr.ontimeout = () => reject(new Error('上传超时'));
+        // onerror 时 xhr.status 恒为 0，浏览器不会给出 HTTP 状态码。
+        // 把已发送比例带进错误信息，才能判断是传输阶段被掐还是服务端处理阶段断开。
+        xhr.onerror = () => {
+          const where = sentRatio >= 0.999
+            ? '请求体已全部发出，等待服务端响应时连接被断开'
+            : `传送到 ${Math.round(sentRatio * 100)}% 时连接被断开`;
+          reject(new Error(`网络中断（${where}）`));
+        };
+        xhr.ontimeout = () => reject(new Error(`上传超时（已发送 ${Math.round(sentRatio * 100)}%）`));
         xhr.onabort = () => reject(new Error('上传已取消'));
         try {
           xhr.send(JSON.stringify(payload));
@@ -1301,13 +1314,29 @@
       };
       if (sha) body.sha = sha;
       report(50, '正在上传到私有仓');
-      // 真正的传输阶段占 50%~96%，按已发送字节数推进
-      const data = await putJsonWithProgress(
-        `${repoApiBase()}/contents/${encodeRepoPath(targetPath)}`,
-        body,
-        ghHeaders({ 'Content-Type': 'application/json' }),
-        ratio => report(50 + Math.min(1, ratio) * 46, '正在上传到私有仓')
-      );
+      // 真正的传输阶段占 50%~96%，按已发送字节数推进。
+      // 大文件一次 PUT 可能传到一半就被链路掐断，所以这里做一次自动重试：
+      // 只对网络层失败重试（HTTP 4xx/5xx 说明是权限或内容问题，重试无意义）。
+      const url = `${repoApiBase()}/contents/${encodeRepoPath(targetPath)}`;
+      const send = ratio => report(50 + Math.min(1, ratio) * 46, '正在上传到私有仓');
+      let data = null;
+      let lastErr = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          data = await putJsonWithProgress(url, body, ghHeaders({ 'Content-Type': 'application/json' }), send);
+          lastErr = null;
+          break;
+        } catch (e) {
+          lastErr = e;
+          const msg = String(e && e.message || '');
+          const isNet = /网络中断|上传超时|上传已取消/.test(msg);
+          const hasHttp = /^HTTP \d{3}/.test(msg);
+          if (!isNet || hasHttp || attempt === 1) break;
+          report(50, '连接中断，正在自动重试一次');
+          await delay(1200);
+        }
+      }
+      if (lastErr) throw lastErr;
       report(97, '等待仓库确认提交');
       book.cloudPath = targetPath;
       book.cloudSha = data && data.content ? data.content.sha : (sha || '');
