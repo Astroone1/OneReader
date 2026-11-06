@@ -89,6 +89,14 @@
     }
     .download-bar-fail { background: linear-gradient(90deg, #f87171 0%, #ef4444 100%) !important; box-shadow: 0 0 10px rgba(239,68,68,.85) !important; }
     .download-bar-fail::after { animation: none !important; background: none !important; }
+    .upload-bar-indeterminate, .download-bar-indeterminate {
+      width: 28% !important;
+      animation: progressIndeterminate 1.35s ease-in-out infinite;
+    }
+    @keyframes progressIndeterminate {
+      from { transform: translateX(-120%); }
+      to { transform: translateX(430%); }
+    }
     .download-ring { animation: uploadRingSpin .95s linear infinite; }
     @media (prefers-reduced-motion: reduce) {
       .download-bar-fill, .download-bar-fill::after, .download-ring { animation: none !important; }
@@ -750,6 +758,7 @@
       const fill = card.querySelector('.upload-bar-fill');
       if (!fill) return false;
       const pct = clampPct(percent);
+      fill.classList.remove('upload-bar-indeterminate');
       fill.style.width = `${pct}%`;
       const band = fill.parentElement;
       if (band) band.title = uploadTitle(pct);
@@ -763,10 +772,17 @@
       const fill = card.querySelector('.download-bar-fill');
       if (!fill) return false;
       const pct = clampPct(percent);
+      fill.classList.remove('download-bar-indeterminate');
       fill.style.width = `${pct}%`;
       const band = fill.parentElement;
       if (band) band.title = downloadTitle(pct);
       return true;
+    }
+
+    function updateBookProgressLabel(bookId, text) {
+      const card = document.querySelector(bookCardSel(bookId));
+      const label = card && card.querySelector('.book-progress-label');
+      if (label) label.textContent = text;
     }
 
     // 卡片局部刷新：整格重绘（并重新绑定点击事件），避免重建整个书库列表导致滚动位置跳动
@@ -1248,148 +1264,251 @@
     }
 
     // 异步版：几十 MB 的书一次编码会长时间占住主线程，进度条会整段卡死。
-    // 这里分片编码、定期让出主线程，进度条才能持续平滑前进。
-    // 注意：String.fromCharCode.apply 的参数个数有上限（约 6 万），单次分片不能太大。
-    // 用 setTimeout 而不是 requestAnimationFrame 让出：切到后台标签页时 rAF 会被冻结，
-    // 用 rAF 会让上传直接卡死。
+    // 用 setTimeout 让出主线程；切到后台标签页时 requestAnimationFrame 可能被冻结。
     const yieldToUI = () => new Promise(r => setTimeout(r, 0));
-    async function arrayBufferToBase64Async(buf, onChunk) {
-      const bytes = new Uint8Array(buf);
-      const slice = 0x8000;       // 每次 apply 的安全分片（32768 个参数）
-      const yieldEvery = 0x40000; // 每处理约 256KB 让出一次主线程
-      let binary = '';
-      let sinceYield = 0;
-      for (let i = 0; i < bytes.length; i += slice) {
-        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + slice));
-        sinceYield += slice;
-        if (sinceYield >= yieldEvery && i + slice < bytes.length) {
-          sinceYield = 0;
-          if (onChunk) onChunk(Math.min(1, (i + slice) / bytes.length));
-          await yieldToUI();
+
+    // GitHub Contents API 要求 JSON 中的 content 为 Base64。
+    // 不再先拼出一个与文件等大的 binary 字符串，再一次性 btoa + JSON.stringify；
+    // 改为分块 Base64 后构造 Blob 请求体，减少大文件上传时的瞬时内存峰值。
+    // 每个 Base64 分块（除最后一块外）对应的原始字节数是 3 的倍数，避免中间块产生 padding。
+    async function createGitHubUploadBodyBlob(fileBytes, message, branch, sha, onChunk) {
+      const bytes = fileBytes instanceof Uint8Array ? fileBytes : new Uint8Array(fileBytes);
+      const parts = [`{"message":${JSON.stringify(message)},"content":"`];
+      const chunkSize = 0x60000; // 384 KB，能被 3 整除
+      const applySlice = 0x8000; // 单次 apply 32768 个参数，避开参数数量上限
+      for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+        const end = Math.min(bytes.length, offset + chunkSize);
+        let binary = '';
+        for (let i = offset; i < end; i += applySlice) {
+          binary += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(end, i + applySlice)));
         }
+        parts.push(btoa(binary));
+        if (onChunk) onChunk(bytes.length ? end / bytes.length : 1);
+        await yieldToUI();
       }
-      if (onChunk) onChunk(1);
-      return btoa(binary);
+      parts.push(`","branch":${JSON.stringify(branch)}${sha ? `,"sha":${JSON.stringify(sha)}` : ''}}`);
+      return new Blob(parts, { type: 'application/json' });
     }
 
-    // 用 XHR 而不是 fetch 发 PUT：fetch 拿不到「已发出多少个字节」，
-    // 只能靠假定时器推进度条；XHR 的 upload.onprogress 是真实上传字节数，
-    // 所以大文件上传时进度条走的是真正的进度。
+    // Git 对象 SHA-1 = SHA1("blob <size>\0" + 原始字节)。
+    // 只在上传结果不确定时计算，用来确认「请求超时但 GitHub 实际已提交」的情况。
+    async function computeGitBlobSha(fileBytes) {
+      try {
+        if (!window.crypto || !crypto.subtle || typeof TextEncoder === 'undefined') return null;
+        const bytes = fileBytes instanceof Uint8Array ? fileBytes : new Uint8Array(fileBytes);
+        const header = new TextEncoder().encode(`blob ${bytes.byteLength}\0`);
+        const input = new Uint8Array(header.byteLength + bytes.byteLength);
+        input.set(header, 0);
+        input.set(bytes, header.byteLength);
+        const digest = await crypto.subtle.digest('SHA-1', input);
+        return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+      } catch (e) {
+        return null;
+      }
+    }
+
+    // XHR 可报告真实请求体上传字节数。注意：监听器尽量在 open() 前注册，兼容有此要求的浏览器。
     function putJsonWithProgress(url, payload, headers, onProgress, opts = {}) {
       return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
+        let sentRatio = 0;
+        const emitProgress = ratio => {
+          sentRatio = Math.max(sentRatio, Math.min(1, ratio));
+          try { onProgress && onProgress(sentRatio); } catch (err) {}
+        };
+        xhr.upload.addEventListener('progress', e => {
+          if (e.lengthComputable && e.total > 0) emitProgress(e.loaded / e.total);
+        });
+        xhr.upload.addEventListener('load', () => emitProgress(1));
+
         xhr.open('PUT', url, true);
-        // 之前从来没设过 timeout：「上传超时」这条分支永远不可能触发，
-        // 链路卡死时只能无限干等，用户看到的就是「没反应」。
-        try { xhr.timeout = opts.timeoutMs || 180000; } catch (e) {}
+        try { xhr.timeout = opts.timeoutMs || 900000; } catch (e) {} // 默认 15 分钟，覆盖慢速网络和服务端提交时间
         Object.entries(headers || {}).forEach(([k, v]) => {
           try { xhr.setRequestHeader(k, v); } catch (e) {}
         });
-        // 记录已发出的比例：失败时用它区分「传到一半被掐」和「发完了等响应时断开」
-        let sentRatio = 0;
-        xhr.upload.onprogress = e => {
-          if (!e.lengthComputable || !e.total) return;
-          sentRatio = e.loaded / e.total;
-          try { onProgress && onProgress(sentRatio); } catch (err) {}
-        };
         xhr.onload = () => {
           const ok = xhr.status >= 200 && xhr.status < 300;
           let data = null;
           try { data = xhr.responseText ? JSON.parse(xhr.responseText) : null; } catch (e) { data = null; }
           if (!ok) {
-            reject(new Error(`HTTP ${xhr.status} ${String(xhr.responseText || '').slice(0, 200)}`));
+            const err = new Error(`HTTP ${xhr.status} ${String(xhr.responseText || '').slice(0, 240)}`);
+            err.httpStatus = xhr.status;
+            err.responseText = xhr.responseText || '';
+            const retryAfter = xhr.getResponseHeader('Retry-After');
+            if (retryAfter) {
+              const seconds = Number(retryAfter);
+              const dateMs = Date.parse(retryAfter);
+              err.retryAfterMs = Number.isFinite(seconds) ? seconds * 1000 : (Number.isFinite(dateMs) ? Math.max(0, dateMs - Date.now()) : 0);
+            }
+            reject(err);
             return;
           }
           resolve(data);
         };
-        // onerror 时 xhr.status 恒为 0，浏览器不会给出 HTTP 状态码。
-        // 把已发送比例带进错误信息，才能判断是传输阶段被掐还是服务端处理阶段断开。
         xhr.onerror = () => {
           const where = sentRatio >= 0.999
             ? '请求体已全部发出，等待服务端响应时连接被断开'
-            : `传送到 ${Math.round(sentRatio * 100)}% 时连接被断开`;
-          reject(new Error(`网络中断（${where}）`));
+            : `请求体发送到 ${Math.round(sentRatio * 100)}% 时连接被断开`;
+          const err = new Error(`网络中断（${where}）`);
+          err.sentRatio = sentRatio;
+          err.networkError = true;
+          reject(err);
         };
-        xhr.ontimeout = () => reject(new Error(`上传超时（已发送 ${Math.round(sentRatio * 100)}%）`));
+        xhr.ontimeout = () => {
+          const err = new Error(`上传超时（请求体已发送 ${Math.round(sentRatio * 100)}%）`);
+          err.sentRatio = sentRatio;
+          err.isTimeout = true;
+          reject(err);
+        };
         xhr.onabort = () => reject(new Error('上传已取消'));
         try {
-          xhr.send(JSON.stringify(payload));
+          const requestBody = (typeof Blob !== 'undefined' && payload instanceof Blob) ? payload : JSON.stringify(payload);
+          xhr.send(requestBody);
         } catch (e) {
           reject(e);
         }
       });
     }
 
+    // Contents API 对 1 MB 以上文件应使用 object/raw media type；这里仅读取元数据，不拉取整本 EPUB。
     async function getCloudFileSha(path) {
       const branch = state.github.branch || 'main';
       const url = `${repoApiBase()}/contents/${encodeRepoPath(path)}?ref=${encodeURIComponent(branch)}&_t=${Date.now()}`;
-      const res = await fetch(url, { headers: ghHeaders(), cache: 'no-store' });
-      if (res.status === 404) return null;
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      return data && data.sha ? data.sha : null;
+      let lastErr = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const ctrl = new AbortController();
+        const timeout = setTimeout(() => ctrl.abort(), 60000);
+        try {
+          const res = await fetch(url, {
+            headers: ghHeaders({ 'Accept': 'application/vnd.github.object+json' }),
+            cache: 'no-store', signal: ctrl.signal
+          });
+          if (res.status === 404) return null;
+          if (!res.ok) {
+            const body = await res.text().catch(() => '');
+            const err = new Error(`HTTP ${res.status} ${body.slice(0, 180)}`);
+            err.httpStatus = res.status;
+            if (![429, 500, 502, 503, 504].includes(res.status)) throw err;
+            lastErr = err;
+          } else {
+            const data = await res.json();
+            return data && data.sha ? data.sha : null;
+          }
+        } catch (e) {
+          if (e.httpStatus && ![429, 500, 502, 503, 504].includes(e.httpStatus)) throw e;
+          lastErr = e;
+        } finally {
+          clearTimeout(timeout);
+        }
+        if (attempt < 2) await delay(900 * (2 ** attempt));
+      }
+      throw lastErr || new Error('读取云端文件 SHA 失败');
     }
 
-    // 上传时的进度回调约定：onProgress(percent, stageText)
-    // percent 为 0~100；stageText 仅用于提示文案，卡片上只显示进度条本身
+    async function getCloudFileSize(path) {
+      const branch = state.github.branch || 'main';
+      const url = `${repoApiBase()}/contents/${encodeRepoPath(path)}?ref=${encodeURIComponent(branch)}&_t=${Date.now()}`;
+      const ctrl = new AbortController();
+      const timeout = setTimeout(() => ctrl.abort(), 60000);
+      try {
+        const res = await fetch(url, {
+          headers: ghHeaders({ 'Accept': 'application/vnd.github.object+json' }),
+          cache: 'no-store', signal: ctrl.signal
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const size = Number(data && data.size);
+        return Number.isFinite(size) && size > 0 ? size : 0;
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+
+    // 上传回调：准备阶段显示独立百分比；发送阶段显示 XHR 实际请求体字节百分比；
+    // 请求体传完后显示「等待云端确认」，收到 GitHub 成功响应（或核对 SHA 确认已提交）才算完成。
     async function uploadBookToCloud(book, onProgress) {
       if (!isCloudConnected()) throw new Error('未连接私有仓');
       if (!book.fileBytes) throw new Error('本地没有原始文件，无法上传');
-      const report = (pct, text) => { try { onProgress && onProgress(pct, text); } catch (e) {} };
+      const bytes = book.fileBytes instanceof Uint8Array ? book.fileBytes : new Uint8Array(book.fileBytes);
+      const report = (pct, text, meta) => { try { onProgress && onProgress(pct, text, meta); } catch (e) {} };
       const branch = state.github.branch || 'main';
       const fileName = book.fileName || `${book.title}.epub`;
       const targetPath = book.shelf ? `${book.shelf}/${fileName}` : fileName;
-      report(0, '检查云端是否已有同名文件');
-      const sha = await getCloudFileSha(targetPath);
-      // 进度分配：编码 0~40%，网络传输 40~96%。
-      // 两段都按真实字节数推进——编码看已处理字节，传输看已发送字节。
-      const content = await arrayBufferToBase64Async(book.fileBytes, done => {
-        report(done * 40, '编码文件内容');
+      report(0, '准备上传文件', { preparing: true });
+      const initialSha = await getCloudFileSha(targetPath);
+
+      const bodyBlob = await createGitHubUploadBodyBlob(bytes, `upload: ${targetPath}`, branch, initialSha, done => {
+        report(done * 100, '分块编码文件内容', { preparing: true });
       });
-      const body = {
-        message: `upload: ${targetPath}`,
-        content,
-        branch
-      };
-      if (sha) body.sha = sha;
-      report(40, '正在上传到私有仓');
-      // 真正的传输阶段占 40%~96%，按已发送字节数推进。
-      // 大文件一次 PUT 可能传到一半就被链路掐断，所以这里做一次自动重试：
-      // 只对网络层失败重试（HTTP 4xx/5xx 说明是权限或内容问题，重试无意义）。
+      report(0, '开始发送请求体', { networkStart: true });
+
       const url = `${repoApiBase()}/contents/${encodeRepoPath(targetPath)}`;
-      const send = ratio => report(40 + Math.min(1, ratio) * 56, '正在上传到私有仓');
+      const encodedBytes = bodyBlob.size;
+      // XHR timeout 是整个请求的总时限（包含 GitHub 服务端提交时间）。按文件大小留出更充分的时间。
+      const timeoutMs = Math.max(10 * 60 * 1000, Math.min(45 * 60 * 1000, Math.ceil(encodedBytes / (16 * 1024) * 1000) + 3 * 60 * 1000));
+      const send = ratio => report(Math.min(100, ratio * 100), '正在上传到私有仓');
+      const retryableStatus = [408, 409, 425, 429, 500, 502, 503, 504];
+      const maxAttempts = 3;
       let data = null;
       let lastErr = null;
-      for (let attempt = 0; attempt < 2; attempt++) {
+      let expectedBlobSha = null;
+
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
         try {
-          data = await putJsonWithProgress(url, body, ghHeaders({ 'Content-Type': 'application/json' }), send);
+          data = await putJsonWithProgress(
+            url,
+            bodyBlob,
+            ghHeaders({ 'Content-Type': 'application/json' }),
+            send,
+            { timeoutMs }
+          );
           lastErr = null;
           break;
         } catch (e) {
           lastErr = e;
-          const msg = String(e && e.message || '');
-          const isNet = /网络中断|上传超时|上传已取消/.test(msg);
-          const hasHttp = /^HTTP \d{3}/.test(msg);
-          if (!isNet || hasHttp || attempt === 1) break;
-          report(40, '连接中断，正在自动重试一次');
-          await delay(1200);
+          const status = Number(e && e.httpStatus) || 0;
+          const isRetryable = !status || e.isTimeout || retryableStatus.includes(status);
+          if (!isRetryable) break;
+
+          // 超时/断线不代表 GitHub 一定没提交。先核对远端 SHA，避免盲目重复提交或覆盖别的设备的新版本。
+          let remoteSha;
+          let remoteCheckSucceeded = false;
+          try {
+            remoteSha = await getCloudFileSha(targetPath);
+            remoteCheckSucceeded = true;
+          } catch (checkErr) {
+            console.warn('[OneReader] 上传结果核对失败：', checkErr);
+          }
+          if (remoteCheckSucceeded && remoteSha !== initialSha) {
+            if (expectedBlobSha === null) expectedBlobSha = await computeGitBlobSha(bytes);
+            if (expectedBlobSha && remoteSha === expectedBlobSha) {
+              data = { content: { sha: remoteSha, size: bytes.byteLength } };
+              lastErr = null;
+              break; // 请求虽然超时，但云端文件已完整提交
+            }
+            throw new Error('上传状态不确定：云端文件在本次上传期间发生了变化。为避免覆盖其他设备的新版本，已停止自动重试；请先同步书架再重试。');
+          }
+
+          if (attempt >= maxAttempts - 1) break;
+          report(0, `网络异常，准备第 ${attempt + 2} 次完整重传`, { reset: true });
+          const backoff = e.retryAfterMs ? Math.min(60000, e.retryAfterMs) : Math.min(10000, 1500 * (2 ** attempt));
+          await delay(backoff);
         }
       }
       if (lastErr) throw lastErr;
-      report(97, '等待仓库确认提交');
+
+      report(98, 'GitHub 已接收，等待提交确认', { confirming: true });
       book.cloudPath = targetPath;
-      book.cloudSha = data && data.content ? data.content.sha : (sha || '');
+      book.cloudSha = data && data.content ? data.content.sha : (expectedBlobSha || initialSha || '');
+      book.cloudSize = bytes.byteLength;
       book.cloudMissing = false;
       report(100, '上传完成');
       return targetPath;
     }
 
     // 带进度动画的云仓库上传。
-    // 进度只反映「真实完成量」，不含任何估算：
-    //   0~40%   Base64 编码，按实际已编码字节数推进（arrayBufferToBase64Async 的 onChunk）
-    //   40~96%  真实网络上传，按 xhr.upload.onprogress 的已发送字节数推进
-    // 之前这里有一段「涓流」计时器，在浏览器不上报上传进度时会自己往上爬，
-    // 那会让用户看到一个并非真实进度的百分比，现已移除。
+    // 准备阶段按本地分块编码量显示独立百分比；网络阶段按 XHR 真实请求体字节显示百分比；
+    // 请求体发送完毕后进入「等待云端确认」，避免把网络发送完成误报为 GitHub 提交完成。
     async function uploadBookWithProgress(book) {
       if (!book) return null;
       const id = book.id;
@@ -1415,13 +1534,43 @@
         if (t) { clearTimeout(t); uploadTimers.delete(id); }
       };
 
-      uploadProgress.set(id, { percent: 0, phase: 'uploading' });
+      uploadProgress.set(id, { percent: 0, preparePercent: 0, phase: 'uploading', stage: 'preparing' });
       refreshBookCard(id);
-      ease();
+      const prepFill = document.querySelector(`${bookCardSel(id)} .upload-bar-fill`);
+      if (prepFill) { prepFill.classList.add('upload-bar-indeterminate'); prepFill.style.width = '28%'; }
+      updateBookProgressLabel(id, '准备文件 0%');
 
       try {
-        const path = await uploadBookToCloud(book, pct => {
-          target = Math.max(target, clampPct(pct));
+        const path = await uploadBookToCloud(book, (pct, stageText, meta) => {
+          const current = uploadProgress.get(id) || { phase: 'uploading', percent: 0 };
+          if (meta && meta.preparing) {
+            const prepPercent = clampPct(pct);
+            uploadProgress.set(id, { ...current, phase: 'uploading', stage: 'preparing', preparePercent: prepPercent });
+            const fill = document.querySelector(`${bookCardSel(id)} .upload-bar-fill`);
+            if (fill) {
+              fill.classList.remove('upload-bar-indeterminate');
+              fill.style.width = `${prepPercent}%`;
+            }
+            updateBookProgressLabel(id, `准备文件 ${prepPercent}%`);
+            return;
+          }
+          if (meta && (meta.networkStart || meta.reset)) {
+            target = 0;
+            shown = 0;
+            uploadProgress.set(id, { ...current, phase: 'uploading', stage: 'sending', percent: 0 });
+            paintUploadBar(id, 0);
+            updateBookProgressLabel(id, meta.reset ? '重新上传 0%' : '上传 0%');
+            return;
+          }
+          if (meta && meta.confirming) {
+            target = Math.max(target, 98);
+            uploadProgress.set(id, { ...current, phase: 'uploading', stage: 'confirming', percent: 98 });
+            updateBookProgressLabel(id, '等待云端确认…');
+          } else {
+            target = Math.max(target, clampPct(pct));
+            uploadProgress.set(id, { ...current, phase: 'uploading', stage: 'sending', percent: target });
+            updateBookProgressLabel(id, `上传 ${clampPct(target)}%`);
+          }
           if (!uploadTimers.has(id)) ease();
         });
         // 上传接口返回：先把进度条视觉上冲满，再切换到「完成」态
@@ -1596,6 +1745,7 @@
             claimedIds.add(exist.id);
             exist.cloudPath = entry.path;
             exist.cloudSha = entry.sha;
+            exist.cloudSize = Number(entry.size) || exist.cloudSize || 0;
             exist.shelf = folderShelf;
             exist.cloudMissing = false;
             toSave.push(exist);
@@ -1607,6 +1757,7 @@
               // 同一路径的占位书已存在（例如上次被标记过），就地复活
               sameId.cloudPath = entry.path;
               sameId.cloudSha = entry.sha;
+              sameId.cloudSize = Number(entry.size) || sameId.cloudSize || 0;
               sameId.shelf = folderShelf;
               sameId.cloudMissing = false;
               claimedIds.add(sameId.id);
@@ -1628,6 +1779,7 @@
               lastPageIndex: 0,
               cloudPath: entry.path,
               cloudSha: entry.sha,
+              cloudSize: Number(entry.size) || 0,
               isCloudOnly: true
             };
             state.books.push(newCloudBook);
@@ -2992,12 +3144,12 @@
         : '';
       // 封面底部进度条：上传绿色、下载深蓝，都是真实字节；完成后满格停留再消失，失败则变红
       const uploadBarHtml = (up)
-        ? `<div class="upload-band" title="${upFailed ? '上传失败' : (uploading ? uploadTitle(clampPct(up.percent)) : '上传完成')}">
-             <div class="upload-bar-fill ${upFailed ? 'upload-bar-fail' : ''}" style="width:${clampPct(up.percent)}%"></div>
+        ? `<div class="upload-band" title="${upFailed ? '上传失败' : (uploading ? (up.stage === 'preparing' ? '正在准备上传文件' : uploadTitle(clampPct(up.percent))) : '上传完成')}">
+             <div class="upload-bar-fill ${upFailed ? 'upload-bar-fail' : (uploading && up.stage === 'preparing' ? 'upload-bar-indeterminate' : '')}" style="width:${uploading && up.stage === 'preparing' ? 28 : clampPct(up.percent)}%"></div>
            </div>`
         : (down
-        ? `<div class="upload-band" title="${downFailed ? '下载失败' : (downloading ? downloadTitle(clampPct(down.percent)) : '下载完成')}">
-             <div class="download-bar-fill ${downFailed ? 'download-bar-fail' : ''}" style="width:${clampPct(down.percent)}%"></div>
+        ? `<div class="upload-band" title="${downFailed ? '下载失败' : (downloading ? (down.indeterminate ? '正在下载（文件大小未知）' : downloadTitle(clampPct(down.percent))) : '下载完成')}">
+             <div class="download-bar-fill ${downFailed ? 'download-bar-fail' : (downloading && down.indeterminate ? 'download-bar-indeterminate' : '')}" style="width:${downloading && down.indeterminate ? 28 : clampPct(down.percent)}%"></div>
            </div>`
         : '');
       return `
@@ -3013,10 +3165,12 @@
           </div>
           <div class="title-box mt-2.5 text-[15px] text-[#3a3a3a] truncate cursor-pointer">${esc(book.title)}</div>
           <div class="mt-1 flex items-center justify-between text-[14px] text-[#666666]">
-            <span>${upFailed ? '<span class="text-red-500">上传失败</span>'
+            <span class="book-progress-label">${upFailed ? '<span class="text-red-500">上传失败</span>'
               : downFailed ? '<span class="text-red-500">下载失败</span>'
-              : uploading ? `<span class="text-emerald-600">上传 ${clampPct(up.percent)}%</span>`
-              : downloading ? `<span style="color:#000080">下载 ${clampPct(down.percent)}%</span>`
+              : up && up.phase === 'done' ? '<span class="text-emerald-600">上传完成</span>'
+              : down && down.phase === 'done' ? '<span style="color:#000080">下载完成</span>'
+              : uploading ? (up.stage === 'preparing' ? `<span class="text-emerald-600">准备文件 ${clampPct(up.preparePercent)}%</span>` : up.stage === 'confirming' ? '<span class="text-emerald-600">等待云端确认…</span>' : `<span class="text-emerald-600">上传 ${clampPct(up.percent)}%</span>`)
+              : downloading ? (down.indeterminate ? '<span style="color:#000080">下载中…</span>' : `<span style="color:#000080">下载 ${clampPct(down.percent)}%</span>`)
               : esc(pct)}</span>
             <button type="button" class="more-btn px-1.5 py-0.5 rounded-lg hover:bg-neutral-100 text-[#666] hover:text-black cursor-pointer">•••</button>
           </div>
@@ -4325,21 +4479,41 @@
       $('toc-backdrop').classList.add('hidden');
     }
 
-    // ==================== 云端图书下载：真实进度 + 超时 ====================
-    // 进度来自 response.body.getReader() 的实际读取字节数，不是估算。
-    // 三者都是原来没有的：可读流进度、超时中止、网络失败重试一次。
+    // ==================== 云端图书下载：按实际读取字节显示进度 ====================
+    // total 优先使用 Git Trees API 保存的 cloudSize；没有时再请求 Contents object 元数据。
+    // raw 响应若没有可用 Content-Length，也不会再让进度条一直停在 0 后突然跳 100。
     async function downloadCloudBookWithProgress(book) {
       const id = book.id;
       const { owner, repo, branch } = state.github;
       const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeRepoPath(book.cloudPath)}?ref=${encodeURIComponent(branch || 'main')}`;
 
-      downloadProgress.set(id, { percent: 0, phase: 'downloading' });
+      downloadProgress.set(id, { percent: 0, phase: 'downloading', indeterminate: true });
       refreshBookCard(id);
+
+      let knownTotal = Number(book.cloudSize) || 0;
+      if (!knownTotal) {
+        try {
+          knownTotal = await getCloudFileSize(book.cloudPath);
+          if (knownTotal > 0) {
+            book.cloudSize = knownTotal;
+            saveBookDB(book).catch(() => {});
+          }
+        } catch (e) {
+          console.warn('[OneReader] 无法读取云端文件大小，将使用响应头或未知进度模式：', e);
+        }
+      }
+
+      if (knownTotal > 0) {
+        downloadProgress.set(id, { percent: 0, phase: 'downloading', indeterminate: false });
+        refreshBookCard(id);
+      }
 
       let shown = 0;
       let target = 0;
       let timer = null;
+      const stopEase = () => { if (timer) { clearTimeout(timer); timer = null; } };
       const ease = () => {
+        timer = null;
         const st = downloadProgress.get(id);
         if (!st || st.phase !== 'downloading') return;
         shown += Math.max(0.6, (target - shown) * 0.22);
@@ -4350,23 +4524,36 @@
 
       const attemptOnce = async () => {
         const ctrl = new AbortController();
-        // 15 秒内没有首字节就判定为连不上；之后每收到一块数据都会重置，见下方
-        let idleTimer = setTimeout(() => ctrl.abort(), 15000);
+        let idleTimer = setTimeout(() => ctrl.abort(), 20000); // 首字节等待上限
         const bump = () => {
           clearTimeout(idleTimer);
-          idleTimer = setTimeout(() => ctrl.abort(), 30000); // 传输中 30 秒没有任何数据才中止
+          idleTimer = setTimeout(() => ctrl.abort(), 45000); // 下载中 45 秒无数据才中止
         };
         try {
-          const res = await fetch(url, { headers: ghHeaders({ 'Accept': 'application/vnd.github.raw' }), signal: ctrl.signal, cache: 'no-store' });
+          const res = await fetch(url, {
+            headers: ghHeaders({ 'Accept': 'application/vnd.github.raw+json' }),
+            signal: ctrl.signal, cache: 'no-store'
+          });
           if (!res.ok) {
             const err = new Error(`HTTP ${res.status}`);
             err.httpStatus = res.status;
             throw err;
           }
-          const total = Number(res.headers.get('content-length') || 0);
+          const headerTotal = Number(res.headers.get('content-length') || 0);
+          const total = knownTotal || headerTotal;
+          if (total > 0) {
+            const current = downloadProgress.get(id);
+            if (current && current.indeterminate) {
+              downloadProgress.set(id, { ...current, indeterminate: false });
+              refreshBookCard(id);
+            }
+          }
           if (!res.body || !res.body.getReader) {
-            // 环境不支持流式读取（极旧浏览器）：退回一次性读取，没有进度但能工作
+            // 没有可读流就无法逐块报告进度；关闭短空闲超时，改用较长的总等待上限。
+            clearTimeout(idleTimer);
+            idleTimer = setTimeout(() => ctrl.abort(), 45 * 60 * 1000);
             const buf = await res.arrayBuffer();
+            book.cloudSize = buf.byteLength;
             return buf;
           }
           const reader = res.body.getReader();
@@ -4377,16 +4564,17 @@
             if (done) break;
             bump();
             chunks.push(value);
-            received += value.length;
-            // 只有服务端给了 content-length 才有真实分母；没有分母就不编造百分比
+            received += value.byteLength;
             if (total > 0) {
-              target = Math.min(100, (received / total) * 100);
+              // 最高显示 99%，100% 只在完整响应结束后出现。
+              target = Math.min(99, (received / total) * 99);
               if (!timer) ease();
             }
           }
           const out = new Uint8Array(received);
           let at = 0;
-          for (const c of chunks) { out.set(c, at); at += c.length; }
+          for (const c of chunks) { out.set(c, at); at += c.byteLength; }
+          book.cloudSize = received;
           return out.buffer;
         } finally {
           clearTimeout(idleTimer);
@@ -4396,22 +4584,36 @@
       try {
         let buf = null;
         let lastErr = null;
-        for (let attempt = 0; attempt < 2; attempt++) {
+        const retryableStatus = [408, 425, 429, 500, 502, 503, 504];
+        const maxAttempts = 3;
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
           try {
             buf = await attemptOnce();
             lastErr = null;
             break;
           } catch (e) {
             lastErr = e;
-            // HTTP 层面的拒绝（404/403）重试没有意义，直接抛
-            if (e && e.httpStatus) throw e;
-            if (attempt === 1) break;
-            await delay(1000);
+            if (e && e.httpStatus && !retryableStatus.includes(e.httpStatus)) throw e;
+            if (attempt >= maxAttempts - 1) break;
+            // 失败的那一段字节会被丢弃，重试是从头完整下载，所以进度必须归零，不能沿用上次的百分比。
+            stopEase();
+            target = 0;
+            shown = 0;
+            const retryState = downloadProgress.get(id);
+            if (retryState && retryState.indeterminate) {
+              const fill = document.querySelector(`${bookCardSel(id)} .download-bar-fill`);
+              if (fill) { fill.classList.add('download-bar-indeterminate'); fill.style.width = '28%'; }
+              updateBookProgressLabel(id, '下载中…（重试）');
+            } else {
+              paintDownloadBar(id, 0);
+              updateBookProgressLabel(id, '下载 0%（重试）');
+            }
+            await delay(Math.min(10000, 1200 * (2 ** attempt)));
           }
         }
         if (lastErr) throw lastErr;
 
-        if (timer) { clearTimeout(timer); timer = null; }
+        stopEase();
         downloadProgress.set(id, { percent: 100, phase: 'done' });
         paintDownloadBar(id, 100);
         refreshBookCard(id);
@@ -4420,7 +4622,7 @@
         refreshBookCard(id);
         return buf;
       } catch (e) {
-        if (timer) { clearTimeout(timer); timer = null; }
+        stopEase();
         downloadProgress.set(id, { percent: clampPct(shown), phase: 'error' });
         refreshBookCard(id);
         await delay(700);
