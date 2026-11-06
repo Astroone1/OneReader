@@ -71,6 +71,28 @@
       100% { opacity: 1; transform: scale(1); }
     }
     .cloud-badge-pop { animation: cloudBadgePop .52s cubic-bezier(.34,1.56,.64,1) both; }
+
+    /* ===== 下载进度条：深蓝 #000080，与上传的绿色条区分开 ===== */
+    .download-bar-fill {
+      position: relative; height: 100%; width: 0%;
+      background: linear-gradient(90deg, #3a3ac8 0%, #000080 60%, #00005c 100%);
+      box-shadow: 0 0 10px rgba(0,0,128,.85);
+      border-radius: 0 999px 999px 0;
+      transition: width .12s linear;
+      overflow: hidden;
+    }
+    .download-bar-fill::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.75) 50%, rgba(255,255,255,0) 100%);
+      animation: uploadBarShine 1.15s linear infinite;
+    }
+    .download-bar-fail { background: linear-gradient(90deg, #f87171 0%, #ef4444 100%) !important; box-shadow: 0 0 10px rgba(239,68,68,.85) !important; }
+    .download-bar-fail::after { animation: none !important; background: none !important; }
+    .download-ring { animation: uploadRingSpin .95s linear infinite; }
+    @media (prefers-reduced-motion: reduce) {
+      .download-bar-fill, .download-bar-fill::after, .download-ring { animation: none !important; }
+    }
     @media (prefers-reduced-motion: reduce) {
       .upload-bar-fill, .upload-bar-fill::after, .upload-ring, .cloud-badge-pop { animation: none !important; }
     }
@@ -705,6 +727,9 @@
     // ==================== 云仓库上传进度（按书 id 记录，供卡片渲染进度条） ====================
     // phase: 'uploading' 上传中（封面底部进度条 + 右上角旋转环） / 'done' 已完成（进度条满格待淡出）
     const uploadProgress = new Map();
+    // 下载进度（点开云端占位书时）。结构与上传一致，但只记真实字节：
+    // received/total 全部来自 response.body.getReader() 的实际读取量，没有任何估算。
+    const downloadProgress = new Map();
     // 最近一次上传成功的时间戳：让右上角云标志做一次弹出动画
     const justUploaded = new Map();
     const uploadTimers = new Map();
@@ -712,6 +737,7 @@
 
     const clampPct = v => Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
     const uploadTitle = pct => `正在上传到云仓库 ${pct}%`;
+    const downloadTitle = pct => `正在下载到本地 ${pct}%`;
     const bookCardSel = id => {
       const safe = (window.CSS && CSS.escape) ? CSS.escape(String(id)) : String(id).replace(/["\\]/g, '\\$&');
       return `[data-book-card="${safe}"]`;
@@ -727,6 +753,19 @@
       fill.style.width = `${pct}%`;
       const band = fill.parentElement;
       if (band) band.title = uploadTitle(pct);
+      return true;
+    }
+
+    // 下载进度条：只改宽度，不重绘卡片
+    function paintDownloadBar(bookId, percent) {
+      const card = document.querySelector(bookCardSel(bookId));
+      if (!card) return false;
+      const fill = card.querySelector('.download-bar-fill');
+      if (!fill) return false;
+      const pct = clampPct(percent);
+      fill.style.width = `${pct}%`;
+      const band = fill.parentElement;
+      if (band) band.title = downloadTitle(pct);
       return true;
     }
 
@@ -1300,12 +1339,12 @@
       const branch = state.github.branch || 'main';
       const fileName = book.fileName || `${book.title}.epub`;
       const targetPath = book.shelf ? `${book.shelf}/${fileName}` : fileName;
-      report(3, '检查云端是否已有同名文件');
+      report(0, '检查云端是否已有同名文件');
       const sha = await getCloudFileSha(targetPath);
-      report(8, '编码文件内容');
-      // 编码阶段占 8%~50%
+      // 进度分配：编码 0~40%，网络传输 40~96%。
+      // 两段都按真实字节数推进——编码看已处理字节，传输看已发送字节。
       const content = await arrayBufferToBase64Async(book.fileBytes, done => {
-        report(8 + done * 42, '编码文件内容');
+        report(done * 40, '编码文件内容');
       });
       const body = {
         message: `upload: ${targetPath}`,
@@ -1313,12 +1352,12 @@
         branch
       };
       if (sha) body.sha = sha;
-      report(50, '正在上传到私有仓');
-      // 真正的传输阶段占 50%~96%，按已发送字节数推进。
+      report(40, '正在上传到私有仓');
+      // 真正的传输阶段占 40%~96%，按已发送字节数推进。
       // 大文件一次 PUT 可能传到一半就被链路掐断，所以这里做一次自动重试：
       // 只对网络层失败重试（HTTP 4xx/5xx 说明是权限或内容问题，重试无意义）。
       const url = `${repoApiBase()}/contents/${encodeRepoPath(targetPath)}`;
-      const send = ratio => report(50 + Math.min(1, ratio) * 46, '正在上传到私有仓');
+      const send = ratio => report(40 + Math.min(1, ratio) * 56, '正在上传到私有仓');
       let data = null;
       let lastErr = null;
       for (let attempt = 0; attempt < 2; attempt++) {
@@ -1332,7 +1371,7 @@
           const isNet = /网络中断|上传超时|上传已取消/.test(msg);
           const hasHttp = /^HTTP \d{3}/.test(msg);
           if (!isNet || hasHttp || attempt === 1) break;
-          report(50, '连接中断，正在自动重试一次');
+          report(40, '连接中断，正在自动重试一次');
           await delay(1200);
         }
       }
@@ -1345,10 +1384,12 @@
       return targetPath;
     }
 
-    // 带进度动画的云仓库上传：
-    // 1) 卡片右上角先变成旋转环，封面底部进度条开始跑；
-    // 2) 进度条跟随真实上传阶段推进（不是假动画：Base64 编码可能耗时很长，这里单独给一段）；
-    // 3) 成功后进度条走满 → 卡片重绘成「右上角云标志」→ 进度条淡出并移除。
+    // 带进度动画的云仓库上传。
+    // 进度只反映「真实完成量」，不含任何估算：
+    //   0~40%   Base64 编码，按实际已编码字节数推进（arrayBufferToBase64Async 的 onChunk）
+    //   40~96%  真实网络上传，按 xhr.upload.onprogress 的已发送字节数推进
+    // 之前这里有一段「涓流」计时器，在浏览器不上报上传进度时会自己往上爬，
+    // 那会让用户看到一个并非真实进度的百分比，现已移除。
     async function uploadBookWithProgress(book) {
       if (!book) return null;
       const id = book.id;
@@ -1356,36 +1397,18 @@
       if (prevTimer) { clearTimeout(prevTimer); uploadTimers.delete(id); }
       justUploaded.delete(id);
 
+      // 进度条平滑逼近：只做视觉缓动，目标值永远来自真实字节
       let shown = 0;
       let target = 0;
-      // 传输阶段的「涓流」：52% → 95% 缓慢爬升。
-      // 真实字节进度（XHR upload.onprogress）会不断把 target 顶上去；
-      // 如果浏览器/代理不上报上传进度，涓流保证进度条不会在 50% 死等。
-      const CRAWL_FROM = 52;
-      const CRAWL_TO = 95;
-      const CRAWL_TAU = 4200; // 时间常数：约 4 秒逼近上限，越接近越慢
-      let crawlStartAt = 0;
-      let gotRealBytes = false;
-      const crawlTarget = () => {
-        if (!crawlStartAt) return CRAWL_FROM;
-        const elapsed = Date.now() - crawlStartAt;
-        return CRAWL_FROM + (CRAWL_TO - CRAWL_FROM) * (1 - Math.exp(-elapsed / CRAWL_TAU));
-      };
-      // 进度条目标值平滑逼近：真实阶段是跳跃的（3→8→50→96），直接跳会显得很生硬
       const ease = () => {
         uploadTimers.delete(id);
-        // 只有「上传中」这一阶段才继续逼近；进入 done/error 后由主流程直接定宽度
         const st = uploadProgress.get(id);
         if (!st || st.phase !== 'uploading') return;
         if (!document.querySelector(`${bookCardSel(id)} .upload-bar-fill`)) return;
-        if (crawlStartAt && !gotRealBytes) target = Math.max(target, crawlTarget());
         shown += Math.max(0.6, (target - shown) * 0.22);
         if (shown > target) shown = target;
         paintUploadBar(id, shown);
-        // 没到目标、或涓流还没爬到顶，就继续走
-        if (shown < target - 0.05 || (crawlStartAt && !gotRealBytes && target < CRAWL_TO - 0.5)) {
-          uploadTimers.set(id, setTimeout(ease, 90));
-        }
+        if (shown < target - 0.05) uploadTimers.set(id, setTimeout(ease, 90));
       };
       const stopEase = () => {
         const t = uploadTimers.get(id);
@@ -1394,16 +1417,11 @@
 
       uploadProgress.set(id, { percent: 0, phase: 'uploading' });
       refreshBookCard(id);
-      target = 8;
       ease();
 
       try {
         const path = await uploadBookToCloud(book, pct => {
-          const v = clampPct(pct);
-          if (v >= 50 && !crawlStartAt) crawlStartAt = Date.now();
-          if (v > crawlTarget() + 0.5) gotRealBytes = true;
-          target = Math.max(target, v);
-          // 真实阶段跳变时立刻把计时器踢起来，让进度条马上跟着动
+          target = Math.max(target, clampPct(pct));
           if (!uploadTimers.has(id)) ease();
         });
         // 上传接口返回：先把进度条视觉上冲满，再切换到「完成」态
@@ -2921,6 +2939,10 @@
       const up = uploadProgress.get(book.id) || null;
       const uploading = Boolean(up && up.phase === 'uploading');
       const upFailed = Boolean(up && up.phase === 'error');
+      const down = downloadProgress.get(book.id) || null;
+      const downloading = Boolean(down && down.phase === 'downloading');
+      const downFailed = Boolean(down && down.phase === 'error');
+      const busy = uploading || downloading;
       // 刚上传成功的那一下，让云标志做一次弹出动画
       const upStamp = justUploaded.get(book.id);
       const popBadge = Boolean(upStamp) && (Date.now() - upStamp) < 1800;
@@ -2931,7 +2953,7 @@
              <div class="text-[15px] font-semibold text-[#2b2b2b] line-clamp-3 leading-snug">${esc(book.title)}</div>
              <div class="text-[11px] text-neutral-400 truncate">${esc(book.shelf || '本地图书')}</div>
            </div>`;
-      const cloudLostBadgeHtml = (!state.multiSelectMode && cloudLost && !uploading)
+      const cloudLostBadgeHtml = (!state.multiSelectMode && cloudLost && !busy)
         ? `<div class="absolute top-2 right-2 w-7 h-7 rounded-xl bg-white/90 backdrop-blur-sm shadow-[0_2px_6px_rgba(0,0,0,0.12)] flex items-center justify-center pointer-events-none" title="云端已删除（其他设备已从私有仓移除，本地仍可阅读）">
              <svg class="w-5 h-5 text-neutral-400" viewBox="0 0 40 32" fill="none">
                <path d="M11.5 26.5H29.5C33.6421 26.5 37 23.1421 37 19C37 15.203 34.1783 12.065 30.514 11.568C29.389 6.657 25.002 3 19.75 3C13.675 3 8.75 7.925 8.75 14C8.75 14.389 8.77 14.773 8.81 15.151C5.534 15.792 3 18.678 3 22.15C3 24.552 4.948 26.5 7.35 26.5H11.5Z" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" fill="rgba(115,115,115,0.04)"/>
@@ -2939,7 +2961,7 @@
              </svg>
            </div>`
         : '';
-      // 上传中：右上角先占位成旋转环，告诉用户「正在飘向云端」
+      // 上传中：右上角旋转环；下载中：同一个位置换成深蓝色的下载环，颜色区分方向
       const uploadingBadgeHtml = (!state.multiSelectMode && uploading)
         ? `<div class="absolute top-2 right-2 w-7 h-7 rounded-xl bg-white/90 backdrop-blur-sm shadow-[0_2px_6px_rgba(0,0,0,0.12)] flex items-center justify-center pointer-events-none" title="正在上传到云仓库…">
              <svg class="upload-ring w-[18px] h-[18px] text-emerald-500" viewBox="0 0 24 24" fill="none">
@@ -2948,7 +2970,15 @@
              </svg>
            </div>`
         : '';
-      const cloudBadgeHtml = (!state.multiSelectMode && hasCloud && !uploading)
+      const downloadingBadgeHtml = (!state.multiSelectMode && downloading)
+        ? `<div class="absolute top-2 right-2 w-7 h-7 rounded-xl bg-white/90 backdrop-blur-sm shadow-[0_2px_6px_rgba(0,0,0,0.12)] flex items-center justify-center pointer-events-none" title="正在下载到本地…">
+             <svg class="download-ring w-[18px] h-[18px]" style="color:#000080" viewBox="0 0 24 24" fill="none">
+               <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity="0.18" stroke-width="2.6"/>
+               <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+             </svg>
+           </div>`
+        : '';
+      const cloudBadgeHtml = (!state.multiSelectMode && hasCloud && !busy)
         ? `<div class="absolute top-2 right-2 w-7 h-7 rounded-xl bg-white/90 backdrop-blur-sm shadow-[0_2px_6px_rgba(0,0,0,0.12)] flex items-center justify-center pointer-events-none ${popBadge ? 'cloud-badge-pop' : ''}" title="${isLocalReady ? '已同步云端（已下载到本地）' : '云端图书（点击下载阅读）'}">
              <svg class="w-5 h-5 text-[#3b3b3b]" viewBox="0 0 40 32" fill="none">
                <path d="M11.5 26.5H29.5C33.6421 26.5 37 23.1421 37 19C37 15.203 34.1783 12.065 30.514 11.568C29.389 6.657 25.002 3 19.75 3C13.675 3 8.75 7.925 8.75 14C8.75 14.389 8.77 14.773 8.81 15.151C5.534 15.792 3 18.678 3 22.15C3 24.552 4.948 26.5 7.35 26.5H11.5Z" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" fill="rgba(59,59,59,0.04)"/>
@@ -2960,12 +2990,16 @@
              ${isLocalReady ? `<span class="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-white"></span>` : ''}
            </div>`
         : '';
-      // 封面底部进度条：上传中跟随真实阶段推进，完成后满格停留再消失，失败则变红
+      // 封面底部进度条：上传绿色、下载深蓝，都是真实字节；完成后满格停留再消失，失败则变红
       const uploadBarHtml = (up)
         ? `<div class="upload-band" title="${upFailed ? '上传失败' : (uploading ? uploadTitle(clampPct(up.percent)) : '上传完成')}">
              <div class="upload-bar-fill ${upFailed ? 'upload-bar-fail' : ''}" style="width:${clampPct(up.percent)}%"></div>
            </div>`
-        : '';
+        : (down
+        ? `<div class="upload-band" title="${downFailed ? '下载失败' : (downloading ? downloadTitle(clampPct(down.percent)) : '下载完成')}">
+             <div class="download-bar-fill ${downFailed ? 'download-bar-fail' : ''}" style="width:${clampPct(down.percent)}%"></div>
+           </div>`
+        : '');
       return `
         <div class="group flex flex-col select-none" data-book-card="${esc(book.id)}">
           <div class="cover-box relative aspect-[3/4.15] w-full rounded-lg shadow-[0_2px_10px_rgba(0,0,0,0.08)] group-hover:shadow-lg transition overflow-hidden cursor-pointer bg-[#f5f3ef]">
@@ -2973,12 +3007,17 @@
             ${cloudBadgeHtml}
             ${cloudLostBadgeHtml}
             ${uploadingBadgeHtml}
+            ${downloadingBadgeHtml}
             ${state.multiSelectMode ? `<div class="absolute top-2.5 right-2.5 w-6 h-6 rounded-full border-2 flex items-center justify-center ${selected ? 'bg-[#3b3b3b] border-[#3b3b3b] text-white' : 'bg-white/85 border-neutral-400 text-transparent'}">✓</div>` : ''}
             ${uploadBarHtml}
           </div>
           <div class="title-box mt-2.5 text-[15px] text-[#3a3a3a] truncate cursor-pointer">${esc(book.title)}</div>
           <div class="mt-1 flex items-center justify-between text-[14px] text-[#666666]">
-            <span>${upFailed ? '<span class="text-red-500">上传失败</span>' : esc(pct)}</span>
+            <span>${upFailed ? '<span class="text-red-500">上传失败</span>'
+              : downFailed ? '<span class="text-red-500">下载失败</span>'
+              : uploading ? `<span class="text-emerald-600">上传 ${clampPct(up.percent)}%</span>`
+              : downloading ? `<span style="color:#000080">下载 ${clampPct(down.percent)}%</span>`
+              : esc(pct)}</span>
             <button type="button" class="more-btn px-1.5 py-0.5 rounded-lg hover:bg-neutral-100 text-[#666] hover:text-black cursor-pointer">•••</button>
           </div>
         </div>`;
@@ -4286,6 +4325,112 @@
       $('toc-backdrop').classList.add('hidden');
     }
 
+    // ==================== 云端图书下载：真实进度 + 超时 ====================
+    // 进度来自 response.body.getReader() 的实际读取字节数，不是估算。
+    // 三者都是原来没有的：可读流进度、超时中止、网络失败重试一次。
+    async function downloadCloudBookWithProgress(book) {
+      const id = book.id;
+      const { owner, repo, branch } = state.github;
+      const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeRepoPath(book.cloudPath)}?ref=${encodeURIComponent(branch || 'main')}`;
+
+      downloadProgress.set(id, { percent: 0, phase: 'downloading' });
+      refreshBookCard(id);
+
+      let shown = 0;
+      let target = 0;
+      let timer = null;
+      const ease = () => {
+        const st = downloadProgress.get(id);
+        if (!st || st.phase !== 'downloading') return;
+        shown += Math.max(0.6, (target - shown) * 0.22);
+        if (shown > target) shown = target;
+        paintDownloadBar(id, shown);
+        if (shown < target - 0.05) timer = setTimeout(ease, 90);
+      };
+
+      const attemptOnce = async () => {
+        const ctrl = new AbortController();
+        // 15 秒内没有首字节就判定为连不上；之后每收到一块数据都会重置，见下方
+        let idleTimer = setTimeout(() => ctrl.abort(), 15000);
+        const bump = () => {
+          clearTimeout(idleTimer);
+          idleTimer = setTimeout(() => ctrl.abort(), 30000); // 传输中 30 秒没有任何数据才中止
+        };
+        try {
+          const res = await fetch(url, { headers: ghHeaders({ 'Accept': 'application/vnd.github.raw' }), signal: ctrl.signal, cache: 'no-store' });
+          if (!res.ok) {
+            const err = new Error(`HTTP ${res.status}`);
+            err.httpStatus = res.status;
+            throw err;
+          }
+          const total = Number(res.headers.get('content-length') || 0);
+          if (!res.body || !res.body.getReader) {
+            // 环境不支持流式读取（极旧浏览器）：退回一次性读取，没有进度但能工作
+            const buf = await res.arrayBuffer();
+            return buf;
+          }
+          const reader = res.body.getReader();
+          const chunks = [];
+          let received = 0;
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            bump();
+            chunks.push(value);
+            received += value.length;
+            // 只有服务端给了 content-length 才有真实分母；没有分母就不编造百分比
+            if (total > 0) {
+              target = Math.min(100, (received / total) * 100);
+              if (!timer) ease();
+            }
+          }
+          const out = new Uint8Array(received);
+          let at = 0;
+          for (const c of chunks) { out.set(c, at); at += c.length; }
+          return out.buffer;
+        } finally {
+          clearTimeout(idleTimer);
+        }
+      };
+
+      try {
+        let buf = null;
+        let lastErr = null;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            buf = await attemptOnce();
+            lastErr = null;
+            break;
+          } catch (e) {
+            lastErr = e;
+            // HTTP 层面的拒绝（404/403）重试没有意义，直接抛
+            if (e && e.httpStatus) throw e;
+            if (attempt === 1) break;
+            await delay(1000);
+          }
+        }
+        if (lastErr) throw lastErr;
+
+        if (timer) { clearTimeout(timer); timer = null; }
+        downloadProgress.set(id, { percent: 100, phase: 'done' });
+        paintDownloadBar(id, 100);
+        refreshBookCard(id);
+        await delay(260);
+        downloadProgress.delete(id);
+        refreshBookCard(id);
+        return buf;
+      } catch (e) {
+        if (timer) { clearTimeout(timer); timer = null; }
+        downloadProgress.set(id, { percent: clampPct(shown), phase: 'error' });
+        refreshBookCard(id);
+        await delay(700);
+        downloadProgress.delete(id);
+        refreshBookCard(id);
+        if (e && e.name === 'AbortError') throw new Error('下载超时（长时间没有收到数据）');
+        throw e;
+      }
+    }
+
     async function openBook(book) {
       if (book.fileBytes && ((book.parseVer || 0) < PARSE_VERSION || !Array.isArray(book.toc))) {
         try {
@@ -4317,10 +4462,7 @@
         }
         showToast(`正在下载《${book.title}》...`);
         try {
-          const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeRepoPath(book.cloudPath)}?ref=${encodeURIComponent(branch || 'main')}`;
-          const res = await fetch(url, { headers: ghHeaders({ 'Accept': 'application/vnd.github.raw' }) });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const buf = await res.arrayBuffer();
+          const buf = await downloadCloudBookWithProgress(book);
           book.fileBytes = buf;
           const parsed = await parseEpubBuffer(buf, book.title);
           book.rawBlocks = parsed.rawBlocks;
@@ -4333,7 +4475,7 @@
           if (/HTTP 404/.test(String(e && e.message))) {
             return showToast('该书的云端文件已不存在');
           }
-          return showToast('云端图书下载失败，请检查网络或仓库权限');
+          return showToast(`云端图书下载失败：${e.message || '请检查网络或仓库权限'}`);
         }
       }
 
