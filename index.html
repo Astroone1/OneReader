@@ -32,10 +32,14 @@
     .paged-leaf > div > :first-child { margin-top: 0 !important; }
     .paged-leaf > div > :last-child { margin-bottom: 0 !important; }
     #reader-view.mobile-controls-active .corner-float-btn { opacity: 1 !important; pointer-events: auto !important; }
-    @media (hover: none) {
-      #fs-sense-zone { pointer-events: none !important; }
-      #fs-sense-zone #reader-fullscreen-toggle { pointer-events: none; }
-      #reader-view.mobile-controls-active #fs-sense-zone #reader-fullscreen-toggle { pointer-events: auto; }
+    /* 触屏设备上，四角/顶部悬浮按钮的感应矩形不参与命中测试。
+       这些绝对定位覆盖层默认 pointer-events: auto，落在其上（典型如左右上角、左侧中部）的
+       滑动手势会被它们吞掉、不再冒泡到阅读内容层，读起来就像屏幕边缘有"划不动的真空区"。
+       控制条展开时按钮本身恢复可点，其余区域依旧放行给阅读手势。 */
+    @media (hover: none), (pointer: coarse) {
+      .reader-sense-zone,
+      .reader-sense-zone .corner-float-btn { pointer-events: none !important; }
+      #reader-view.mobile-controls-active .reader-sense-zone .corner-float-btn { pointer-events: auto !important; }
     }
     @keyframes cloudPulse { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
     .cloud-btn-hover:hover svg .cloud-arrow { animation: cloudPulse 1.2s ease-in-out infinite; }
@@ -453,7 +457,7 @@
       <div id="book-stage" class="relative w-full h-full border border-[#bfbab0] overflow-hidden flex flex-col transition-colors duration-150" style="background-color: var(--reader-bg); color: var(--reader-text); filter: brightness(var(--reader-brightness));">
         
         <!-- 顶部正中沉浸全屏切换 -->
-        <div id="fs-sense-zone" class="group absolute top-0 left-1/2 -translate-x-1/2 w-28 h-14 z-30 flex items-start justify-center pt-2">
+        <div id="fs-sense-zone" class="reader-sense-zone group absolute top-0 left-1/2 -translate-x-1/2 w-28 h-14 z-30 flex items-start justify-center pt-2">
           <button id="reader-fullscreen-toggle" type="button" title="切换沉浸全屏" class="corner-float-btn opacity-0 group-hover:opacity-100 transition-all duration-150 w-9 h-9 rounded-full bg-black/[0.05] hover:bg-black/[0.12] active:scale-95 text-[#59524c] hover:text-[#2f2a25] flex items-center justify-center backdrop-blur-sm cursor-pointer shadow-[0_1px_4px_rgba(0,0,0,0.08)] border border-black/[0.04]">
             <svg id="fs-icon-expand" class="w-[15px] h-[15px]" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M10 4H6a2 2 0 00-2 2v4"/><path d="M14 20h4a2 2 0 002-2v-4"/><path d="M20 10V6a2 2 0 00-2-2h-4"/><path d="M4 14v4a2 2 0 002 2h4"/></svg>
             <svg id="fs-icon-shrink" class="w-[15px] h-[15px] hidden" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 4v3a2 2 0 01-2 2H4"/><path d="M15 20v-3a2 2 0 012-2h3"/><path d="M20 9h-3a2 2 0 01-2-2V4"/><path d="M4 15h3a2 2 0 012 2v3"/></svg>
@@ -461,19 +465,19 @@
         </div>
 
         <!-- 悬浮两角感应按钮：左上返回、右上设置 -->
-        <div class="group absolute top-0 left-0 w-24 h-[72px] z-30 flex items-start justify-start p-2.5">
+        <div class="reader-sense-zone group absolute top-0 left-0 w-24 h-[72px] z-30 flex items-start justify-start p-2.5">
           <button id="reader-home-trigger" type="button" title="返回书库" class="corner-float-btn opacity-0 group-hover:opacity-100 transition w-10 h-10 rounded-full bg-black/[0.05] hover:bg-black/[0.12] flex items-center justify-center text-[#59524c] hover:text-[#2f2a25] shadow-[0_1px_4px_rgba(0,0,0,0.08)] border border-black/[0.04] cursor-pointer">
             <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
           </button>
         </div>
-        <div class="group absolute top-0 right-0 w-24 h-[72px] z-30 flex items-start justify-end p-2.5">
+        <div class="reader-sense-zone group absolute top-0 right-0 w-24 h-[72px] z-30 flex items-start justify-end p-2.5">
           <button id="reader-settings-trigger" type="button" title="阅读选项" class="corner-float-btn opacity-0 group-hover:opacity-100 transition w-10 h-10 rounded-full bg-black/[0.05] hover:bg-black/[0.12] flex items-center justify-center text-[#59524c] hover:text-[#2f2a25] shadow-[0_1px_4px_rgba(0,0,0,0.08)] border border-black/[0.04] cursor-pointer">
             <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/></svg>
           </button>
         </div>
 
         <!-- 左侧中心：目录 / 书签 -->
-        <div class="group absolute top-1/2 left-0 -translate-y-1/2 w-14 h-28 z-30 flex items-center justify-start pl-2">
+        <div class="reader-sense-zone group absolute top-1/2 left-0 -translate-y-1/2 w-14 h-28 z-30 flex items-center justify-start pl-2">
           <button id="reader-toc-trigger" type="button" title="目录与书签" class="corner-float-btn opacity-0 group-hover:opacity-100 transition w-10 h-10 rounded-full bg-black/[0.05] hover:bg-black/[0.12] flex items-center justify-center text-[#59524c] hover:text-[#2f2a25] shadow-[0_1px_4px_rgba(0,0,0,0.08)] border border-black/[0.04] cursor-pointer">
             <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M4 5.5A1.5 1.5 0 015.5 4H9v16H5.5A1.5 1.5 0 014 18.5v-13z"/><path d="M9 4h9.5A1.5 1.5 0 0120 5.5v13a1.5 1.5 0 01-1.5 1.5H9"/><path d="M12.5 9h4M12.5 13h4"/></svg>
           </button>
@@ -6277,46 +6281,77 @@
         if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(e.key)) turnPage(1);
       });
 
-      let touchStartX = 0, touchStartY = 0, touchStartTime = 0, touchStartedOnImage = false;
-      $('reader-content-viewport').addEventListener('touchstart', e => {
+      // 触摸翻页挂在整个阅读视图层上，而不是只挂内容视口：
+      // 内容视口外侧还有 1px 描边（宽屏下还有 6px 留白），手指落在这些像素上时
+      // 事件根本不会冒泡到内容视口，同样会造成"边缘划不动"。
+      const toggleReaderControls = () => {
+        const v = $('reader-view');
+        v.classList.toggle('mobile-controls-active');
+        if (v.classList.contains('mobile-controls-active')) autoHideMobileControls();
+        else clearTimeout(mobileCtrlTimer);
+      };
+
+      let touchStartX = 0, touchStartY = 0, touchStartTime = 0;
+      let touchStartedOnImage = false, touchTracking = false, selectionAtTouchStart = '';
+      // 只有当次手势是单指时才记录起点；双指缩放后抬指不应被当成翻页。
+      const readerTouchLayer = $('reader-view');
+      readerTouchLayer.addEventListener('touchstart', e => {
+        if (e.touches.length !== 1) { touchTracking = false; return; }
+        touchTracking = true;
         touchStartedOnImage = !!(e.target && e.target.closest && e.target.closest('.fig-wrap img'));
-        if (touchStartedOnImage) return;
+        selectionAtTouchStart = window.getSelection().toString();
         touchStartX = e.touches[0].clientX;
         touchStartY = e.touches[0].clientY;
         touchStartTime = Date.now();
       }, { passive: true });
 
-      $('reader-content-viewport').addEventListener('touchend', e => {
-        if (touchStartedOnImage) { touchStartedOnImage = false; return; }
+      readerTouchLayer.addEventListener('touchend', e => {
+        if (!touchTracking) return;
+        touchTracking = false;
+        if (!e.changedTouches || e.changedTouches.length !== 1) return;
+
+        const x = e.changedTouches[0].clientX;
+        const y = e.changedTouches[0].clientY;
+        const dx = x - touchStartX;
+        const dy = y - touchStartY;
         const held = Date.now() - touchStartTime;
-        if (held > 350) return;
-        if (window.getSelection().toString()) return;
-        const dx = e.changedTouches[0].clientX - touchStartX;
-        const dy = e.changedTouches[0].clientY - touchStartY;
+        const isTap = Math.abs(dx) < 10 && Math.abs(dy) < 10;
+        const isHorizontalSwipe = Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy);
+
         if (state.readerConfig.viewMode === 'scroll') {
-          if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
-            const v = $('reader-view');
-            v.classList.toggle('mobile-controls-active');
-            if (v.classList.contains('mobile-controls-active')) autoHideMobileControls();
-            else clearTimeout(mobileCtrlTimer);
+          // 滚动模式正文交给原生滚动，这里只处理轻点切换控制条。
+          if (isTap && held <= 350 && !touchStartedOnImage && !window.getSelection().toString()) {
+            toggleReaderControls();
           }
           return;
         }
-        if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+
+        // 横向滑动：不再用"按住时长 <= 350ms"卡住它。原来慢半拍、或按下后停顿再滑，
+        // 都会被当成无效操作，这正是"有时候划不动"的主因。是明显的横向位移就翻页，
+        // 顺手清掉残留选区（否则一段旧选中会让后续滑动一直失效）。
+        if (isHorizontalSwipe) {
+          const sel = window.getSelection();
+          const hasSelection = !!(sel && sel.toString());
+          // 本次长按新选中的内容：多半是在拖选字句，别把这次手势抢去翻页。
+          // 上手之前就存在的旧选区不算，否则一段残留选中会让之后每次滑动都失效。
+          if (hasSelection && held > 350 && sel.toString() !== selectionAtTouchStart) return;
+          if (hasSelection) sel.removeAllRanges();
           turnPage(dx < 0 ? 1 : -1);
-        } else if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
-          const x = e.changedTouches[0].clientX, w = window.innerWidth;
+          return;
+        }
+
+        // 轻点：左右 1/4 翻页，中间切换控制条。图片上轻点留给灯箱，不翻页。
+        if (isTap && held <= 350 && !touchStartedOnImage && !window.getSelection().toString()) {
+          const w = window.innerWidth;
           if (x < w * 0.25) turnPage(-1);
           else if (x > w * 0.75) turnPage(1);
-          else {
-            const v = $('reader-view');
-            v.classList.toggle('mobile-controls-active');
-            if (v.classList.contains('mobile-controls-active')) autoHideMobileControls();
-            else clearTimeout(mobileCtrlTimer);
-          }
+          else toggleReaderControls();
         }
       }, { passive: true });
-      $('reader-content-viewport').addEventListener('touchcancel', () => { touchStartedOnImage = false; }, { passive: true });
+      readerTouchLayer.addEventListener('touchcancel', () => {
+        touchTracking = false;
+        touchStartedOnImage = false;
+      }, { passive: true });
     });
   </script>
 </body>
