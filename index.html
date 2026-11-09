@@ -6292,6 +6292,15 @@
       // 起点是否落在正文视口内。四角悬浮按钮的感应矩形压住正文，落在其上的轻点仍然
       // 按原有交互交给按钮处理（先浮出、再点生效），不要被这里的 tap 判定抢去翻页。
       let touchStartedInViewport = false;
+      // 起点是否落在四块绝对定位的悬浮感应层里（左右上角、左侧中部、顶部正中）。
+      // 触屏上只要是从这些矩形中起手，整段手势就吸收掉：不翻页、不切控制条，
+      // 点击依旧由它们自己的按钮/浮窗处理。否则握持时拇指压在角上一划就误翻页。
+      let touchStartedInSenseZone = false;
+      const readerSenseZones = [...document.querySelectorAll('#book-stage > div.absolute')];
+      const pointInSenseZone = (x, y) => readerSenseZones.some(zone => {
+        const r = zone.getBoundingClientRect();
+        return r.width > 0 && r.height > 0 && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+      });
       // 只有当次手势是单指时才记录起点；双指缩放后抬指不应被当成翻页。
       const readerTouchLayer = $('reader-view');
       readerTouchLayer.addEventListener('touchstart', e => {
@@ -6304,12 +6313,15 @@
         touchStartX = e.touches[0].clientX;
         touchStartY = e.touches[0].clientY;
         touchStartTime = Date.now();
+        touchStartedInSenseZone = pointInSenseZone(touchStartX, touchStartY);
       }, { passive: true });
 
       readerTouchLayer.addEventListener('touchend', e => {
         if (!touchTracking) return;
         touchTracking = false;
         if (!e.changedTouches || e.changedTouches.length !== 1) return;
+        // 从悬浮感应层起手：这次手势完全归属按钮/浮窗，阅读层不介入。
+        if (touchStartedInSenseZone) return;
 
         const x = e.changedTouches[0].clientX;
         const y = e.changedTouches[0].clientY;
