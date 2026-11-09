@@ -6277,95 +6277,46 @@
         if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(e.key)) turnPage(1);
       });
 
-      // 触摸翻页挂在整个阅读视图层上，而不是只挂内容视口：
-      // 内容视口外侧还有 1px 描边（宽屏下还有 6px 留白），手指落在这些像素上时
-      // 事件根本不会冒泡到内容视口，同样会造成"边缘划不动"。
-      const toggleReaderControls = () => {
-        const v = $('reader-view');
-        v.classList.toggle('mobile-controls-active');
-        if (v.classList.contains('mobile-controls-active')) autoHideMobileControls();
-        else clearTimeout(mobileCtrlTimer);
-      };
-
-      let touchStartX = 0, touchStartY = 0, touchStartTime = 0;
-      let touchStartedOnImage = false, touchTracking = false, selectionAtTouchStart = '';
-      // 起点是否落在正文视口内。四角悬浮按钮的感应矩形压住正文，落在其上的轻点仍然
-      // 按原有交互交给按钮处理（先浮出、再点生效），不要被这里的 tap 判定抢去翻页。
-      let touchStartedInViewport = false;
-      // 起点是否落在四块绝对定位的悬浮感应层里（左右上角、左侧中部、顶部正中）。
-      // 触屏上只要是从这些矩形中起手，整段手势就吸收掉：不翻页、不切控制条，
-      // 点击依旧由它们自己的按钮/浮窗处理。否则握持时拇指压在角上一划就误翻页。
-      let touchStartedInSenseZone = false;
-      const readerSenseZones = [...document.querySelectorAll('#book-stage > div.absolute')];
-      const pointInSenseZone = (x, y) => readerSenseZones.some(zone => {
-        const r = zone.getBoundingClientRect();
-        return r.width > 0 && r.height > 0 && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
-      });
-      // 只有当次手势是单指时才记录起点；双指缩放后抬指不应被当成翻页。
-      const readerTouchLayer = $('reader-view');
-      readerTouchLayer.addEventListener('touchstart', e => {
-        if (e.touches.length !== 1) { touchTracking = false; return; }
-        touchTracking = true;
-        const t = e.target;
-        touchStartedOnImage = !!(t && t.closest && t.closest('.fig-wrap img'));
-        touchStartedInViewport = !!(t && t.closest && t.closest('#reader-content-viewport'));
-        selectionAtTouchStart = window.getSelection().toString();
+      let touchStartX = 0, touchStartY = 0, touchStartTime = 0, touchStartedOnImage = false;
+      $('reader-content-viewport').addEventListener('touchstart', e => {
+        touchStartedOnImage = !!(e.target && e.target.closest && e.target.closest('.fig-wrap img'));
+        if (touchStartedOnImage) return;
         touchStartX = e.touches[0].clientX;
         touchStartY = e.touches[0].clientY;
         touchStartTime = Date.now();
-        touchStartedInSenseZone = pointInSenseZone(touchStartX, touchStartY);
       }, { passive: true });
 
-      readerTouchLayer.addEventListener('touchend', e => {
-        if (!touchTracking) return;
-        touchTracking = false;
-        if (!e.changedTouches || e.changedTouches.length !== 1) return;
-        // 从悬浮感应层起手：这次手势完全归属按钮/浮窗，阅读层不介入。
-        if (touchStartedInSenseZone) return;
-
-        const x = e.changedTouches[0].clientX;
-        const y = e.changedTouches[0].clientY;
-        const dx = x - touchStartX;
-        const dy = y - touchStartY;
+      $('reader-content-viewport').addEventListener('touchend', e => {
+        if (touchStartedOnImage) { touchStartedOnImage = false; return; }
         const held = Date.now() - touchStartTime;
-        const isTap = Math.abs(dx) < 10 && Math.abs(dy) < 10;
-        const isHorizontalSwipe = Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy);
-
+        if (held > 350) return;
+        if (window.getSelection().toString()) return;
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = e.changedTouches[0].clientY - touchStartY;
         if (state.readerConfig.viewMode === 'scroll') {
-          // 滚动模式正文交给原生滚动，这里只处理正文上的轻点（切换控制条）。
-          if (isTap && touchStartedInViewport && held <= 350 && !touchStartedOnImage && !window.getSelection().toString()) {
-            toggleReaderControls();
+          if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+            const v = $('reader-view');
+            v.classList.toggle('mobile-controls-active');
+            if (v.classList.contains('mobile-controls-active')) autoHideMobileControls();
+            else clearTimeout(mobileCtrlTimer);
           }
           return;
         }
-
-        // 横向滑动：不再用"按住时长 <= 350ms"卡住它。原来慢半拍、或按下后停顿再滑，
-        // 都会被当成无效操作，这正是"有时候划不动"的主因。是明显的横向位移就翻页，
-        // 顺手清掉残留选区（否则一段旧选中会让后续滑动一直失效）。
-        if (isHorizontalSwipe) {
-          const sel = window.getSelection();
-          const hasSelection = !!(sel && sel.toString());
-          // 本次长按新选中的内容：多半是在拖选字句，别把这次手势抢去翻页。
-          // 上手之前就存在的旧选区不算，否则一段残留选中会让之后每次滑动都失效。
-          if (hasSelection && held > 350 && sel.toString() !== selectionAtTouchStart) return;
-          if (hasSelection) sel.removeAllRanges();
+        if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
           turnPage(dx < 0 ? 1 : -1);
-          return;
-        }
-
-        // 轻点：左右 1/4 翻页，中间切换控制条。图片上、以及四角悬浮按钮的感应区上轻点，
-        // 都留给它们各自的原有交互（灯箱 / 按钮浮出后再点），不在这里翻页。
-        if (isTap && touchStartedInViewport && held <= 350 && !touchStartedOnImage && !window.getSelection().toString()) {
-          const w = window.innerWidth;
+        } else if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+          const x = e.changedTouches[0].clientX, w = window.innerWidth;
           if (x < w * 0.25) turnPage(-1);
           else if (x > w * 0.75) turnPage(1);
-          else toggleReaderControls();
+          else {
+            const v = $('reader-view');
+            v.classList.toggle('mobile-controls-active');
+            if (v.classList.contains('mobile-controls-active')) autoHideMobileControls();
+            else clearTimeout(mobileCtrlTimer);
+          }
         }
       }, { passive: true });
-      readerTouchLayer.addEventListener('touchcancel', () => {
-        touchTracking = false;
-        touchStartedOnImage = false;
-      }, { passive: true });
+      $('reader-content-viewport').addEventListener('touchcancel', () => { touchStartedOnImage = false; }, { passive: true });
     });
   </script>
 </body>
